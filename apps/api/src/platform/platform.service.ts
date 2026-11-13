@@ -103,10 +103,27 @@ export class PlatformService {
 
   // ---- Organizations & users -------------------------------------------------
 
-  async createOrganization(actorId: string | null, name: string, slug: string): Promise<Organization> {
+  async createOrganization(
+    actorId: string | null,
+    name: string,
+    slug: string,
+    admin?: { email: string; displayName: string; password: string; role?: Role },
+  ): Promise<Organization & { adminEnrollment?: { userId: string; email: string; role: Role; totpSecret: string } }> {
     const org = await this.store.createOrganization(name, slug);
     await this.log(org.id, actorId, 'organization.create', `organization:${org.id}`, 'success');
-    return org;
+    if (!admin) return org;
+    // Optionally staff the tenant in the same call: same rules as
+    // provisionTenantAdmin (provisionable roles only, MFA-enrolled, secret
+    // returned once). A failure here leaves the org created but unstaffed —
+    // identical to the two-step flow, recoverable via /platform provision.
+    const role = admin.role ?? 'organization_owner';
+    if (!PlatformService.PROVISIONABLE_ROLES.has(role)) {
+      throw new Error(`FORBIDDEN: role ${role} cannot be provisioned at platform level`);
+    }
+    const user = await this.createUser(org.id, admin.email, admin.displayName, admin.password);
+    await this.assignRole(actorId ?? 'bootstrap', org.id, user.id, role);
+    await this.log(org.id, actorId, 'platform.provisionAdmin', `user:${user.id}`, `success:${role}`);
+    return { ...org, adminEnrollment: { userId: user.id, email: user.email, role, totpSecret: user.totpSecret } };
   }
 
   async createUser(organizationId: string | null, email: string, displayName: string, password: string): Promise<Omit<User, 'passwordHash' | 'totpSecret'> & { totpSecret: string }> {

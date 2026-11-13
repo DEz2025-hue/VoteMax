@@ -91,6 +91,11 @@ export default function PlatformPage() {
   // New organization
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgSlug, setNewOrgSlug] = useState('');
+  const [orgAdminEmail, setOrgAdminEmail] = useState('');
+  const [orgAdminName, setOrgAdminName] = useState('');
+  const [orgAdminPassword, setOrgAdminPassword] = useState('');
+  const [orgAdminRole, setOrgAdminRole] = useState('organization_owner');
+  const [orgEnrollment, setOrgEnrollment] = useState<{ email: string; role: string; totpSecret: string } | null>(null);
 
   // Provisioning
   const [provEmail, setProvEmail] = useState('');
@@ -193,9 +198,20 @@ export default function PlatformPage() {
 
   async function createOrg() {
     await act('Create organization', async () => {
-      await call('/organizations', { name: newOrgName, slug: newOrgSlug });
-      setNewOrgName('');
-      setNewOrgSlug('');
+      const withAdmin = Boolean(orgAdminEmail);
+      const res = await call('/organizations', {
+        name: newOrgName, slug: newOrgSlug,
+        ...(withAdmin ? {
+          admin: {
+            email: orgAdminEmail, displayName: orgAdminName || orgAdminEmail,
+            password: orgAdminPassword, role: orgAdminRole,
+          },
+        } : {}),
+      });
+      const enr = res.adminEnrollment as { email?: string; role?: string; totpSecret?: string } | undefined;
+      setOrgEnrollment(enr?.totpSecret ? { email: String(enr.email), role: String(enr.role), totpSecret: String(enr.totpSecret) } : null);
+      setNewOrgName(''); setNewOrgSlug('');
+      setOrgAdminEmail(''); setOrgAdminName(''); setOrgAdminPassword(''); setOrgAdminRole('organization_owner');
       await refreshAll();
     });
   }
@@ -305,13 +321,36 @@ export default function PlatformPage() {
       {section === 'organizations' && (
         <>
           <Card title="New organization">
-            <p className="muted small" style={{ marginTop: 0 }}>Creates a tenant. Afterwards use “Provision admin” on the tenant to create its first owner — the tenant cannot staff itself until then.</p>
+            <p className="muted small" style={{ marginTop: 0 }}>Creates a tenant. Optionally staff it immediately with its first administrator below — otherwise use “Provision admin” on the tenant afterwards.</p>
             <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
               <Field label="Name" htmlFor="org-name"><Input id="org-name" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)} placeholder="University of …" /></Field>
               <Field label="Slug" hint="Used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => setNewOrgSlug(e.target.value)} placeholder="university-name" /></Field>
             </div>
+            <h3 style={{ marginTop: 16 }}>First administrator (optional)</h3>
+            <p className="muted small">Leave blank to create an unstaffed tenant. When set, an MFA-enrolled account is created and assigned the selected role.</p>
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+              <Field label="Admin email" htmlFor="org-admin-email"><Input id="org-admin-email" type="email" value={orgAdminEmail} onChange={(e) => setOrgAdminEmail(e.target.value)} placeholder="admin@org.org" /></Field>
+              <Field label="Display name" htmlFor="org-admin-name"><Input id="org-admin-name" value={orgAdminName} onChange={(e) => setOrgAdminName(e.target.value)} /></Field>
+              <Field label="Password" hint="Minimum 12 characters" htmlFor="org-admin-password"><Input id="org-admin-password" type="password" value={orgAdminPassword} onChange={(e) => setOrgAdminPassword(e.target.value)} autoComplete="new-password" /></Field>
+              <Field label="Role" htmlFor="org-admin-role">
+                <Select id="org-admin-role" value={orgAdminRole} onChange={(e) => setOrgAdminRole(e.target.value)}>
+                  <option value="organization_owner">organization_owner — full tenant staffing</option>
+                  <option value="committee_chair">committee_chair — readiness, certify</option>
+                  <option value="election_admin">election_admin — configure, tally, publish</option>
+                  <option value="voter_registrar">voter_registrar — register management</option>
+                  <option value="auditor">auditor — verify, read-only oversight</option>
+                  <option value="observer">observer — participation aggregates</option>
+                </Select>
+              </Field>
+            </div>
+            {orgEnrollment && (
+              <Alert kind="success" title="Organization created with admin — share the TOTP secret once">
+                <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) — enroll this secret in their authenticator now; it is not shown again:</p>
+                <code>{orgEnrollment.totpSecret}</code>
+              </Alert>
+            )}
             <div className="form-actions">
-              <Button onClick={() => void createOrg()} disabled={loading || !newOrgName || !newOrgSlug}>Create organization</Button>
+              <Button onClick={() => void createOrg()} disabled={loading || !newOrgName || !newOrgSlug || (Boolean(orgAdminEmail) && orgAdminPassword.length < 12)}>Create organization</Button>
             </div>
           </Card>
 

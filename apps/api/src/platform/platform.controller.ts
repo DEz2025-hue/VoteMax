@@ -49,8 +49,11 @@ export class PlatformController {
   @Post('organizations')
   @Public()
   @RequireCapability('organization.create')
-  createOrganization(@Req() req: { principal?: Principal }, @Body() body: { name: string; slug: string }) {
-    return guard(() => this.platform.createOrganization(actor(req), body.name, body.slug));
+  createOrganization(@Req() req: { principal?: Principal }, @Body() body: {
+    name: string; slug: string;
+    admin?: { email: string; displayName: string; password: string; role?: Role };
+  }) {
+    return guard(() => this.platform.createOrganization(actor(req), body.name, body.slug, body.admin));
   }
 
   @Post('users')
