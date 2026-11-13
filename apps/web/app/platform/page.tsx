@@ -364,6 +364,7 @@ export default function PlatformPage() {
               <Alert kind="success" title="Organization created with admin — share the TOTP secret once">
                 <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) — enroll this secret in their authenticator now; it is not shown again:</p>
                 <code>{orgEnrollment.totpSecret}</code>
+                <p className="small" style={{ margin: '8px 0 0' }}>The administrator signs in at <a href="/admin">/admin</a> with their email, password, and TOTP code.</p>
               </Alert>
             )}
             <div className="form-actions">
@@ -405,6 +406,7 @@ export default function PlatformPage() {
                 <Alert kind="success" title="Admin provisioned — share the TOTP secret once">
                   <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> — enroll this secret in their authenticator now; it is not shown again:</p>
                   <code>{enrolled.totpSecret}</code>
+                  <p className="small" style={{ margin: '8px 0 0' }}>The administrator signs in at <a href="/admin">/admin</a> with their email, password, and TOTP code.</p>
                 </Alert>
               )}
 
