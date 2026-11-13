@@ -1,0 +1,1 @@
+ALTER TABLE "audit"."audit_records" ALTER COLUMN "actor_id" SET DATA TYPE text;

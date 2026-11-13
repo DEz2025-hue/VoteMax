@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "steps": {
+    "install": {
+      "commands": [
+        "...",
+        "npm install --include=dev"
+      ]
+    },
+    "build": {
+      "inputs": ["...", { "step": "install" }],
+      "commands": [
+        "npm run build:api"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "node apps/api/dist/main.js"
+  }
+}

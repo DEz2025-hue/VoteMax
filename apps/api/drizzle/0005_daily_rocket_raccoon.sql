@@ -1,0 +1,1 @@
+ALTER TABLE "audit"."audit_outbox" DROP COLUMN "chained";

@@ -1,0 +1,311 @@
+'use client';
+
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { Alert, Badge, Button, Card, Field, Input, Skeleton } from '../../components/ui';
+import { fraudHeaders } from '../../lib/fraud';
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+interface BallotData {
+  election: { id: string; name: string };
+  positions: {
+    id: string; title: string; maxChoices: number; allowAbstain: boolean;
+    candidates: { id: string; fullName: string; statement: string | null }[];
+  }[];
+}
+
+interface PublicElection {
+  id: string; name: string; state: string;
+  votingOpensAt: string | null; votingClosesAt: string | null;
+}
+
+async function call(path: string, body: unknown): Promise<Record<string, unknown>> {
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(await fraudHeaders()) },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : `Request failed (${res.status})`);
+  return data;
+}
+
+async function getJson(path: string): Promise<unknown> {
+  const res = await fetch(`${API}${path}`, { headers: await fraudHeaders() });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : `Request failed (${res.status})`);
+  return data;
+}
+
+type Step = 'identify' | 'code' | 'ballot' | 'review' | 'done';
+const STEP_ORDER: Step[] = ['identify', 'code', 'ballot', 'review', 'done'];
+const STEP_LABELS = ['Find election', 'Verify', 'Ballot', 'Review', 'Done'];
+
+function statePill(state: string): 'success' | 'warning' | 'error' | 'accent' | 'neutral' {
+  if (state === 'OPEN') return 'success';
+  if (state === 'CLOSED' || state === 'ARCHIVED') return 'neutral';
+  if (state === 'SUSPENDED' || state === 'RECOUNT') return 'warning';
+  return 'accent';
+}
+
+function VoteFlow() {
+  const params = useSearchParams();
+  const [step, setStep] = useState<Step>('identify');
+  const [orgSlug, setOrgSlug] = useState('');
+  const [elections, setElections] = useState<PublicElection[]>([]);
+  const [electionId, setElectionId] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [code, setCode] = useState('');
+  const [devHint, setDevHint] = useState('');
+  const [session, setSession] = useState('');
+  const [ballot, setBallot] = useState<BallotData | null>(null);
+  const [selections, setSelections] = useState<Record<string, string[]>>({});
+  const [receipt, setReceipt] = useState('');
+  const [assisted, setAssisted] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    const org = params.get('org');
+    if (org) {
+      setOrgSlug(org);
+      void findElections(org);
+    }
+    // Assisted voting: a station officer hands the voter a ?session= link.
+    // The token is a short-lived ballot capability — skip OTP entirely.
+    const s = params.get('session');
+    if (s) {
+      setSession(s);
+      setAssisted(true);
+      void act(async () => {
+        const b = await call('/voting/ballot', { ballotSession: s });
+        const ballotData = b as unknown as BallotData;
+        setBallot(ballotData);
+        setElectionId(ballotData.election.id);
+        const status = await getJson(`/elections/${ballotData.election.id}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
+        if (status.hasVoted) {
+          setError('Our records show a ballot was already accepted for this voter in this election. If you believe this is wrong, contact your election officer.');
+          return;
+        }
+        setNotice('Assisted voting session — review your selections carefully before submitting.');
+        setStep('ballot');
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
+  async function act(fn: () => Promise<void>) {
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try { await fn(); } catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.'); }
+    finally { setBusy(false); }
+  }
+
+  async function findElections(slug = orgSlug) {
+    const clean = slug.trim();
+    if (!clean) return;
+    setSearched(true);
+    const list = (await getJson(`/organizations/${encodeURIComponent(clean)}/elections`)) as PublicElection[];
+    const arr = Array.isArray(list) ? list : [];
+    setElections(arr);
+    if (arr.length === 1) setElectionId(arr[0].id);
+  }
+
+  function choose(candidateId: string, position: BallotData['positions'][number], checked: boolean) {
+    const current = selections[position.id] ?? [];
+    const next = checked
+      ? (position.maxChoices > 1 ? [...current, candidateId] : [candidateId])
+      : current.filter((id) => id !== candidateId);
+    setSelections({ ...selections, [position.id]: next });
+  }
+
+  const stepIndex = STEP_ORDER.indexOf(step);
+
+  return (
+    <main className="page">
+      <p className="eyebrow">Secure voting</p>
+      <h1>Cast your ballot</h1>
+      <p className="lede">
+        Your selections are private. No record links you to how you voted, and your
+        confirmation will not show your choices.
+      </p>
+
+      <ol className="progress" aria-hidden="true">
+        {STEP_LABELS.map((label, i) => <li key={label} className={i <= stepIndex ? 'done' : ''} title={label} />)}
+      </ol>
+      <p className="small muted" style={{ marginTop: -14, marginBottom: 22 }}>
+        Step {stepIndex + 1} of {STEP_LABELS.length} — {STEP_LABELS[stepIndex]}
+      </p>
+
+      {error && <Alert kind="error" title="Something needs attention">{error}</Alert>}
+      {notice && <Alert kind="success">{notice}</Alert>}
+
+      {step === 'identify' && (
+        <Card title="Find your election">
+          <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await findElections(); }); }}>
+            <Field label="Organization code" htmlFor="org-slug" hint="The code your election officer gave you — it is not a secret.">
+              <Input id="org-slug" value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} required autoComplete="organization" placeholder="e.g. ul" />
+            </Field>
+            <Button type="submit" variant="secondary" block disabled={busy || !orgSlug.trim()}>
+              {busy ? 'Searching…' : 'Find my election'}
+            </Button>
+          </form>
+
+          {elections.length > 0 && (
+            <fieldset style={{ border: 0, padding: 0, margin: '20px 0 0' }}>
+              <legend className="field-label">Choose your election</legend>
+              {elections.map((el) => (
+                <label key={el.id} className="choice">
+                  <input type="radio" name="election" checked={electionId === el.id} onChange={() => setElectionId(el.id)} />
+                  <span className="choice-body">
+                    <span className="choice-name">{el.name}</span>
+                    <span className="choice-note" style={{ display: 'block' }}>
+                      <Badge tone={statePill(el.state)}>{el.state === 'OPEN' ? 'Voting open' : el.state.toLowerCase()}</Badge>{' '}
+                      {el.votingClosesAt ? `closes ${new Date(el.votingClosesAt).toLocaleString()}` : ''}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {searched && elections.length === 0 && !busy && (
+            <Alert kind="warning" title="No elections found">Check the organization code spelling or ask your election officer.</Alert>
+          )}
+
+          <hr className="divider" />
+          <form onSubmit={(e) => { e.preventDefault(); if (!electionId) return; void act(async () => {
+            const r = await call(`/elections/${electionId}/voting/otp/request`, { studentId });
+            if (typeof r.devCode === 'string') setDevHint(`Local test code: ${r.devCode} (shown only outside production)`);
+            setStep('code');
+          }); }}>
+            <Field label="Student ID" htmlFor="student-id">
+              <Input id="student-id" value={studentId} onChange={(e) => setStudentId(e.target.value)} required autoComplete="username" />
+            </Field>
+            <Button type="submit" variant="primary" size="lg" block disabled={busy || !electionId}>
+              {busy ? 'Sending…' : 'Send my code'}
+            </Button>
+          </form>
+        </Card>
+      )}
+
+      {step === 'code' && (
+        <Card title="Verify your identity">
+          <p className="lede" style={{ marginBottom: 18 }}>
+            Enter the 6-digit code sent to your registered email or phone. It expires in 10 minutes.
+          </p>
+          {devHint && <Alert kind="info">{devHint}</Alert>}
+          <form onSubmit={(e) => { e.preventDefault(); void act(async () => {
+            const r = await call(`/elections/${electionId}/voting/otp/verify`, { studentId, code });
+            const s = String(r.ballotSession);
+            setSession(s);
+            const status = await getJson(`/elections/${electionId}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
+            if (status.hasVoted) {
+              setError('Our records show a ballot was already accepted for this voter in this election. If you believe this is wrong, contact your election officer.');
+              return;
+            }
+            const b = await call('/voting/ballot', { ballotSession: s });
+            setBallot(b as unknown as BallotData);
+            setStep('ballot');
+          }); }}>
+            <Field label="Verification code" htmlFor="otp-code">
+              <Input id="otp-code" value={code} onChange={(e) => setCode(e.target.value)} required inputMode="numeric" autoComplete="one-time-code"
+                style={{ fontSize: 22, letterSpacing: '0.3em', textAlign: 'center', fontFamily: 'var(--mono)' }} />
+            </Field>
+            <div className="form-actions">
+              <Button type="button" variant="ghost" onClick={() => setStep('identify')}>Back</Button>
+              <Button type="submit" variant="primary" size="lg" block disabled={busy}>
+                {busy ? 'Checking…' : 'Continue to ballot'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {step === 'ballot' && ballot && (
+        <Card title={ballot.election.name}>
+          <form onSubmit={(e) => { e.preventDefault(); setStep('review'); }}>
+            {ballot.positions.map((pos) => (
+              <fieldset key={pos.id} className="ballot-position">
+                <legend className="field-label" style={{ fontSize: 15, color: 'var(--text)', marginBottom: 10 }}>
+                  {pos.title}
+                  {pos.maxChoices > 1 && <span className="field-hint" style={{ display: 'inline', marginLeft: 8 }}>choose up to {pos.maxChoices}</span>}
+                </legend>
+                {pos.candidates.map((cand) => (
+                  <label key={cand.id} className="choice">
+                    <input type={pos.maxChoices > 1 ? 'checkbox' : 'radio'} name={pos.id}
+                      checked={(selections[pos.id] ?? []).includes(cand.id)}
+                      onChange={(e) => choose(cand.id, pos, e.target.checked)} />
+                    <span className="choice-body">
+                      <span className="choice-name">{cand.fullName}</span>
+                      {cand.statement ? <span className="choice-note" style={{ display: 'block' }}>{cand.statement}</span> : null}
+                    </span>
+                  </label>
+                ))}
+                {pos.allowAbstain && <p className="small muted" style={{ margin: '4px 0 0' }}>Leave blank to abstain for this position.</p>}
+              </fieldset>
+            ))}
+            <div className="form-actions">
+              {!assisted && <Button type="button" variant="ghost" onClick={() => setStep('code')}>Back</Button>}
+              <Button type="submit" variant="primary" size="lg" block disabled={busy}>
+                {busy ? 'Loading…' : 'Review ballot'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {step === 'review' && ballot && (
+        <Card title="Review before you submit">
+          <Alert kind="warning" title="This cannot be undone">Check carefully — after submitting, your ballot cannot be changed.</Alert>
+          {ballot.positions.map((pos) => {
+            const chosen = (selections[pos.id] ?? [])
+              .map((id) => pos.candidates.find((c) => c.id === id)?.fullName)
+              .filter(Boolean);
+            return (
+              <div key={pos.id} className="result-row">
+                <div><strong>{pos.title}</strong><div className="small muted">{chosen.length ? chosen.join(', ') : 'Abstain'}</div></div>
+                <Button variant="ghost" size="sm" onClick={() => setStep('ballot')}>Edit</Button>
+              </div>
+            );
+          })}
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setStep('ballot')}>Go back</Button>
+            <Button variant="primary" size="lg" block disabled={busy} onClick={() => void act(async () => {
+              const r = await call('/voting/submit', {
+                ballotSession: session, selections,
+                idempotencyKey: `${electionId}-${studentId}-submit`,
+              });
+              setReceipt(String(r.receiptId));
+              setStep('done');
+            })}>{busy ? 'Submitting…' : 'Submit ballot'}</Button>
+          </div>
+        </Card>
+      )}
+
+      {step === 'done' && (
+        <Card title="Ballot accepted">
+          <Alert kind="success" title="Your ballot was recorded">Your ballot has been recorded. Confirmation reference:</Alert>
+          <p><code className="mono-code" style={{ fontSize: 18, padding: '8px 12px' }}>{receipt}</code></p>
+          <p className="muted" style={{ lineHeight: 1.6 }}>
+            This reference confirms acceptance only. It does not show your selections,
+            and no one can use it to see how you voted. Save it if you want proof
+            your vote was counted.
+          </p>
+          <Button variant="secondary" onClick={() => window.location.href = '/'}>Return home</Button>
+        </Card>
+      )}
+    </main>
+  );
+}
+
+export default function VotePage() {
+  return (
+    <Suspense fallback={<main className="page"><Skeleton lines={6} /></main>}>
+      <VoteFlow />
+    </Suspense>
+  );
+}

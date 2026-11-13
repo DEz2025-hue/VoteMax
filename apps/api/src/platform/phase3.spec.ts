@@ -1,0 +1,204 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { PlatformService } from './platform.service';
+import { InMemoryStore } from '../store/memory.store';
+
+let svc: PlatformService;
+let store: InMemoryStore;
+let orgId: string;
+let electionId: string;
+let positionId: string;
+let adaId: string;
+let benId: string;
+let chairId: string;
+let executorId: string;
+let approver1: string;
+let approver2: string;
+
+function future(days: number): string {
+  return new Date(Date.now() + days * 86400_000).toISOString();
+}
+
+async function vote(studentId: string, candidateId: string | null, key?: string): Promise<string> {
+  const { devCode } = await svc.requestOtp(electionId, studentId);
+  const { ballotSession } = await svc.verifyOtp(electionId, studentId, devCode!);
+  const ballot = await svc.ballotForSession(ballotSession);
+  const posId = ballot.positions[0].id;
+  const receipt = await svc.submitBallot(
+    ballotSession,
+    candidateId ? { [posId]: [candidateId] } : { [posId]: [] },
+    key ?? `key-${studentId}`,
+  );
+  return receipt.receiptId;
+}
+
+beforeEach(async () => {
+  svc = new PlatformService();
+  store = svc.store as InMemoryStore;
+  orgId = (await svc.createOrganization(null, 'University of Liberia', 'ul')).id;
+  const admin = await svc.createUser(orgId, 'admin@ul.edu.lr', 'Admin', 'pw-long-enough');
+  executorId = admin.id;
+  chairId = (await svc.createUser(orgId, 'chair@ul.edu.lr', 'Chair', 'pw-long-enough')).id;
+  approver1 = (await svc.createUser(orgId, 'ap1@ul.edu.lr', 'Approver One', 'pw-long-enough')).id;
+  approver2 = (await svc.createUser(orgId, 'ap2@ul.edu.lr', 'Approver Two', 'pw-long-enough')).id;
+  const registrar = await svc.createUser(orgId, 'reg@ul.edu.lr', 'Registrar', 'pw-long-enough');
+
+  const election = await svc.createElection(admin.id, orgId, {
+    name: 'Student Union 2026', votingOpensAt: future(-1), votingClosesAt: future(1),
+  });
+  electionId = election.id;
+  await svc.assignRole(admin.id, orgId, chairId, 'committee_chair', electionId);
+  await svc.assignRole(admin.id, orgId, approver1, 'auditor', electionId);
+  await svc.assignRole(admin.id, orgId, approver2, 'observer', electionId);
+  const position = await svc.addPosition(admin.id, electionId, 'President', 1, 1);
+  positionId = position.id;
+  adaId = (await svc.addCandidate(admin.id, electionId, positionId, 'Ada Kamara')).id;
+  benId = (await svc.addCandidate(admin.id, electionId, positionId, 'Ben Kollie')).id;
+  await svc.transition(admin.id, electionId, 'CONFIGURED');
+  await svc.transition(admin.id, electionId, 'REGISTRATION');
+  const lines = ['studentId,fullName,email'];
+  for (let i = 1; i <= 6; i++) lines.push(`S00${i},Student ${i},s${i}@ul.edu.lr`);
+  await svc.importRegister(registrar.id, electionId, lines.join('\n'));
+  await svc.freezeRegister(registrar.id, electionId);
+  await svc.transition(admin.id, electionId, 'READY');
+  await svc.transition(admin.id, electionId, 'OPEN');
+});
+
+describe('Phase 3 voting and results (mock election)', () => {
+  it('runs end-to-end: vote, close, tally, verify, certify, publish', async () => {
+    await vote('S001', adaId);
+    await vote('S002', adaId);
+    await vote('S003', benId);
+    await vote('S004', null); // abstain
+    await expect(svc.participation(electionId)).resolves.toMatchObject({ eligible: 6, ballotsCast: 4 });
+    await expect(svc.submissionStatus(electionId, 'S001')).resolves.toEqual({ hasVoted: true });
+    await expect(svc.submissionStatus(electionId, 'S005')).resolves.toEqual({ hasVoted: false });
+
+    const close = await svc.closeElection(executorId, electionId);
+    expect(close).toMatchObject({ reconciled: true, ballotsCast: 4, consumedEntitlements: 4 });
+
+    const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    expect(run.ballotCount).toBe(4);
+    expect(run.counts[adaId]).toBe(2);
+    expect(run.counts[benId]).toBe(1);
+    expect(run.counts[`abstain:${positionId}`]).toBe(1);
+
+    expect((await svc.verifyTally(electionId)).verified).toBe(true);
+    await svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: approver1 });
+    const report = await svc.publish(executorId, electionId);
+    expect(report.election.state).toBe('PUBLISHED');
+    expect(report.positions[0].results[0]).toMatchObject({ candidate: 'Ada Kamara', votes: 2 });
+    expect(report.certification?.tallyHash).toBe(run.tallyHash);
+  });
+
+  it('prevents duplicate ballots under concurrent submissions (FR-VTG-005)', async () => {
+    const sessions: string[] = [];
+    // One voter, several ballot sessions (e.g. multiple tabs/retries).
+    // Session count respects the per-voter OTP request throttle.
+    for (let i = 0; i < 4; i++) {
+      const { devCode } = await svc.requestOtp(electionId, 'S001');
+      const s = await svc.verifyOtp(electionId, 'S001', devCode!);
+      sessions.push(s.ballotSession);
+    }
+    const results = await Promise.allSettled(
+      sessions.map((s, i) => svc.submitBallot(s, { [positionId]: [adaId] }, `burst-${i}`)),
+    );
+    const accepted = results.filter((r) => r.status === 'fulfilled');
+    expect(accepted.length).toBe(1);
+    expect(store.ballots.filter((b) => b.electionId === electionId).length).toBe(1);
+  });
+
+  it('idempotent retry returns the original receipt without a second ballot', async () => {
+    const { devCode } = await svc.requestOtp(electionId, 'S002');
+    const { ballotSession } = await svc.verifyOtp(electionId, 'S002', devCode!);
+    const first = await svc.submitBallot(ballotSession, { [positionId]: [benId] }, 'retry-key');
+    // Retry needs a fresh session (first was consumed); same idempotency key.
+    const { devCode: devCode2 } = await svc.requestOtp(electionId, 'S002');
+    const { ballotSession: s2 } = await svc.verifyOtp(electionId, 'S002', devCode2!);
+    const second = await svc.submitBallot(s2, { [positionId]: [benId] }, 'retry-key');
+    expect(second).toEqual({ receiptId: first.receiptId, alreadyRecorded: true });
+    expect(store.ballots.length).toBe(1);
+  });
+
+  it('ballot records contain no voter linkage and audit contains no selections (SEC-BAL)', async () => {
+    await vote('S001', adaId);
+    const ballot = store.ballots[0];
+    const keys = Object.keys(ballot);
+    for (const forbidden of ['voterId', 'studentId', 'sessionId', 'entitlementId', 'otp', 'selections']) {
+      expect(keys).not.toContain(forbidden);
+    }
+    expect(store.audit.some((a) => JSON.stringify(a).includes(adaId))).toBe(false);
+    await expect(svc.verifyAuditChain()).resolves.toBe(true);
+  });
+
+  it('rejects ineligible voters, wrong OTP, and votes after close', async () => {
+    await expect(svc.requestOtp(electionId, 'S999')).rejects.toThrow(/NOT_ELIGIBLE/);
+    await svc.requestOtp(electionId, 'S001');
+    await expect(svc.verifyOtp(electionId, 'S001', '000000')).rejects.toThrow(/OTP_INVALID|OTP_LOCKED/);
+    await vote('S001', adaId);
+    await svc.closeElection(executorId, electionId);
+    await expect(svc.requestOtp(electionId, 'S002')).rejects.toThrow(/ELECTION_NOT_OPEN/);
+  });
+
+  it('assisted station flow requires the assigned officer', async () => {
+    const officer = await svc.createUser(orgId, 'officer@ul.edu.lr', 'Officer', 'pw-long-enough');
+    const station = await svc.createStation(executorId, electionId, 'Main Hall Station');
+    await expect(svc.startAssistedSession(officer.id, station.id, electionId, 'S003')).rejects.toThrow(/FORBIDDEN/);
+    await svc.assignRole(executorId, orgId, officer.id, 'station_officer', electionId, station.id);
+    const { ballotSession } = await svc.startAssistedSession(officer.id, station.id, electionId, 'S003');
+    const receipt = await svc.submitBallot(ballotSession, { [positionId]: [benId] }, 'assisted-1');
+    expect(receipt.alreadyRecorded).toBe(false);
+    await expect(svc.submissionStatus(electionId, 'S003')).resolves.toEqual({ hasVoted: true });
+  });
+
+  it('tally enforces SoD: chair authorizes, executor separate, two approvers', async () => {
+    await vote('S001', adaId);
+    await svc.closeElection(executorId, electionId);
+    await expect(svc.tally(chairId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] }))
+      .rejects.toThrow(/SOD_VIOLATION/);
+    await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1] }))
+      .rejects.toThrow(/PRECONDITION/);
+    const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    expect(run.ballotCount).toBe(1);
+  });
+
+  it('recount reproduces the same tally hash', async () => {
+    await vote('S001', adaId);
+    await vote('S002', benId);
+    await svc.closeElection(executorId, electionId);
+    const first = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    expect((await svc.verifyTally(electionId)).verified).toBe(true);
+    const recount = await svc.recount(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    expect(recount.tallyHash).toBe(first.tallyHash);
+  });
+
+  it('requires oversight roles for tally approvers and the certification second approver', async () => {
+    await vote('S001', adaId);
+    await svc.closeElection(executorId, electionId);
+    const nobody = await svc.createUser(orgId, 'nop@ul.edu.lr', 'No Role', 'pw-long-enough');
+
+    await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, nobody.id] }))
+      .rejects.toThrow(/oversight role/);
+    const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    expect(run.ballotCount).toBe(1);
+    expect((await svc.verifyTally(electionId)).verified).toBe(true);
+
+    await expect(svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: nobody.id }))
+      .rejects.toThrow(/oversight role/);
+    await expect(svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: approver1 }))
+      .resolves.toMatchObject({ electionId });
+  });
+
+  it('reveals hasVoted only to a live ballot session', async () => {
+    const { devCode } = await svc.requestOtp(electionId, 'S001');
+    const { ballotSession } = await svc.verifyOtp(electionId, 'S001', devCode!);
+    await expect(svc.submissionStatusForSession(electionId, ballotSession)).resolves.toEqual({ hasVoted: false });
+
+    await svc.submitBallot(ballotSession, { [positionId]: [adaId] }, 'status-key');
+    await expect(svc.submissionStatusForSession(electionId, ballotSession)).rejects.toThrow(/SESSION_INVALID/);
+
+    const { devCode: devCode2 } = await svc.requestOtp(electionId, 'S001');
+    const { ballotSession: second } = await svc.verifyOtp(electionId, 'S001', devCode2!);
+    await expect(svc.submissionStatusForSession(electionId, second)).resolves.toEqual({ hasVoted: true });
+    await expect(svc.submissionStatusForSession(electionId, 'not-a-session')).rejects.toThrow(/SESSION_INVALID/);
+  });
+});
