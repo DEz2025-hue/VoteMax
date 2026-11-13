@@ -166,17 +166,35 @@ export default function AdminPage() {
 
   useEffect(() => {
     const t = sessionStorage.getItem('votery.session');
-    if (t) { sessionToken = t; setSignedIn(true); }
-    const u = sessionStorage.getItem('votery.user');
-    if (u) setUserId(u);
-    const o = sessionStorage.getItem('votery.org');
-    if (o) setOrgId(o);
-    const s = sessionStorage.getItem('votery.orgSlug');
-    if (s) setOrgSlug(s);
-    const e = sessionStorage.getItem('votery.election');
-    if (e) setElectionId(e);
-    const a = sessionStorage.getItem('votery.assignments');
-    if (a) { try { setAssignments(JSON.parse(a) as AssignmentInfo[]); } catch { /* ignore corrupt cache */ } }
+    if (!t) return;
+    // Validate the stored session before trusting it — expired or revoked
+    // tokens must return the visitor to sign-in, not the dashboard.
+    fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${t}` } })
+      .then((res) => {
+        if (!res.ok) throw new Error('invalid session');
+        sessionToken = t;
+        setSignedIn(true);
+        const u = sessionStorage.getItem('votery.user');
+        if (u) setUserId(u);
+        const o = sessionStorage.getItem('votery.org');
+        if (o) setOrgId(o);
+        const s = sessionStorage.getItem('votery.orgSlug');
+        if (s) setOrgSlug(s);
+        const e = sessionStorage.getItem('votery.election');
+        if (e) setElectionId(e);
+        const a = sessionStorage.getItem('votery.assignments');
+        if (a) { try { setAssignments(JSON.parse(a) as AssignmentInfo[]); } catch { /* ignore corrupt cache */ } }
+      })
+      .catch(() => {
+        sessionStorage.removeItem('votery.session');
+        sessionStorage.removeItem('votery.user');
+        sessionStorage.removeItem('votery.org');
+        sessionStorage.removeItem('votery.orgSlug');
+        sessionStorage.removeItem('votery.election');
+        sessionStorage.removeItem('votery.assignments');
+        setStatus('Your session has expired. Please sign in again.');
+        setStatusKind('info');
+      });
   }, []);
 
   useEffect(() => {

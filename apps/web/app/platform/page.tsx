@@ -109,7 +109,24 @@ export default function PlatformPage() {
 
   useEffect(() => {
     const t = sessionStorage.getItem('votery.session');
-    if (t) { sessionToken = t; setSignedIn(true); }
+    if (!t) return;
+    // Validate the stored session before trusting it — expired or revoked
+    // tokens must return the visitor to sign-in, not the dashboard.
+    fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${t}` } })
+      .then((res) => {
+        if (!res.ok) throw new Error('invalid session');
+        sessionToken = t;
+        setSignedIn(true);
+      })
+      .catch(() => {
+        sessionToken = '';
+        sessionStorage.removeItem('votery.session');
+        sessionStorage.removeItem('votery.user');
+        sessionStorage.removeItem('votery.org');
+        sessionStorage.removeItem('votery.assignments');
+        setStatus('Your session has expired. Please sign in again.');
+        setStatusKind('info');
+      });
   }, []);
 
   useEffect(() => {

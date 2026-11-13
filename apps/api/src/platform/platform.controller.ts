@@ -321,6 +321,13 @@ export class AuthController {
     return guard(() => this.platform.login(body.email, body.password, body.totp));
   }
 
+  /** Resolve the caller's session to a principal — lets clients validate a stored token. */
+  @Get('me')
+  @UseGuards(SessionGuard)
+  me(@Req() req: { principal?: Principal }) {
+    return req.principal ?? null;
+  }
+
   /**
    * Revoke the bearer session server-side. Public so logout still succeeds
    * for expired/invalid tokens; revocation of an unknown hash is a no-op.
