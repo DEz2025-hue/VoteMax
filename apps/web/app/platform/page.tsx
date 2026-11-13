@@ -6,8 +6,7 @@ import {
   Select, Skeleton, Stat, Table, Toast,
 } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { API, sessionIsValid, signIn as apiSignIn, storeSession } from '../../lib/auth';
 
 let sessionToken = '';
 
@@ -112,21 +111,20 @@ export default function PlatformPage() {
     if (!t) return;
     // Validate the stored session before trusting it — expired or revoked
     // tokens must return the visitor to sign-in, not the dashboard.
-    fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${t}` } })
-      .then((res) => {
-        if (!res.ok) throw new Error('invalid session');
+    void sessionIsValid(t).then((ok) => {
+      if (ok) {
         sessionToken = t;
         setSignedIn(true);
-      })
-      .catch(() => {
-        sessionToken = '';
-        sessionStorage.removeItem('votery.session');
-        sessionStorage.removeItem('votery.user');
-        sessionStorage.removeItem('votery.org');
-        sessionStorage.removeItem('votery.assignments');
-        setStatus('Your session has expired. Please sign in again.');
-        setStatusKind('info');
-      });
+        return;
+      }
+      sessionToken = '';
+      sessionStorage.removeItem('votery.session');
+      sessionStorage.removeItem('votery.user');
+      sessionStorage.removeItem('votery.org');
+      sessionStorage.removeItem('votery.assignments');
+      setStatus('Your session has expired. Please sign in again.');
+      setStatusKind('info');
+    });
   }, []);
 
   useEffect(() => {
@@ -176,13 +174,9 @@ export default function PlatformPage() {
 
   async function signIn() {
     await act('Sign in', async () => {
-      const res = await call('/auth/login', { email, password, totp: totp || undefined });
-      sessionToken = String(res.token ?? '');
-      sessionStorage.setItem('votery.session', sessionToken);
-      sessionStorage.setItem('votery.user', String(res.userId ?? ''));
-      // Shared with the admin console so it can render capability-appropriate UI.
-      if (Array.isArray(res.assignments)) sessionStorage.setItem('votery.assignments', JSON.stringify(res.assignments));
-      if (res.organizationId) sessionStorage.setItem('votery.org', String(res.organizationId));
+      const data = await apiSignIn(email, password, totp || undefined);
+      sessionToken = data.token;
+      storeSession(data);
       setSignedIn(true);
     });
   }
@@ -364,7 +358,7 @@ export default function PlatformPage() {
               <Alert kind="success" title="Organization created with admin — share the TOTP secret once">
                 <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) — enroll this secret in their authenticator now; it is not shown again:</p>
                 <code>{orgEnrollment.totpSecret}</code>
-                <p className="small" style={{ margin: '8px 0 0' }}>The administrator signs in at <a href="/admin">/admin</a> with their email, password, and TOTP code.</p>
+                <p className="small" style={{ margin: '8px 0 0' }}>The administrator signs in at <a href="/login">/login</a> with their email, password, and TOTP code.</p>
               </Alert>
             )}
             <div className="form-actions">
@@ -406,7 +400,7 @@ export default function PlatformPage() {
                 <Alert kind="success" title="Admin provisioned — share the TOTP secret once">
                   <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> — enroll this secret in their authenticator now; it is not shown again:</p>
                   <code>{enrolled.totpSecret}</code>
-                  <p className="small" style={{ margin: '8px 0 0' }}>The administrator signs in at <a href="/admin">/admin</a> with their email, password, and TOTP code.</p>
+                  <p className="small" style={{ margin: '8px 0 0' }}>The administrator signs in at <a href="/login">/login</a> with their email, password, and TOTP code.</p>
                 </Alert>
               )}
 

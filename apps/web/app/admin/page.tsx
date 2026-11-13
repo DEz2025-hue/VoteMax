@@ -1,11 +1,13 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input,
   Select, Skeleton, Stat, Table, Textarea, Toast,
 } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
+import { clearSession, sessionIsValid } from '../../lib/auth';
 import { hasCapability, type AssignmentInfo } from '../../lib/capabilities';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -85,13 +87,6 @@ const SECTION_CAPS: Record<Section, string[]> = {
   session: [],
 };
 
-// Signed-out visitors get sign-in only. Tenant bootstrap (organization +
-// first staff accounts) is handled by the platform administration portal —
-// election admins sign in with accounts provisioned for them.
-const SIGNED_OUT_SECTIONS: { id: Section; label: string }[] = [
-  { id: 'session', label: 'Sign in' },
-];
-
 interface AdminUser { id: string; email: string; displayName: string; mfaEnrolled: boolean }
 interface VoterRow { id: string; studentId: string; fullName: string; status: string; statusReason: string | null }
 interface StationRow { id: string; name: string }
@@ -136,6 +131,7 @@ function fmtDate(v: string | null | undefined) {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   const [section, setSection] = useState<Section>('overview');
   const [mobileNav, setMobileNav] = useState(false);
   const [orgId, setOrgId] = useState('');
@@ -143,11 +139,12 @@ export default function AdminPage() {
   const [electionId, setElectionId] = useState('');
   const [positionId, setPositionId] = useState('');
   const [stationId, setStationId] = useState('');
-  const [status, setStatus] = useState('Sign in to continue.');
+  const [status, setStatus] = useState('Ready.');
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info');
   const [toast, setToast] = useState<{ message: string; kind: 'info' | 'error' } | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [userId, setUserId] = useState('');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [voters, setVoters] = useState<VoterRow[]>([]);
@@ -166,36 +163,39 @@ export default function AdminPage() {
 
   useEffect(() => {
     const t = sessionStorage.getItem('votery.session');
-    if (!t) return;
+    if (!t) {
+      setSessionChecked(true);
+      return;
+    }
     // Validate the stored session before trusting it — expired or revoked
     // tokens must return the visitor to sign-in, not the dashboard.
-    fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${t}` } })
-      .then((res) => {
-        if (!res.ok) throw new Error('invalid session');
-        sessionToken = t;
-        setSignedIn(true);
-        const u = sessionStorage.getItem('votery.user');
-        if (u) setUserId(u);
-        const o = sessionStorage.getItem('votery.org');
-        if (o) setOrgId(o);
-        const s = sessionStorage.getItem('votery.orgSlug');
-        if (s) setOrgSlug(s);
-        const e = sessionStorage.getItem('votery.election');
-        if (e) setElectionId(e);
-        const a = sessionStorage.getItem('votery.assignments');
-        if (a) { try { setAssignments(JSON.parse(a) as AssignmentInfo[]); } catch { /* ignore corrupt cache */ } }
-      })
-      .catch(() => {
-        sessionStorage.removeItem('votery.session');
-        sessionStorage.removeItem('votery.user');
-        sessionStorage.removeItem('votery.org');
-        sessionStorage.removeItem('votery.orgSlug');
-        sessionStorage.removeItem('votery.election');
-        sessionStorage.removeItem('votery.assignments');
+    void sessionIsValid(t).then((ok) => {
+      if (!ok) {
+        clearSession();
         setStatus('Your session has expired. Please sign in again.');
-        setStatusKind('info');
-      });
+        setSessionChecked(true);
+        return;
+      }
+      sessionToken = t;
+      setSignedIn(true);
+      const u = sessionStorage.getItem('votery.user');
+      if (u) setUserId(u);
+      const o = sessionStorage.getItem('votery.org');
+      if (o) setOrgId(o);
+      const s = sessionStorage.getItem('votery.orgSlug');
+      if (s) setOrgSlug(s);
+      const e = sessionStorage.getItem('votery.election');
+      if (e) setElectionId(e);
+      const a = sessionStorage.getItem('votery.assignments');
+      if (a) { try { setAssignments(JSON.parse(a) as AssignmentInfo[]); } catch { /* ignore corrupt cache */ } }
+      setSessionChecked(true);
+    });
   }, []);
+
+  // Signed-out visitors go to the dedicated sign-in page.
+  useEffect(() => {
+    if (sessionChecked && !signedIn) router.replace('/login');
+  }, [sessionChecked, signedIn, router]);
 
   useEffect(() => {
     if (signedIn && orgId) { void refreshUsers().catch(() => undefined); void refreshElections().catch(() => undefined); }
@@ -293,38 +293,6 @@ export default function AdminPage() {
     ]);
   }
 
-  async function login(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    try {
-      const res = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...(await fraudHeaders()) },
-        body: JSON.stringify({ email: f.get('email'), password: f.get('password'), totp: f.get('totp') || undefined }),
-      });
-      const data = (await res.json()) as { token?: string; userId?: string; organizationId?: string | null; assignments?: AssignmentInfo[]; message?: string };
-      if (!res.ok || !data.token) throw new Error(data.message ?? `Login failed (${res.status})`);
-      sessionToken = data.token;
-      if (data.userId) { setUserId(data.userId); sessionStorage.setItem('votery.user', data.userId); }
-      sessionStorage.setItem('votery.session', data.token);
-      // The API resolves the tenant from the session; remember it locally so
-      // org-scoped forms (user creation, election creation) have the ID.
-      if (data.organizationId) { setOrgId(data.organizationId); sessionStorage.setItem('votery.org', data.organizationId); }
-      if (Array.isArray(data.assignments)) {
-        setAssignments(data.assignments);
-        sessionStorage.setItem('votery.assignments', JSON.stringify(data.assignments));
-      }
-      setSignedIn(true);
-      setSection('overview');
-      setStatus('Signed in.');
-      setStatusKind('info');
-      await refreshUsers().catch(() => undefined);
-    } catch (err) {
-      setStatus(`Sign in: ${err instanceof Error ? err.message : 'failed'}`);
-      setStatusKind('error');
-    }
-  }
-
   function signOut() {
     // Revoke the session server-side; clearing storage alone leaves the
     // bearer token valid until expiry.
@@ -333,41 +301,23 @@ export default function AdminPage() {
       await fetch(`${API}/auth/logout`, { method: 'POST', headers: { ...authHeaders(), ...fh } }).catch(() => undefined);
     })();
     sessionToken = '';
-    sessionStorage.removeItem('votery.session');
-    sessionStorage.removeItem('votery.user');
-    sessionStorage.removeItem('votery.org');
-    sessionStorage.removeItem('votery.orgSlug');
-    sessionStorage.removeItem('votery.election');
-    sessionStorage.removeItem('votery.assignments');
-    setSignedIn(false); setSection('session'); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]); setStations([]);
+    clearSession();
+    setSignedIn(false); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]); setStations([]);
     setOrgId(''); setOrgSlug(''); setElectionId(''); setUserId(''); setAssignments([]);
   }
 
-  // Signed-out visitors get a dedicated auth screen — sign-in only.
-  // Tenant bootstrap lives in the platform administration portal.
-  if (!signedIn) {
+  // While the stored session is being validated, show a neutral loading
+  // state; signed-out visitors are redirected to /login by the effect above.
+  if (!sessionChecked) {
     return (
       <main className="auth-page">
         <div className="auth-card">
-          <p className="eyebrow">Election administration</p>
-          <h1>Sign in</h1>
-          <p className="lede">Access the election console for your organization.</p>
-          <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>
-          <Card title="Administrator sign in">
-            <form onSubmit={login} className="inline-form">
-              <Field label="Email" htmlFor="admin-email"><Input id="admin-email" name="email" type="email" required autoComplete="username" /></Field>
-              <Field label="Password" htmlFor="admin-password"><Input id="admin-password" name="password" type="password" required autoComplete="current-password" /></Field>
-              <Field label="TOTP code" hint="Required for privileged accounts" htmlFor="admin-totp"><Input id="admin-totp" name="totp" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" /></Field>
-              <Button type="submit" variant="primary" block>Sign in</Button>
-            </form>
-          </Card>
-          <p className="small muted" style={{ margin: '16px 2px 0', textAlign: 'center' }}>
-            Don't have an account? Organizations and staff accounts are provisioned through the <a href="/platform">platform administration portal</a>.
-          </p>
+          <Skeleton lines={5} />
         </div>
       </main>
     );
   }
+  if (!signedIn) return null;
 
   const userOptions = users.map((u) => <option key={u.id} value={u.id}>{u.displayName} ({u.email})</option>);
   const positionOptions = (election?.positions ?? []).map((p) => <option key={p.id} value={p.id}>{p.title}</option>);
@@ -391,12 +341,8 @@ export default function AdminPage() {
   const sectionAllowed = (caps: string[]) =>
     caps.length === 0 || !orgId || caps.some((c) => capOrg(c));
 
-  const visibleSections = signedIn
-    ? SECTIONS.filter((s) => sectionAllowed(SECTION_CAPS[s.id]))
-    : SIGNED_OUT_SECTIONS;
-  const activeSection: Section = signedIn
-    ? (visibleSections.some((s) => s.id === section) ? section : 'overview')
-    : 'session';
+  const visibleSections = SECTIONS.filter((s) => sectionAllowed(SECTION_CAPS[s.id]));
+  const activeSection: Section = visibleSections.some((s) => s.id === section) ? section : 'overview';
 
   const nav = (
     <nav className="admin-nav" aria-label="Administration">
@@ -409,44 +355,29 @@ export default function AdminPage() {
   );
 
   return (
-    <div className={signedIn ? 'admin-shell' : ''}>
-      {signedIn && (
-        <>
-          <aside className={`admin-sidebar ${mobileNav ? 'open' : ''}`}>
-            <div className="admin-brand">VoteMax Administration</div>
-            {nav}
-          </aside>
-          {mobileNav && <div className="drawer-backdrop" onClick={() => setMobileNav(false)} />}
-        </>
-      )}
+    <div className="admin-shell">
+      <>
+        <aside className={`admin-sidebar ${mobileNav ? 'open' : ''}`}>
+          <div className="admin-brand">VoteMax Administration</div>
+          {nav}
+        </aside>
+        {mobileNav && <div className="drawer-backdrop" onClick={() => setMobileNav(false)} />}
+      </>
 
-      <main className={signedIn ? 'admin-main' : 'page'}>
-        {signedIn ? (
-          <div className="admin-topbar">
-            <div>
-              <Button variant="secondary" size="sm" className="nav-toggle" onClick={() => setMobileNav((v) => !v)}>Sections</Button>
-              <h1>{visibleSections.find((s) => s.id === activeSection)?.label}</h1>
-              <div className="breadcrumbs">
-                <a href="/">Home</a><span>/</span><span>Administration</span><span>/</span><span>{visibleSections.find((s) => s.id === activeSection)?.label}</span>
-              </div>
-            </div>
-            <div className="card-actions">
-              <Badge tone="success">Signed in</Badge>
-              {election && <Badge tone={electionPill(election.state)}>{election.state}</Badge>}
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginBottom: 22 }}>
-            <p className="eyebrow">Election administration</p>
+      <main className="admin-main">
+        <div className="admin-topbar">
+          <div>
+            <Button variant="secondary" size="sm" className="nav-toggle" onClick={() => setMobileNav((v) => !v)}>Sections</Button>
             <h1>{visibleSections.find((s) => s.id === activeSection)?.label}</h1>
-            <p className="muted">Sign in to access the election console. Need an account? Your organization is set up by the platform administrator.</p>
-            <div className="form-actions" style={{ marginTop: 0 }}>
-              {SIGNED_OUT_SECTIONS.map((s) => (
-                <Button key={s.id} variant={activeSection === s.id ? 'primary' : 'secondary'} size="sm" onClick={() => setSection(s.id)}>{s.label}</Button>
-              ))}
+            <div className="breadcrumbs">
+              <a href="/">Home</a><span>/</span><span>Administration</span><span>/</span><span>{visibleSections.find((s) => s.id === activeSection)?.label}</span>
             </div>
           </div>
-        )}
+          <div className="card-actions">
+            <Badge tone="success">Signed in</Badge>
+            {election && <Badge tone={electionPill(election.state)}>{election.state}</Badge>}
+          </div>
+        </div>
 
         <Alert kind={statusKind === 'error' ? 'error' : 'info'} title="Console status">{status}</Alert>
 

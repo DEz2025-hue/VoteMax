@@ -8,6 +8,7 @@ const links = [
   { href: '/', label: 'Home' },
   { href: '/vote', label: 'Vote' },
   { href: '/help', label: 'How to vote' },
+  { href: '/login', label: 'Sign in' },
   { href: '/admin', label: 'Administration' },
   { href: '/platform', label: 'Platform' },
 ];

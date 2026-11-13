@@ -1,0 +1,58 @@
+'use client';
+
+import { fraudHeaders } from './fraud';
+import type { AssignmentInfo } from './capabilities';
+
+export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+export interface SessionData {
+  token: string;
+  userId: string;
+  organizationId: string | null;
+  assignments?: AssignmentInfo[];
+}
+
+const SESSION_KEYS = [
+  'votery.session',
+  'votery.user',
+  'votery.org',
+  'votery.orgSlug',
+  'votery.election',
+  'votery.assignments',
+] as const;
+
+/** POST /auth/login — returns the session payload or throws with the API message. */
+export async function signIn(email: string, password: string, totp?: string): Promise<SessionData> {
+  const res = await fetch(`${API}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(await fraudHeaders()) },
+    body: JSON.stringify({ email, password, totp: totp || undefined }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Partial<SessionData> & { message?: string };
+  if (!res.ok || !data.token) throw new Error(data.message ?? `Login failed (${res.status})`);
+  return data as SessionData;
+}
+
+/** Persist the session exactly as the console pages expect it. */
+export function storeSession(data: SessionData): void {
+  sessionStorage.setItem('votery.session', data.token);
+  if (data.userId) sessionStorage.setItem('votery.user', data.userId);
+  if (data.organizationId) sessionStorage.setItem('votery.org', data.organizationId);
+  if (Array.isArray(data.assignments)) {
+    sessionStorage.setItem('votery.assignments', JSON.stringify(data.assignments));
+  }
+}
+
+export function clearSession(): void {
+  for (const key of SESSION_KEYS) sessionStorage.removeItem(key);
+}
+
+/** True when the bearer token still resolves to a principal. */
+export async function sessionIsValid(token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
