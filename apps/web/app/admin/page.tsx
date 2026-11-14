@@ -266,11 +266,10 @@ export default function AdminPage() {
     if (file) loadCsvFile(file);
   }
 
-  async function doRegisterImport(freeze: boolean): Promise<void> {
+  async function doRegisterImport(): Promise<void> {
     const result = await call(`/elections/${electionId}/register/import`, { csv: csvText }) as unknown as
       { eligible: number; duplicates: number; errors: { line: number; message: string }[] };
     setImportResult(result);
-    if (freeze) await call(`/elections/${electionId}/register/freeze`, {});
     await refreshVoters();
     await refreshElection();
   }
@@ -636,9 +635,9 @@ export default function AdminPage() {
                     {label}
                   </Button>
                 ))}
-                <Button variant="primary" size="sm" disabled={!electionId || !csvText.trim() || !cap('register.manage') || !cap('register.freeze')}
-                  title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') && cap('register.freeze') ? undefined : 'Requires register.manage and register.freeze (e.g. voter_registrar + committee_chair)'}
-                  onClick={() => setConfirm({ title: 'Import CSV + freeze register', message: `Import ${registerPreview?.rowCount ?? '?'} rows and freeze the register? Voting cannot proceed until the register is frozen.`, action: () => void act('Import CSV + freeze register', () => doRegisterImport(true)) })}>Import CSV + freeze</Button>
+                <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.freeze')}
+                  title={cap('register.freeze') ? 'Seal the imported register for voting (committee_chair)' : 'Requires register.freeze — assigned to committee_chair'}
+                  onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting — imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
                 <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
               </div>
               <div className="import-box">
@@ -716,10 +715,11 @@ export default function AdminPage() {
                   <Button
                     variant="primary"
                     disabled={!electionId || !csvText.trim() || !cap('register.manage')}
+                    title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') ? undefined : 'Requires register.manage — assigned to voter_registrar'}
                     onClick={() => setConfirm({
                       title: 'Import register',
                       message: `Import ${registerPreview?.rowCount ?? '?'} rows into the voter register?`,
-                      action: () => void act('Import register', () => doRegisterImport(false)),
+                      action: () => void act('Import register', doRegisterImport),
                     })}
                   >Import register</Button>
                 </div>
