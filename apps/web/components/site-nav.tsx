@@ -10,7 +10,6 @@ const links = [
   { href: '/help', label: 'How to vote' },
   { href: '/login', label: 'Sign in' },
   { href: '/admin', label: 'Administration' },
-  { href: '/platform', label: 'Platform' },
 ];
 
 export default function SiteNav() {
