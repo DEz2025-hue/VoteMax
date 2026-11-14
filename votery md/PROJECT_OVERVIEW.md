@@ -9,7 +9,7 @@
 **Last Updated:** 11 November 2026\
 **Project Name:** Election Management Platform (working name)\
 **Initial Market:** Liberia\
-**Initial Pilot:** University Student Union Election
+**Initial Pilot:** Membership Organization Election
 
 ------------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ It will support three voting arrangements:
     synchronize them through a controlled reconciliation process.
 
 The initial product will focus on organizational elections, beginning
-with a university student union pilot in Liberia.
+with a membership organization pilot in Liberia.
 
 The long-term objective is to develop a reliable election infrastructure
 platform that can serve organizations across Liberia and other African
@@ -146,8 +146,8 @@ membership-based elections.
   -----------------------------------------------------------------------
   Market segment                      Potential applications
   ----------------------------------- -----------------------------------
-  Universities and colleges           Student union elections, faculty
-                                      representatives, student
+  Universities and colleges           Membership elections, faculty
+                                      representatives, staff
                                       associations
 
   Churches and religious              Leadership elections, committee
@@ -169,7 +169,7 @@ membership-based elections.
                                       organizational voting
   -----------------------------------------------------------------------
 
-**Initial market priority:** Universities and student organizations.
+**Initial market priority:** Membership and professional organizations.
 
 **Initial geographic priority:** Liberia, followed by expansion into
 other African markets.
@@ -179,9 +179,9 @@ product authorization. Any future deployment in that context would
 require separate legal, institutional, technical, security, and
 independent assurance assessments.
 
-## 7. Initial Pilot: University Student Union
+## 7. Initial Pilot: Membership Organization
 
-The first planned pilot will be a university student union election.
+The first planned pilot will be a membership organization election.
 
 ### 7.1 Planning assumptions
 
@@ -220,7 +220,7 @@ production capabilities.
 
 The pilot should demonstrate that EMP can:
 
--   Register and manage up to 10,000 eligible students.
+-   Register and manage up to 10,000 eligible members.
 -   Verify voter eligibility.
 -   Prevent duplicate accepted ballots under concurrent activity.
 -   Support online voting.
@@ -414,7 +414,7 @@ requirements, and measured performance.
 
 ## 12. Scalability and Capacity Direction
 
-EMP must be designed for growth beyond the first university pilot.
+EMP must be designed for growth beyond the first pilot.
 
 Initial engineering targets:
 
@@ -622,8 +622,9 @@ phases:
   DEC-009                 Pricing and             Open
                           subscription model      
 
-  DEC-010                 Final pilot university  To confirm
-                          and election authority  
+  DEC-010                 Final pilot             To confirm
+                          organization and        
+                          election authority  
   -----------------------------------------------------------------------
 
 ## 20. Related Documentation

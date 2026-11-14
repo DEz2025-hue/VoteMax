@@ -181,10 +181,10 @@ export class InMemoryStore implements PlatformStore {
     return this.voters.filter((v) => v.electionId === electionId);
   }
 
-  async findVoterByStudentId(electionId: string, studentId: string): Promise<VoterRecord | null> {
-    const needle = studentId.toLowerCase();
+  async findVoterByMemberId(electionId: string, memberId: string): Promise<VoterRecord | null> {
+    const needle = memberId.toLowerCase();
     return this.voters.find(
-      (v) => v.electionId === electionId && v.studentId.toLowerCase() === needle,
+      (v) => v.electionId === electionId && v.memberId.toLowerCase() === needle,
     ) ?? null;
   }
 

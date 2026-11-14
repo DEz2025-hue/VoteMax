@@ -18,7 +18,7 @@ In scope: web/PWA, API, PostgreSQL (D1–D4), KMS/custody (D5), Redis, object st
 
 | Adversary | Threat | Primary controls | Residual / honest limit |
 |---|---|---|---|
-| External attacker | Credential stuffing on voter/admin login; injection; DDoS at open | MFA (SEC-IAM-01), rate limiting tuned for campus NAT (SCALE §5.5), parameterized queries (SEC-SDL-11), WAF/DDoS (SEC-OPS-04) | Surge + attack overlap rehearsed in Phase 4 |
+| External attacker | Credential stuffing on voter/admin login; injection; DDoS at open | MFA (SEC-IAM-01), rate limiting tuned for shared-network NAT (SCALE §5.5), parameterized queries (SEC-SDL-11), WAF/DDoS (SEC-OPS-04) | Surge + attack overlap rehearsed in Phase 4 |
 | Malicious voter | Double voting; OTP sharing; retry abuse | Atomic entitlement (SEC-VOT-02…04), idempotency, per-account throttling | A voter **can** share their own OTP — cannot be prevented, only stated (DEC-004 §4) |
 | Compromised voter device | Malware reads/changes selections | None available to platform | **Out of platform control; never claimed solved** (SEC §6) |
 | Coercer / vote buyer | Pressure or purchase of remote votes | Assisted-station alternative; no receipt showing selections (FR-VTG-007) | Remote coercion **cannot be fully mitigated**; stated plainly |

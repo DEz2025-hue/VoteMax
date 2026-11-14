@@ -33,7 +33,7 @@ describe('admin console wiring', () => {
 
   it('lists stations for an election', async () => {
     expect(await svc.listStationsForElection(electionId)).toEqual([]);
-    const s = await svc.createStation(adminId, electionId, 'Main Campus');
+    const s = await svc.createStation(adminId, electionId, 'Main Hall');
     const list = await svc.listStationsForElection(electionId);
     expect(list).toEqual([s]);
     await expect(svc.listStationsForElection('missing')).rejects.toThrow();

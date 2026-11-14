@@ -11,7 +11,7 @@ let adminId: string;
 
 function setupElection() {
   return svc.createElection(adminId, orgId, {
-    name: 'Student Union 2026',
+    name: 'Organization Election 2026',
     votingOpensAt: '2026-12-01T08:00:00Z',
     votingClosesAt: '2026-12-01T16:00:00Z',
   });
@@ -20,9 +20,9 @@ function setupElection() {
 beforeEach(async () => {
   svc = new PlatformService();
   store = svc.store as InMemoryStore;
-  orgId = (await svc.createOrganization(null, 'University of Liberia', 'ul')).id;
-  registrarId = (await svc.createUser(orgId, 'registrar@ul.edu.lr', 'Regina Registrar', 'correct horse battery')).id;
-  adminId = (await svc.createUser(orgId, 'admin@ul.edu.lr', 'Adam Admin', 'correct horse battery')).id;
+  orgId = (await svc.createOrganization(null, 'Example Organization', 'example')).id;
+  registrarId = (await svc.createUser(orgId, 'registrar@example.org', 'Regina Registrar', 'correct horse battery')).id;
+  adminId = (await svc.createUser(orgId, 'admin@example.org', 'Adam Admin', 'correct horse battery')).id;
 });
 
 describe('Phase 2 core workflows', () => {
@@ -35,9 +35,9 @@ describe('Phase 2 core workflows', () => {
     await svc.transition(adminId, election.id, 'CONFIGURED');
     await svc.transition(adminId, election.id, 'REGISTRATION');
     const csv = [
-      'studentId,fullName,email,phone',
-      'S001,Alice Doe,alice@ul.edu.lr,',
-      'S002,Bob Doe,bob@ul.edu.lr,',
+      'memberId,fullName,email,phone',
+      'S001,Alice Doe,alice@example.org,',
+      'S002,Bob Doe,bob@example.org,',
     ].join('\n');
     await expect(svc.importRegister(registrarId, election.id, csv)).resolves.toMatchObject({ eligible: 2, duplicates: 0 });
     const frozen = await svc.freezeRegister(registrarId, election.id);
@@ -59,10 +59,10 @@ describe('Phase 2 core workflows', () => {
     await svc.addCandidate(adminId, election.id, position.id, 'Ada Kamara');
     await svc.transition(adminId, election.id, 'CONFIGURED');
     await svc.transition(adminId, election.id, 'REGISTRATION');
-    await svc.importRegister(registrarId, election.id, 'studentId,fullName,email\nS001,Alice,alice@ul.edu.lr');
+    await svc.importRegister(registrarId, election.id, 'memberId,fullName,email\nS001,Alice,alice@example.org');
     await svc.freezeRegister(registrarId, election.id);
     await expect(svc.addPosition(adminId, election.id, 'Vice President')).rejects.toThrow(/CONFIG_FROZEN/);
-    await expect(svc.importRegister(registrarId, election.id, 'studentId,fullName,email\nS009,X,x@ul.edu.lr')).rejects.toThrow(/REGISTER_FROZEN/);
+    await expect(svc.importRegister(registrarId, election.id, 'memberId,fullName,email\nS009,X,x@example.org')).rejects.toThrow(/REGISTER_FROZEN/);
   });
 
   it('flags duplicates and blocks freeze until resolved (FR-VOT-002/T3)', async () => {
@@ -72,9 +72,9 @@ describe('Phase 2 core workflows', () => {
     await svc.transition(adminId, election.id, 'CONFIGURED');
     await svc.transition(adminId, election.id, 'REGISTRATION');
     const csv = [
-      'studentId,fullName,email',
-      'S001,Alice,alice@ul.edu.lr',
-      'S001,Alice Clone,alice@ul.edu.lr',
+      'memberId,fullName,email',
+      'S001,Alice,alice@example.org',
+      'S001,Alice Clone,alice@example.org',
       'bad-row',
     ].join('\n');
     const result = await svc.importRegister(registrarId, election.id, csv);
@@ -89,7 +89,7 @@ describe('Phase 2 core workflows', () => {
 
   it('enforces SoD-1 and audits the denied attempt (SoD-9)', async () => {
     const election = await setupElection();
-    const user = await svc.createUser(orgId, 'dual@ul.edu.lr', 'Dual Role', 'pw-long-enough');
+    const user = await svc.createUser(orgId, 'dual@example.org', 'Dual Role', 'pw-long-enough');
     await svc.assignRole(adminId, orgId, user.id, 'election_admin', election.id);
     const auditBefore = store.audit.length;
     await expect(svc.assignRole(adminId, orgId, user.id, 'voter_registrar', election.id)).rejects.toThrow(/SOD_VIOLATION/);
@@ -100,13 +100,13 @@ describe('Phase 2 core workflows', () => {
 
   it('requires MFA for privileged login (FR-IAM-001)', async () => {
     await setupElection();
-    const user = await svc.createUser(orgId, 'chair@ul.edu.lr', 'Chair Person', 'pw-long-enough');
+    const user = await svc.createUser(orgId, 'chair@example.org', 'Chair Person', 'pw-long-enough');
     await svc.assignRole(adminId, orgId, user.id, 'committee_chair', null);
-    await expect(svc.login('chair@ul.edu.lr', 'pw-long-enough')).rejects.toThrow(/MFA_REQUIRED/);
+    await expect(svc.login('chair@example.org', 'pw-long-enough')).rejects.toThrow(/MFA_REQUIRED/);
     const stored = store.users.get(user.id)!;
-    const session = await svc.login('chair@ul.edu.lr', 'pw-long-enough', totpCode(stored.totpSecret!));
+    const session = await svc.login('chair@example.org', 'pw-long-enough', totpCode(stored.totpSecret!));
     expect(session.token).toBeTruthy();
-    await expect(svc.login('chair@ul.edu.lr', 'wrong-password', totpCode(stored.totpSecret!))).rejects.toThrow(/AUTH_FAILED/);
+    await expect(svc.login('chair@example.org', 'wrong-password', totpCode(stored.totpSecret!))).rejects.toThrow(/AUTH_FAILED/);
   });
 
   it('imports a 10,000-record register and reconciles entitlements', async () => {
@@ -115,9 +115,9 @@ describe('Phase 2 core workflows', () => {
     await svc.addCandidate(adminId, election.id, position.id, 'Ada Kamara');
     await svc.transition(adminId, election.id, 'CONFIGURED');
     await svc.transition(adminId, election.id, 'REGISTRATION');
-    const lines = ['studentId,fullName,email'];
+    const lines = ['memberId,fullName,email'];
     for (let i = 1; i <= 10000; i++) {
-      lines.push(`S${String(i).padStart(5, '0')},Student ${i},student${i}@ul.edu.lr`);
+      lines.push(`M${String(i).padStart(5, '0')},Member ${i},member${i}@example.org`);
     }
     const start = Date.now();
     const result = await svc.importRegister(registrarId, election.id, lines.join('\n'));
@@ -136,7 +136,7 @@ describe('Phase 2 core workflows', () => {
     await svc.addCandidate(adminId, election.id, position.id, 'Ada Kamara');
     await svc.transition(adminId, election.id, 'CONFIGURED');
     await svc.transition(adminId, election.id, 'REGISTRATION');
-    await svc.importRegister(registrarId, election.id, 'studentId,fullName,email\nS001,Alice,alice@ul.edu.lr');
+    await svc.importRegister(registrarId, election.id, 'memberId,fullName,email\nS001,Alice,alice@example.org');
     await svc.freezeRegister(registrarId, election.id);
     await svc.transition(adminId, election.id, 'READY');
     await svc.transition(adminId, election.id, 'OPEN');
@@ -156,7 +156,7 @@ describe('Phase 2 core workflows', () => {
     await svc.addCandidate(adminId, election.id, position.id, 'Ada Kamara');
     await svc.transition(adminId, election.id, 'CONFIGURED');
     await svc.transition(adminId, election.id, 'REGISTRATION');
-    await svc.importRegister(registrarId, election.id, 'studentId,fullName,email\nS001,Alice,alice@ul.edu.lr');
+    await svc.importRegister(registrarId, election.id, 'memberId,fullName,email\nS001,Alice,alice@example.org');
     await svc.freezeRegister(registrarId, election.id);
     await svc.transition(adminId, election.id, 'READY');
     await svc.transition(adminId, election.id, 'OPEN');

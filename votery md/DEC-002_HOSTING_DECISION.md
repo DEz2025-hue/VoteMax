@@ -34,7 +34,7 @@ Select cloud provider and region for all EMP environments (dev, test, staging, p
 
 **This recommendation is conditional.** EMP-SCALE-001 §1: no capacity or latency may be represented as achieved until measured. DEC-002 closes only after:
 
-1. Latency probe from at least two Liberian networks (e.g. Monrovia university + mobile) to `af-south-1`, `eu-west-1`, `eu-west-3` — record p50/p95.
+1. Latency probe from at least two Liberian networks (e.g. Monrovia site + mobile) to `af-south-1`, `eu-west-1`, `eu-west-3` — record p50/p95.
 2. Service-parity check: RDS PostgreSQL HA + PITR, ElastiCache Redis, KMS (and CloudHSM if DEC-006 needs it), S3 versioning, WAF — in the chosen region.
 3. DEC-005 counsel view on cross-border transfer under the Liberia Data Protection Act 2026.
 

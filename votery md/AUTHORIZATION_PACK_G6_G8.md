@@ -14,7 +14,7 @@
 
 | # | Evidence | Source | State |
 |---|---|---|---|
-| G6-1 | Election authority letter (named university, committee, electronic process accepted) | `DEC-010_PILOT_CONFIRMATION_PACK.md` §3 | ☐ Not received — pilot in discussion |
+| G6-1 | Election authority letter (named organization, committee, electronic process accepted) | `DEC-010_PILOT_CONFIRMATION_PACK.md` §3 | ☐ Not received — pilot in discussion |
 | G6-2 | Legal review memo: data protection (Liberia Data Protection Act 2026), retention, electronic records, cross-border position | `DEC-005_LEGAL_REVIEW_BRIEF.md` §3 | ☐ Counsel not engaged |
 | G6-3 | Election rules adopted by the committee incl. recount triggers, extension rules, second-approver requirement | Committee (answers Q-LIFE-001/002/004, Q-PRD-003/004) | ☐ Pending committee |
 | G6-4 | Data retention schedule per data class | DEC-005 output (Q-PRD-005) | ☐ Pending G6-2 |
@@ -34,7 +34,7 @@
 
 ## 3. G8 Final Authorization Record (sign only when §2 shows all gates passed)
 
-> We, the [university] [election committee], having reviewed the G1–G7 evidence indexed in this pack, authorize the live [election name] on the Election Management Platform for the window [dates]. We understand the stated limitations in the claims register, including that remote voting cannot prevent coercion and that ballot secrecy does not extend to a voter's own device.
+> We, the [organization] [election committee], having reviewed the G1–G7 evidence indexed in this pack, authorize the live [election name] on the Election Management Platform for the window [dates]. We understand the stated limitations in the claims register, including that remote voting cannot prevent coercion and that ballot secrecy does not extend to a voter's own device.
 
 | Signatory | Role | Signature | Date |
 |---|---|---|---|

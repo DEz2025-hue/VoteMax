@@ -1,6 +1,6 @@
 # Votery — Election Management Platform (EMP)
 
-Secure, multi-tenant election platform for organizations. Pilot: university student union election in Liberia. Governing documents live in `votery md/` — start with `PROJECT_OVERVIEW.md`; code must follow them (EMP-SEC-001 SEC-SDL-01/02).
+Secure, multi-tenant election platform for organizations. Pilot: organizational election. Governing documents live in `votery md/` — start with `PROJECT_OVERVIEW.md`; code must follow them (EMP-SEC-001 SEC-SDL-01/02).
 
 ## Status
 
@@ -24,7 +24,7 @@ Phases 1–4 implemented on a **repository abstraction**: `PostgresStore` (durab
 
 ### Voting flow
 
-1. Voter enters organization slug + student ID on `/vote`.
+1. Voter enters organization slug + member ID on `/vote`.
 2. OTP requested (`POST /elections/:id/voting/otp/request`) — rate-limited and fraud-scored.
 3. OTP verified → short-lived ballot session → ballot (positions/candidates) fetched.
 4. Selections submitted encrypted (`POST /voting/submit`) with an idempotency key; retries return the original receipt, duplicate votes are impossible.

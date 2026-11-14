@@ -44,9 +44,9 @@
 | FR-VOT-003 | Partial | eligible/ineligible/duplicate_unresolved only; no pending/suspended/voted statuses (voted via entitlement) | `csv-import.ts`; `registerStats` |
 | FR-VOT-004 | Implemented | Entitlement per voter; atomic consumption in store transaction | `phase3.spec.ts`; `postgres.store.spec.ts` |
 | FR-VOT-005 | Partial | Freeze enforced; post-freeze exception procedure not implemented | `platform.service.ts:freezeRegister` |
-| FR-VOT-006 | Partial | Student ID + OTP only (DEC-004 recommended); not configurable per election | `platform.service.ts:requestOtp` |
+| FR-VOT-006 | Partial | Member ID + OTP only (DEC-004 recommended); not configurable per election | `platform.service.ts:requestOtp` |
 | FR-VOT-007 | Partial | Duplicate resolution only; no dispute/support case workflow | `platform.service.ts:resolveDuplicate` |
-| FR-VOT-008 | Partial | Register limited to studentId/name/email/phone by parser design; no minimization review on file | `csv-import.ts:VoterRow` |
+| FR-VOT-008 | Partial | Register limited to memberId/name/email/phone by parser design; no minimization review on file | `csv-import.ts:VoterRow` |
 | FR-VOT-009 | Implemented | Changes are new audited records; no silent edit path | Audit assertions in specs |
 | FR-VTG-001 | Implemented | Web/PWA voter flow | `apps/web/app/vote` |
 | FR-VTG-002 | Implemented | Eligibility + entitlement checked before ballot and at submit | `phase3.spec.ts` |

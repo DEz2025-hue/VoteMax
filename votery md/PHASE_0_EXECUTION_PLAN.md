@@ -18,9 +18,9 @@ This plan turns Phase 0 of `PRODUCT_ROADMAP.md` into trackable work. Phase 0 end
 
 | Decision | Confirmed direction | Consequence |
 |---|---|---|
-| Pilot (DEC-010) | University **in discussion, not confirmed** | Build to configurable assumptions; produce confirmation pack (DEC-010 pack); dated decision plan below |
+| Pilot (DEC-010) | Organization **in discussion, not confirmed** | Build to configurable assumptions; produce confirmation pack (DEC-010 pack); dated decision plan below |
 | Hosting (DEC-002) | **AWS**, compare `af-south-1` vs `eu-west` | See `DEC-002_HOSTING_DECISION.md`; recommendation subject to Liberia latency measurement (SCALE-R1) |
-| Voter verification (DEC-004) | **Student ID + one-time code** | See `DEC-004_VOTER_VERIFICATION_OPTIONS.md`; email-first OTP, SMS + assisted fallback |
+| Voter verification (DEC-004) | **Member ID + one-time code** | See `DEC-004_VOTER_VERIFICATION_OPTIONS.md`; email-first OTP, SMS + assisted fallback |
 
 ## 3. Foundation Document Audit
 
@@ -50,7 +50,7 @@ All documents were read in full on 11 November 2026.
 | # | Work item (EMP-ROAD-001 Phase 0) | Artifact | Owner | State |
 |---|---|---|---|---|
 | 1 | Complete foundation documents | This audit + sign-off sheet | Product Owner | Ready for signature |
-| 2 | Confirm pilot university + authority (DEC-010) | `DEC-010_PILOT_CONFIRMATION_PACK.md` | Product Owner | Pack ready; external confirmation pending |
+| 2 | Confirm pilot organization + authority (DEC-010) | `DEC-010_PILOT_CONFIRMATION_PACK.md` | Product Owner | Pack ready; external confirmation pending |
 | 3 | Legal / data-protection review (DEC-005) | `DEC-005_LEGAL_REVIEW_BRIEF.md` | Security Lead + counsel | Brief ready; counsel not yet engaged |
 | 4 | Voter verification options (DEC-004) | `DEC-004_VOTER_VERIFICATION_OPTIONS.md` | Product Owner + Security Lead | **Recommendation made; needs committee approval** |
 | 5 | Crypto reviewer (DEC-006) + assessor (DEC-007) | `DEC-006_007_REVIEWER_SHORTLIST.md` | Security Lead | Criteria ready; outreach pending |
@@ -69,7 +69,7 @@ No pilot election date (E) is confirmed, so Phase 0 uses relative weeks from Pha
 | W0 + 3 | Voter verification method approved by pilot committee (or interim approval by Product + Security Lead pending committee) | DEC-004 |
 | W0 + 4 | Counsel engaged; DEC-005 review underway | DEC-005 |
 | W0 + 4 | Reviewer/assessor shortlist contacted (RFP sent) | DEC-006, DEC-007 |
-| W0 + 6 | Pilot university confirmed in writing, or escalation: second candidate university approached | DEC-010 |
+| W0 + 6 | Pilot organization confirmed in writing, or escalation: second candidate organization approached | DEC-010 |
 
 DEC-010 has no hard close date possible while “in discussion”; the W0 + 6 escalation is the dated decision plan required by the Phase 0 exit criteria.
 
@@ -79,7 +79,7 @@ DEC-010 has no hard close date possible while “in discussion”; the W0 + 6 es
 |---|---|
 | Document set approved by Product, Technical, Security leads | **Blocked:** leads unnamed; sign-off sheet ready |
 | DEC-002 closed or dated plan | Dated plan ✓; close pending ratification + latency measurement |
-| DEC-004 method chosen or dated plan | Method recommended (Student ID + OTP); close pending committee approval |
+| DEC-004 method chosen or dated plan | Method recommended (Member ID + OTP); close pending committee approval |
 | DEC-010 closed or dated plan | Dated plan ✓ (above); written confirmation pending |
 | Reviewers identified | **Blocked:** shortlist criteria ready, no firms named yet (see DEC-006/007 pack — names require outreach, not assumption) |
 

@@ -334,8 +334,8 @@ export default function PlatformPage() {
           <Card title="New organization">
             <p className="muted small" style={{ marginTop: 0 }}>Creates a tenant. Optionally staff it immediately with its first administrator below — otherwise use “Provision admin” on the tenant afterwards.</p>
             <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-              <Field label="Name" htmlFor="org-name"><Input id="org-name" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)} placeholder="University of …" /></Field>
-              <Field label="Slug" hint="Used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => setNewOrgSlug(e.target.value)} placeholder="university-name" /></Field>
+              <Field label="Name" htmlFor="org-name"><Input id="org-name" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)} placeholder="Example Organization" /></Field>
+              <Field label="Slug" hint="Used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => setNewOrgSlug(e.target.value)} placeholder="example-org" /></Field>
             </div>
             <h3 style={{ marginTop: 16 }}>First administrator (optional)</h3>
             <p className="muted small">Leave blank to create an unstaffed tenant. When set, an MFA-enrolled account is created and assigned the selected role.</p>

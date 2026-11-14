@@ -188,7 +188,7 @@ export interface PlatformStore {
 
   // ---- voter register / entitlements ----
   listVoters(electionId: string): Promise<VoterRecord[]>;
-  findVoterByStudentId(electionId: string, studentId: string): Promise<VoterRecord | null>;
+  findVoterByMemberId(electionId: string, memberId: string): Promise<VoterRecord | null>;
   getVoter(id: string): Promise<VoterRecord | null>;
   updateVoterStatus(voterId: string, status: VoterRecord['status'], reason: string): Promise<void>;
   /** Resolve a duplicate and (for 'eligible') create its entitlement atomically. */

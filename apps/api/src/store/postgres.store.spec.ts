@@ -73,14 +73,14 @@ d('PostgresStore (F-01 durability)', () => {
     const cand = await svc.addCandidate(admin.id, el.id, pos.id, 'Ada');
     await svc.transition(admin.id, el.id, 'CONFIGURED');
     await svc.transition(admin.id, el.id, 'REGISTRATION');
-    await svc.importRegister(reg.id, el.id, 'studentId,fullName,email\nP001,Pat,pat@x.edu\nP002,Sam,sam@x.edu');
+    await svc.importRegister(reg.id, el.id, 'memberId,fullName,email\nP001,Pat,pat@x.edu\nP002,Sam,sam@x.edu');
     await svc.freezeRegister(chair.id, el.id);
     await svc.transition(chair.id, el.id, 'READY');
     await svc.transition(chair.id, el.id, 'OPEN');
 
-    for (const [student, key] of [['P001', 'k1'], ['P002', 'k2']] as const) {
-      const { devCode } = await svc.requestOtp(el.id, student);
-      const { ballotSession } = await svc.verifyOtp(el.id, student, devCode!);
+    for (const [member, key] of [['P001', 'k1'], ['P002', 'k2']] as const) {
+      const { devCode } = await svc.requestOtp(el.id, member);
+      const { ballotSession } = await svc.verifyOtp(el.id, member, devCode!);
       await svc.submitBallot(ballotSession, { [pos.id]: [cand.id] }, key);
     }
 
@@ -114,7 +114,7 @@ d('PostgresStore (F-01 durability)', () => {
     const cand = await svc.addCandidate(admin.id, el.id, pos.id, 'C');
     await svc.transition(admin.id, el.id, 'CONFIGURED');
     await svc.transition(admin.id, el.id, 'REGISTRATION');
-    await svc.importRegister(admin.id, el.id, 'studentId,fullName,email\nX1,X One,x1@x.edu');
+    await svc.importRegister(admin.id, el.id, 'memberId,fullName,email\nX1,X One,x1@x.edu');
     await svc.freezeRegister(admin.id, el.id);
     await svc.transition(admin.id, el.id, 'READY');
     await svc.transition(admin.id, el.id, 'OPEN');

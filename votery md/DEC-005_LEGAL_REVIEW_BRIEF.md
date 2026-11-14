@@ -20,21 +20,21 @@ Instruct Liberian counsel for the DEC-005 review and record what is known today.
 |---|---|---|
 | Data Protection Act | Liberia enacted its **first Data Protection Act** (“Act for the Collection, Processing, Transmission, Storage, Protection, and Use of Personal Information”), signed August 2026; earlier sources confirm no comprehensive law existed before (Constitution Art. 16 privacy only; ECOWAS Supplementary Act signed, AU Malabo not signed) | Obtain the Act text; confirm regulator, registration, breach notification, data-subject rights, and **cross-border transfer rules** (DEC-002 depends on this) |
 | Cybercrime Act | Signed alongside (August 2026) | Confirm offences/duties touching platform operation and incident reporting |
-| Election authority | Student union elections governed by university/union constitutions, not national electoral law (assumption) | Confirm no national approval is needed for an organizational election; confirm what the pilot committee's constitution requires (electronic voting, quorum, second approver — Q-LIFE-002) |
+| Election authority | Membership organization elections governed by organization/union constitutions, not national electoral law (assumption) | Confirm no national approval is needed for an organizational election; confirm what the pilot committee's constitution requires (electronic voting, quorum, second approver — Q-LIFE-002) |
 | Telecommunications / SMS | OTP and notifications ride Liberian carriers via aggregators | Confirm sender-ID/A2P registration duties for OTP SMS |
 
 Any conflict between this table and counsel's advice: counsel prevails and this document is corrected by new version.
 
 ## 3. Questions for Counsel (review scope)
 
-1. Data controller/processor roles: EMP vs university; what agreement is required?
-2. Lawful basis and notices for processing the voter register (student ID, contact details); data minimization position (FR-VOT-008).
+1. Data controller/processor roles: EMP vs organization; what agreement is required?
+2. Lawful basis and notices for processing the voter register (member ID, contact details); data minimization position (FR-VOT-008).
 3. Cross-border transfer: may voter personal data be stored/processed in EU (DEC-002 `eu-west`) — or is African residency required (→ `af-south-1`)?
 4. Retention: what periods are lawful/required for register, audit records, encrypted ballots (Q-PRD-005 → retention schedule SEC-OI-6)?
 5. Breach notification duties and timelines (feeds SEC-INC plan).
 6. Electronic records/signatures: are electronic tally/certification records legally effective for an organizational election?
 7. Accessibility, language, and voter-notice duties, if any.
-8. Any sector rules for universities or student unions affecting election conduct, disputes (Q-STK-004), and publication of results.
+8. Any sector rules for organizations or membership bodies affecting election conduct, disputes (Q-STK-004), and publication of results.
 
 ## 4. Deliverable and Gate Link
 

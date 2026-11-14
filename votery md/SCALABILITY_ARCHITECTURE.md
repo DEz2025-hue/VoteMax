@@ -41,7 +41,7 @@ This document defines the capacity targets, load model, scaling strategy, resili
 | Opening surge | 15% of voters attempt login within the first 5 minutes | Notifications and queues at stations often trigger synchronized starts |
 | Peak period | 30% of ballots within one 30-minute period | Typical clustering around breaks and deadlines |
 | Station share | 10 to 20% of ballots via assisted stations | Planning value pending station design |
-| Shared networks | Many voters may share a campus network and appear from the same IP | University NAT is common |
+| Shared networks | Many voters may share an organizational network and appear from the same IP | Shared-network NAT is common |
 
 ### 3.2 Derived rates
 
@@ -61,7 +61,7 @@ The steady load is modest. The risks are **not** raw throughput but:
 2. **Connection and lock contention** in the database on the ballot path.
 3. **Authentication cost** at surge time (password or token verification is CPU-heavy by design).
 4. **Retry storms** from impatient voters on slow connections.
-5. **Per-IP controls** blocking legitimate voters behind a shared campus network.
+5. **Per-IP controls** blocking legitimate voters behind a shared organizational network.
 6. **Dependencies** such as notification or verification providers throttling during bursts.
 7. **Operational failure** (misconfiguration, human error) rather than saturation.
 
@@ -113,7 +113,7 @@ Objectives are proposed and become acceptance criteria once approved by the Tech
 
 - CDN for static assets and PWA shell; reduces origin load and helps low-bandwidth users.
 - Ballot responses and tokens are not cacheable by shared caches.
-- WAF and DDoS protection configured and tested with rate-limit rules that account for shared campus IPs.
+- WAF and DDoS protection configured and tested with rate-limit rules that account for shared organizational IPs.
 
 ### 5.5 Rate limiting design
 
@@ -282,7 +282,7 @@ This configuration is a **hypothesis**. It will be adjusted from measurements an
 | ID | Item | Mitigation |
 |---|---|---|
 | SCALE-R1 | Hosting region may add latency for Liberian users | Measure from Liberian networks; consider edge delivery and region options (DEC-002) |
-| SCALE-R2 | Shared campus IPs break per-IP limits | Rate-limit design in section 5.5; test with shared-IP simulation |
+| SCALE-R2 | Shared organizational IPs break per-IP limits | Rate-limit design in section 5.5; test with shared-IP simulation |
 | SCALE-R3 | Provider throttling during surges (messages, verification) | Pre-agree limits; fallback procedures |
 | SCALE-R4 | Hot-row contention appears in aggregates | Avoid single counters; test counters under burst |
 | SCALE-R5 | Voting window shorter than assumed | Re-run workload model; peaks sharpen |

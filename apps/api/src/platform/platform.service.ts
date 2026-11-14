@@ -220,11 +220,11 @@ export class PlatformService {
 
   /** Voter register rows for an election (admin review; PII — register.manage only). */
   async listVoters(electionId: string): Promise<
-    { id: string; studentId: string; fullName: string; status: string; statusReason: string | null }[]
+    { id: string; memberId: string; fullName: string; status: string; statusReason: string | null }[]
   > {
     const voters = await this.store.listVoters(electionId);
     return voters.map((v) => ({
-      id: v.id, studentId: v.studentId, fullName: v.fullName,
+      id: v.id, memberId: v.memberId, fullName: v.fullName,
       status: v.status, statusReason: v.statusReason,
     }));
   }
@@ -484,8 +484,8 @@ export class PlatformService {
     return station;
   }
 
-  private async eligibleVoter(electionId: string, studentId: string): Promise<VoterRecord> {
-    const voter = await this.store.findVoterByStudentId(electionId, studentId);
+  private async eligibleVoter(electionId: string, memberId: string): Promise<VoterRecord> {
+    const voter = await this.store.findVoterByMemberId(electionId, memberId);
     if (!voter) throw new Error('NOT_ELIGIBLE: voter is not on the register for this election');
     if (voter.status !== 'eligible') throw new Error(`NOT_ELIGIBLE: voter status is ${voter.status}`);
     return voter;
@@ -509,18 +509,18 @@ export class PlatformService {
     }
   }
 
-  /** DEC-004: request a one-time code for Student ID + OTP voting. */
-  async requestOtp(electionId: string, studentId: string): Promise<{ sent: true; devCode?: string; channel?: string }> {
+  /** DEC-004: request a one-time code for Member ID + OTP voting. */
+  async requestOtp(electionId: string, memberId: string): Promise<{ sent: true; devCode?: string; channel?: string }> {
     const election = await this.electionOrThrow(electionId);
     this.assertVotingWindow(election);
-    // Per-voter OTP throttling, not per-IP (campus NAT, SCALE s.5.5).
-    const throttleKey = `${electionId}:${studentId.toLowerCase()}`;
+    // Per-voter OTP throttling, not per-IP (shared-network NAT, SCALE s.5.5).
+    const throttleKey = `${electionId}:${memberId.toLowerCase()}`;
     const now = Date.now();
     const recent = (otpRequestLog.get(throttleKey) ?? []).filter((t) => now - t < 10 * 60_000);
     if (recent.length >= 5) throw new Error('OTP_RATE_LIMITED: too many code requests; wait before trying again');
     recent.push(now);
     otpRequestLog.set(throttleKey, recent);
-    const voter = await this.eligibleVoter(electionId, studentId);
+    const voter = await this.eligibleVoter(electionId, memberId);
     const challengeKey = `${electionId}:${voter.id}`;
     const existing = await this.store.getOtpChallenge(challengeKey);
     const existingActive = existing && existing.expiresAt > Date.now();
@@ -544,7 +544,7 @@ export class PlatformService {
     // Delivered via env-configured providers (DEC-004 §3); the dev outbox —
     // and the returned devCode — exist only outside production (F-04).
     const channel = await this.otpDelivery.deliver({
-      electionId, studentId, code, email: voter.email || undefined, phone: voter.phone || undefined,
+      electionId, memberId, code, email: voter.email || undefined, phone: voter.phone || undefined,
     });
     await this.log(election.organizationId, null, 'voting.otpRequest', `election:${electionId}`, `success:${channel}`);
     return channel === 'dev' ? { sent: true, devCode: code, channel } : { sent: true, channel };
@@ -560,12 +560,12 @@ export class PlatformService {
     return token;
   }
 
-  async verifyOtp(electionId: string, studentId: string, code: string): Promise<{ ballotSession: string }> {
+  async verifyOtp(electionId: string, memberId: string, code: string): Promise<{ ballotSession: string }> {
     const election = await this.electionOrThrow(electionId);
     this.assertVotingWindow(election);
-    const voter = await this.eligibleVoter(electionId, studentId);
+    const voter = await this.eligibleVoter(electionId, memberId);
     const key = `${electionId}:${voter.id}`;
-    const verifyKey = `${electionId}:${studentId.toLowerCase()}`;
+    const verifyKey = `${electionId}:${memberId.toLowerCase()}`;
     const now = Date.now();
     const failures = (otpVerifyFailures.get(verifyKey) ?? []).filter((t) => now - t < 10 * 60_000);
     if (failures.length >= 10) {
@@ -589,7 +589,7 @@ export class PlatformService {
   }
 
   /** Assisted flow: officer verifies identity, voter session opens privately. */
-  async startAssistedSession(officerUserId: string, stationId: string, electionId: string, studentId: string): Promise<{ ballotSession: string }> {
+  async startAssistedSession(officerUserId: string, stationId: string, electionId: string, memberId: string): Promise<{ ballotSession: string }> {
     const election = await this.electionOrThrow(electionId);
     this.assertVotingWindow(election);
     const station = await this.store.getStation(stationId);
@@ -599,7 +599,7 @@ export class PlatformService {
       (a) => a.userId === officerUserId && a.role === 'station_officer' && a.stationId === stationId,
     );
     if (!isOfficer) throw new Error('FORBIDDEN: user is not the station officer for this station');
-    const voter = await this.eligibleVoter(electionId, studentId);
+    const voter = await this.eligibleVoter(electionId, memberId);
     await this.log(election.organizationId, officerUserId, 'station.sessionStart', `election:${electionId}`, 'success');
     return { ballotSession: await this.openBallotSession(voter, electionId, 'assisted') };
   }
@@ -693,8 +693,8 @@ export class PlatformService {
     }
   }
 
-  async submissionStatus(electionId: string, studentId: string): Promise<{ hasVoted: boolean }> {
-    const voter = await this.eligibleVoter(electionId, studentId);
+  async submissionStatus(electionId: string, memberId: string): Promise<{ hasVoted: boolean }> {
+    const voter = await this.eligibleVoter(electionId, memberId);
     const entitlement = await this.store.findEntitlement(electionId, voter.id);
     return { hasVoted: Boolean(entitlement?.consumedAt) };
   }

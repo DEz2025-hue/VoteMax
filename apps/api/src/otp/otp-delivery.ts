@@ -10,7 +10,7 @@ import { logEvent } from '../common/logger';
 
 export interface OtpMessage {
   electionId: string;
-  studentId: string;
+  memberId: string;
   code: string;
   email?: string;
   phone?: string;
@@ -142,7 +142,7 @@ export class WebhookSmsSender implements OtpSender {
   }
 }
 
-export interface DevOutboxEntry { electionId: string; studentId: string; code: string; at: string }
+export interface DevOutboxEntry { electionId: string; memberId: string; code: string; at: string }
 
 /**
  * Selects a configured sender (email first, then SMS per DEC-004 channel
@@ -198,7 +198,7 @@ export class OtpDelivery {
       }
     }
     if (this.devAllowed) {
-      this.devOutbox.push({ electionId: msg.electionId, studentId: msg.studentId, code: msg.code, at: new Date().toISOString() });
+      this.devOutbox.push({ electionId: msg.electionId, memberId: msg.memberId, code: msg.code, at: new Date().toISOString() });
       return 'dev';
     }
     throw new Error('OTP_DELIVERY_UNAVAILABLE: no configured provider could deliver the code');

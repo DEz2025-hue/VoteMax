@@ -16,7 +16,7 @@ export default function ElectionAccess() {
       </p>
       <form onSubmit={(e) => { e.preventDefault(); router.push(`/vote?org=${encodeURIComponent(slug.trim())}`); }}>
         <Field label="Organization code" htmlFor="org-code">
-          <Input id="org-code" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="e.g. ul" autoComplete="organization" required />
+          <Input id="org-code" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="e.g. acme" autoComplete="organization" required />
         </Field>
         <Button type="submit" variant="primary" block disabled={!slug.trim()}>Continue to voter verification</Button>
       </form>

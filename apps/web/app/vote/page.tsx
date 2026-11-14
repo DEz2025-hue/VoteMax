@@ -55,7 +55,7 @@ function VoteFlow() {
   const [orgSlug, setOrgSlug] = useState('');
   const [elections, setElections] = useState<PublicElection[]>([]);
   const [electionId, setElectionId] = useState('');
-  const [studentId, setStudentId] = useState('');
+  const [memberId, setMemberId] = useState('');
   const [code, setCode] = useState('');
   const [devHint, setDevHint] = useState('');
   const [session, setSession] = useState('');
@@ -148,7 +148,7 @@ function VoteFlow() {
         <Card title="Find your election">
           <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await findElections(); }); }}>
             <Field label="Organization code" htmlFor="org-slug" hint="The code your election officer gave you — it is not a secret.">
-              <Input id="org-slug" value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} required autoComplete="organization" placeholder="e.g. ul" />
+              <Input id="org-slug" value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} required autoComplete="organization" placeholder="e.g. acme" />
             </Field>
             <Button type="submit" variant="secondary" block disabled={busy || !orgSlug.trim()}>
               {busy ? 'Searching…' : 'Find my election'}
@@ -178,12 +178,12 @@ function VoteFlow() {
 
           <hr className="divider" />
           <form onSubmit={(e) => { e.preventDefault(); if (!electionId) return; void act(async () => {
-            const r = await call(`/elections/${electionId}/voting/otp/request`, { studentId });
+            const r = await call(`/elections/${electionId}/voting/otp/request`, { memberId });
             if (typeof r.devCode === 'string') setDevHint(`Local test code: ${r.devCode} (shown only outside production)`);
             setStep('code');
           }); }}>
-            <Field label="Student ID" htmlFor="student-id">
-              <Input id="student-id" value={studentId} onChange={(e) => setStudentId(e.target.value)} required autoComplete="username" />
+            <Field label="Member ID" htmlFor="member-id">
+              <Input id="member-id" value={memberId} onChange={(e) => setMemberId(e.target.value)} required autoComplete="username" />
             </Field>
             <Button type="submit" variant="primary" size="lg" block disabled={busy || !electionId}>
               {busy ? 'Sending…' : 'Send my code'}
@@ -199,7 +199,7 @@ function VoteFlow() {
           </p>
           {devHint && <Alert kind="info">{devHint}</Alert>}
           <form onSubmit={(e) => { e.preventDefault(); void act(async () => {
-            const r = await call(`/elections/${electionId}/voting/otp/verify`, { studentId, code });
+            const r = await call(`/elections/${electionId}/voting/otp/verify`, { memberId, code });
             const s = String(r.ballotSession);
             setSession(s);
             const status = await getJson(`/elections/${electionId}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
@@ -277,7 +277,7 @@ function VoteFlow() {
             <Button variant="primary" size="lg" block disabled={busy} onClick={() => void act(async () => {
               const r = await call('/voting/submit', {
                 ballotSession: session, selections,
-                idempotencyKey: `${electionId}-${studentId}-submit`,
+                idempotencyKey: `${electionId}-${memberId}-submit`,
               });
               setReceipt(String(r.receiptId));
               setStep('done');

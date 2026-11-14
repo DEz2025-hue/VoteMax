@@ -11,7 +11,7 @@ export default function HelpPage() {
       <section className="card">
         <h2>Before you start</h2>
         <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
-          <li>Find your <strong>student ID</strong> and your <strong>registered email or phone number</strong>.</li>
+          <li>Find your <strong>member ID</strong> and your <strong>registered email or phone number</strong>.</li>
           <li>Keep a quiet, private space — remote voting cannot stop someone looking over your shoulder.</li>
           <li>Have a stable internet connection. Voting takes about two minutes.</li>
         </ul>
@@ -21,7 +21,7 @@ export default function HelpPage() {
         <h2>Step by step</h2>
         <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
           <li><strong>Find your election.</strong> Go to the Vote page and enter the organization code your election officer gave you, then pick your election.</li>
-          <li><strong>Enter your student ID</strong> and ask for a verification code. It is sent to your registered email or phone and expires in 10 minutes.</li>
+          <li><strong>Enter your member ID</strong> and ask for a verification code. It is sent to your registered email or phone and expires in 10 minutes.</li>
           <li><strong>Enter the code.</strong> This proves it is you and unlocks your ballot.</li>
           <li><strong>Make your choices</strong> for each position. You can abstain by leaving a position blank where allowed.</li>
           <li><strong>Review carefully</strong> — after you submit, your ballot cannot be changed.</li>
@@ -60,8 +60,8 @@ export default function HelpPage() {
         <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
           <li><strong>"No elections found."</strong> Check the organization code spelling, or ask your election officer.</li>
           <li><strong>Code not arriving.</strong> Check spam/junk, confirm your registered phone number, and request a new code — old codes expire.</li>
-          <li><strong>"Already voted."</strong> One ballot per voter is enforced. If you did not vote, contact your election officer immediately with your student ID.</li>
-          <li><strong>Page froze or connection dropped.</strong> Refresh and start again with your student ID — your ballot is only counted when you press Submit, and submitting twice is safe.</li>
+          <li><strong>"Already voted."</strong> One ballot per voter is enforced. If you did not vote, contact your election officer immediately with your member ID.</li>
+          <li><strong>Page froze or connection dropped.</strong> Refresh and start again with your member ID — your ballot is only counted when you press Submit, and submitting twice is safe.</li>
           <li><strong>Lost your confirmation reference?</strong> Ask your election officer to check your submission status with a verified session.</li>
         </ul>
         <p className="muted small" style={{ margin: '12px 0 0' }}>

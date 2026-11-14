@@ -35,7 +35,7 @@ Requirements use "shall" for mandatory behavior.
 
 ## 3. Product Context
 
-- **Initial users:** a university election committee, registrars, polling station officers, candidates, observers, auditors, and 5,000 to 10,000 student voters.
+- **Initial users:** an organization election committee, registrars, polling station officers, candidates, observers, auditors, and 5,000 to 10,000 member voters.
 - **Initial channels:** online (primary) and connected assisted stations (secondary).
 - **Offline voting:** disabled for the first live election.
 - **Interfaces:** web application and PWA only. No native mobile applications in the first release.
@@ -271,7 +271,7 @@ A requirements traceability matrix mapping requirement IDs to tests shall be mai
 1. The pilot election authority will accept an electronic process alongside or in place of paper (to be confirmed, DEC-010).
 2. Voters in the pilot can be reached by at least one verification channel (to be defined, DEC-004).
 3. Reliable power and internet are available at assisted stations during the voting window.
-4. Student voters generally have access to a smartphone or can use an assisted station.
+4. Member voters generally have access to a smartphone or can use an assisted station.
 5. Planning figures in EMP-FOUND-001 section 7.1 are targets, not measured capabilities.
 
 ## 8. Dependencies
@@ -281,7 +281,7 @@ A requirements traceability matrix mapping requirement IDs to tests shall be mai
 - Cryptographic protocol and key custody decision (DEC-006).
 - Hosting provider and region (DEC-002).
 - Independent security assessor (DEC-007).
-- Confirmed pilot university and election authority (DEC-010).
+- Confirmed pilot organization and election authority (DEC-010).
 
 ## 9. Out of Scope
 

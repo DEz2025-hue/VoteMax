@@ -20,7 +20,7 @@
 |---|---|---|
 | 1. Your role and its limits | You help voters *reach* the ballot; you never see, influence, or alter a selection (FR-AST-005). The system enforces this; your conduct must match it | EMP-STAKE-001 §4.8 |
 | 2. Station operation | Opening checks, officer login (assigned station only), starting a voter session, session timeout/clearing, closing counts | API station flow; EMP-LIFE-001 §5.5 |
-| 3. Identity check | Verifying the voter's student ID against the station procedure; starting the session; stepping away for private marking | DEC-004 assisted fallback |
+| 3. Identity check | Verifying the voter's member ID against the station procedure; starting the session; stepping away for private marking | DEC-004 assisted fallback |
 | 4. Accessibility assistance | Helping a voter operate the device without directing choices; offering, never assuming, assistance | NFR-ACC-004 |
 | 5. Problems and escalation | Voter not on register, OTP issues, device/connectivity faults: support scripts, when to escalate to Ops, relocation support | Runbook §5 (S3) |
 | 6. Privacy and conduct | No phones/cameras at the ballot screen, no discussing any voter's participation beyond operations, incident reporting without fear of penalty (SEC-PER-05) | SEC-PER-02/05 |

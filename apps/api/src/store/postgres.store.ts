@@ -292,7 +292,7 @@ export class PostgresStore implements PlatformStore {
 
   private mapVoter(row: typeof schema.voterRecords.$inferSelect): VoterRecord {
     return {
-      id: row.id, electionId: row.electionId, studentId: row.studentId,
+      id: row.id, electionId: row.electionId, memberId: row.memberId,
       fullName: row.fullName, email: row.email ?? '', phone: row.phone ?? '',
       status: row.status as VoterStatus, statusReason: row.statusReason,
     };
@@ -304,10 +304,10 @@ export class PostgresStore implements PlatformStore {
     return rows.map((r) => this.mapVoter(r));
   }
 
-  async findVoterByStudentId(electionId: string, studentId: string): Promise<VoterRecord | null> {
+  async findVoterByMemberId(electionId: string, memberId: string): Promise<VoterRecord | null> {
     const [row] = await this.database.select().from(schema.voterRecords).where(and(
       eq(schema.voterRecords.electionId, electionId),
-      sql`lower(${schema.voterRecords.studentId}) = lower(${studentId})`,
+      sql`lower(${schema.voterRecords.memberId}) = lower(${memberId})`,
     ));
     return row ? this.mapVoter(row) : null;
   }
@@ -376,7 +376,7 @@ export class PostgresStore implements PlatformStore {
     await this.database.transaction(async (tx) => {
       for (const batch of chunks(voters, CHUNK)) {
         await tx.insert(schema.voterRecords).values(batch.map((v) => ({
-          id: v.id, electionId: v.electionId, studentId: v.studentId,
+          id: v.id, electionId: v.electionId, memberId: v.memberId,
           fullName: v.fullName, email: v.email || null, phone: v.phone || null,
           status: v.status, statusReason: v.statusReason,
         })));

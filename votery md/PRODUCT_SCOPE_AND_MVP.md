@@ -14,11 +14,11 @@
 
 This document defines the boundary of the first release: what the Minimum Viable Product (MVP) includes, what it excludes, and what must be true before a live election is authorized.
 
-In EMP, "minimum" does not mean "demo." The MVP is the smallest product that can **safely run a real university student union election**. A software demonstration alone is not approval for a live election (EMP-FOUND-001 section 7.3).
+In EMP, "minimum" does not mean "demo." The MVP is the smallest product that can **safely run a real organizational election**. A software demonstration alone is not approval for a live election (EMP-FOUND-001 section 7.3).
 
 ## 2. MVP Definition
 
-The MVP is a web-first platform that allows one organization (the pilot university) to:
+The MVP is a web-first platform that allows one organization (the pilot organization) to:
 
 1. Be set up as an isolated tenant.
 2. Configure an election with positions and candidates.
@@ -126,7 +126,7 @@ These are planning values and engineering targets, not measured capabilities.
 | Cryptographic design needs specialist review | Delays tally and secrecy architecture | Engage specialist reviewer at architecture stage, not after build |
 | Legal review finds additional requirements | Scope increase | Start DEC-005 in the first phase |
 | Pressure to enable offline for pilot | Safety risk | Offline remains disabled absent DEC-008 approval |
-| Pilot university delays confirmation | Schedule risk | Build to configurable assumptions; confirm DEC-010 early |
+| Pilot organization delays confirmation | Schedule risk | Build to configurable assumptions; confirm DEC-010 early |
 | Scope creep from stakeholders | Quality risk | Change control through the Product Owner |
 
 ## 9. Change Control

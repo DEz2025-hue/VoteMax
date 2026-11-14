@@ -15,9 +15,9 @@ import { logEvent } from '../common/logger';
  *
  * Design rules:
  * - Signals are salted hashes only. Raw IPs, device fingerprints, and actor
- *   identifiers (student IDs, emails, user IDs, session tokens) are never
+ *   identifiers (member IDs, emails, user IDs, session tokens) are never
  *   persisted; fraud rows are never joined to ballot records (SEC-BAL-02).
- * - Campus NAT tolerance: IP velocity thresholds are deliberately high and
+ * - Shared-network NAT tolerance: IP velocity thresholds are deliberately high and
  *   IP-based actions require extreme counts; device-fingerprint correlation
  *   is the primary harvesting signal.
  * - Hard blocks require corroborated high-confidence patterns (e.g. one
@@ -251,7 +251,7 @@ export class FraudService {
       }
     }
 
-    // ---- OTP velocity (per-actor and per-IP; IP thresholds campus-NAT safe) ----
+    // ---- OTP velocity (per-actor and per-IP; IP thresholds shared-network safe) ----
     if (otpSurfaces && refHash && electionId) {
       const n = await this.count({ kind: 'actor', signalHash: refHash, electionId, surface: 'otp_request' }, now, 60 * MIN);
       if (s === 'otp_request' && n > 6) {

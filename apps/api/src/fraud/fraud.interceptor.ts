@@ -60,7 +60,7 @@ function clientIp(req: FraudRequest): string | undefined {
 function deriveRef(req: FraudRequest): string | undefined {
   const b = req.body ?? {};
   const candidates = [
-    b.studentId, b.email, b.officerUserId, b.userId, b.voterId,
+    b.memberId, b.email, b.officerUserId, b.userId, b.voterId,
     b.certifiedBy, b.authorizedBy, b.approvers && Array.isArray(b.approvers) ? b.approvers[0] : undefined,
     req.principal?.userId,
     typeof b.ballotSession === 'string' ? `bs:${b.ballotSession}` : undefined,

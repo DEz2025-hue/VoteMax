@@ -53,11 +53,11 @@ describe('FraudService (SEC-VOT-10)', () => {
     expect(store.fraudEvents.some((e) => e.rule === 'block_hit')).toBe(true);
   });
 
-  it('does not block a shared campus IP with many voters but few per device', async () => {
+  it('does not block a shared network IP with many voters but few per device', async () => {
     const store = new InMemoryStore();
     const svc = new FraudService(store);
     const electionId = randomUUID();
-    const ip = '197.215.9.9'; // campus NAT
+    const ip = '197.215.9.9'; // shared-network NAT
     // 25 distinct voters behind one IP, each on their own device — under the
     // 20-distinct-IP sweep threshold? No: 25 >= 20 → throttle, never block.
     for (let i = 1; i <= 25; i++) {

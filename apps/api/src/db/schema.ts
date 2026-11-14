@@ -149,7 +149,7 @@ export const voterRecords = identitySchema.table('voter_records', {
   electionId: uuid('election_id')
     .notNull()
     .references(() => elections.id),
-  studentId: text('student_id').notNull(),
+  memberId: text('member_id').notNull(),
   fullName: text('full_name').notNull(),
   email: text('email'),
   phone: text('phone'),

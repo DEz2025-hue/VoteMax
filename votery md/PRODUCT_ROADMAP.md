@@ -12,7 +12,7 @@
 
 ## 1. Purpose
 
-This roadmap sequences the work needed to reach a safely authorized pilot election and beyond. It is organized by **phases with exit criteria**, not calendar dates. No dates are committed because the pilot university, election date, team size, and hosting provider are not yet confirmed (DEC-002, DEC-010).
+This roadmap sequences the work needed to reach a safely authorized pilot election and beyond. It is organized by **phases with exit criteria**, not calendar dates. No dates are committed because the pilot organization, election date, team size, and hosting provider are not yet confirmed (DEC-002, DEC-010).
 
 Once the pilot election date is known, phases are scheduled **backward** from it, with the dress rehearsal and independent security review fixed first.
 
@@ -48,7 +48,7 @@ Once the pilot election date is known, phases are scheduled **backward** from it
 | Work item | Output |
 |---|---|
 | Complete the eight foundation documents | Approved EMP document set |
-| Confirm pilot university and election authority | DEC-010 closed |
+| Confirm pilot organization and election authority | DEC-010 closed |
 | Begin legal and data-protection review | DEC-005 in progress |
 | Define voter verification method options | DEC-004 options paper |
 | Shortlist specialist cryptographic reviewer and independent assessor | DEC-006 and DEC-007 engagement started |
@@ -199,7 +199,7 @@ Future expansion must not weaken the security and privacy guarantees of the init
 | DEC-007 independent assessor | Phase 4 start | Assurance gate unachievable |
 | DEC-005 legal review | Phase 5 | Legal non-approval |
 | DEC-002 hosting | Phase 1 | Delay in environments and capacity validation |
-| DEC-010 pilot university | Phase 0 | No concrete election to design to |
+| DEC-010 pilot organization | Phase 0 | No concrete election to design to |
 
 ## 6. Roadmap Risks
 

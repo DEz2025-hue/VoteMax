@@ -33,7 +33,7 @@ Permissions defined here must be **enforced on the server**, not merely hidden i
 | Stakeholder | Interest | Involvement |
 |---|---|---|
 | Organization election committee | Legitimate, defensible result | Authority over the specific election and its rules |
-| Organization leadership (for example, university administration) | Reputation, compliance | Approves use of the platform |
+| Organization leadership (for example, organization administration) | Reputation, compliance | Approves use of the platform |
 | Voters | Easy, private, trustworthy voting | Cast ballots |
 | Candidates and their supporters | Fairness, transparency | Contest the election; observe |
 | Polling station officers | Smooth operation | Assist voters at stations |

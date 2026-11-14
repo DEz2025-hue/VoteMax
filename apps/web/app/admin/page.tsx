@@ -88,7 +88,7 @@ const SECTION_CAPS: Record<Section, string[]> = {
 };
 
 interface AdminUser { id: string; email: string; displayName: string; mfaEnrolled: boolean }
-interface VoterRow { id: string; studentId: string; fullName: string; status: string; statusReason: string | null }
+interface VoterRow { id: string; memberId: string; fullName: string; status: string; statusReason: string | null }
 interface StationRow { id: string; name: string }
 interface PositionRow { id: string; title: string; seats: number; maxChoices: number; candidates?: { id: string; fullName: string; statement: string | null }[] }
 interface ElectionDetail {
@@ -405,8 +405,8 @@ export default function AdminPage() {
                   if (org.slug) sessionStorage.setItem('votery.orgSlug', org.slug);
                 }); }}>
                 <div className="form-grid">
-                  <Field label="Organization name" htmlFor="org-name"><Input id="org-name" name="name" required placeholder="University of Liberia" /></Field>
-                  <Field label="Slug — voter access code" htmlFor="org-slug-input"><Input id="org-slug-input" name="slug" required placeholder="ul" /></Field>
+                  <Field label="Organization name" htmlFor="org-name"><Input id="org-name" name="name" required placeholder="Example Organization" /></Field>
+                  <Field label="Slug — voter access code" htmlFor="org-slug-input"><Input id="org-slug-input" name="slug" required placeholder="example-org" /></Field>
                 </div>
                 <Button type="submit" variant="primary" disabled={!capOrg('organization.create')} title={capOrg('organization.create') ? undefined : 'Requires the platform administrator role'}>Create organization</Button>
               </form>
@@ -483,7 +483,7 @@ export default function AdminPage() {
                   await refreshElection();
                 }); }}>
                 <div className="form-grid">
-                  <Field label="Election name" htmlFor="election-name"><Input id="election-name" name="name" required placeholder="Student Union 2026" /></Field>
+                  <Field label="Election name" htmlFor="election-name"><Input id="election-name" name="name" required placeholder="Board Election 2026" /></Field>
                   <Field label="Voting opens" htmlFor="election-opens"><Input id="election-opens" name="opens" type="datetime-local" required /></Field>
                   <Field label="Voting closes" htmlFor="election-closes"><Input id="election-closes" name="closes" type="datetime-local" required /></Field>
                 </div>
@@ -549,7 +549,7 @@ export default function AdminPage() {
                   await refreshStations();
                 }); }}>
                 <div className="form-grid">
-                  <Field label="Polling station name" htmlFor="station-name"><Input id="station-name" name="station" required placeholder="Main Campus Station" /></Field>
+                  <Field label="Polling station name" htmlFor="station-name"><Input id="station-name" name="station" required placeholder="Main Hall Station" /></Field>
                   <Field label="Station" htmlFor="station-select"><Select id="station-select" name="stationSelect" onChange={(e) => setStationId(e.target.value)}><option value="">Select…</option>{stationOptions}</Select></Field>
                 </div>
                 <Button type="submit" variant="primary" disabled={!electionId || !cap('election.configure')}>Create station</Button>
@@ -566,14 +566,14 @@ export default function AdminPage() {
                 <p className="muted small" style={{ marginTop: 0 }}>Start a station session for a voter. The officer identity must match the signed-in user.</p>
                 <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                   void act('Start assisted session', async () => {
-                    const r = await call(`/elections/${electionId}/stations/${stationId}/session`, { officerUserId: userId, studentId: f.get('studentId') }) as { ballotSession?: string };
+                    const r = await call(`/elections/${electionId}/stations/${stationId}/session`, { officerUserId: userId, memberId: f.get('memberId') }) as { ballotSession?: string };
                     setDetail(JSON.stringify(r, null, 2));
                     setAssistedLink(r.ballotSession ? `${window.location.origin}/vote?session=${encodeURIComponent(r.ballotSession)}` : '');
                   }); }}>
                   <div className="form-grid">
                     <Field label="Station" htmlFor="session-station"><Select id="session-station" name="sessionStation" required disabled={!stationOptions.length} onChange={(e) => setStationId(e.target.value)}><option value="">Select…</option>{stationOptions}</Select></Field>
                     <Field label="Station ID" htmlFor="session-station-id" hint="Paste the station ID if it is not listed."><Input id="session-station-id" value={stationId} onChange={(e) => setStationId(e.target.value)} /></Field>
-                    <Field label="Student ID" htmlFor="session-student"><Input id="session-student" name="studentId" required /></Field>
+                    <Field label="Member ID" htmlFor="session-member"><Input id="session-member" name="memberId" required /></Field>
                   </div>
                   <Button type="submit" variant="primary" disabled={!electionId || !stationId || !userId || !cap('station.runSession', { stationId })}
                     title={cap('station.runSession', { stationId }) ? undefined : 'Requires the station_officer role assigned to this station'}>Start session</Button>
@@ -627,17 +627,17 @@ export default function AdminPage() {
                   setDetail(JSON.stringify(result, null, 2));
                   await refreshVoters(); await refreshElection();
                 }); }}>
-                <Field label="Voter register CSV (studentId, fullName, email, phone)" htmlFor="register-csv">
-                  <Textarea id="register-csv" name="csv" required rows={7} placeholder={'studentId,fullName,email,phone\nS001,Alice Doe,alice@example.edu,'} />
+                <Field label="Voter register CSV (memberId, fullName, email, phone)" htmlFor="register-csv">
+                  <Textarea id="register-csv" name="csv" required rows={7} placeholder={'memberId,fullName,email,phone\nM001,Alice Doe,alice@example.org,'} />
                 </Field>
                 <Button type="submit" variant="primary" disabled={!electionId || !cap('register.manage')}>Import register</Button>
               </form>
               <div style={{ marginTop: 18 }}>
                 {voters.length ? (
-                  <Table head={['Student ID', 'Name', 'Status', 'Resolve']}>
+                  <Table head={['Member ID', 'Name', 'Status', 'Resolve']}>
                     {voters.map((v) => (
                       <tr key={v.id}>
-                        <td><code>{v.studentId}</code></td><td>{v.fullName}</td>
+                        <td><code>{v.memberId}</code></td><td>{v.fullName}</td>
                         <td><Badge tone={statusPill(v.status)}>{v.status}</Badge>{v.statusReason ? <span className="small muted"> — {v.statusReason}</span> : null}</td>
                         <td>{v.status === 'duplicate_unresolved' && (
                           <span style={{ display: 'inline-flex', gap: 6 }}>

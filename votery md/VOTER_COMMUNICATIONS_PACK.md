@@ -12,7 +12,7 @@
 
 ## 1. Core Voter Guide (help page text — FR-SUP-004)
 
-**How to vote.** 1) Open the voting page. 2) Enter your student ID. 3) We send a 6-digit code to your registered email or phone — it lasts 10 minutes and works once. 4) Choose your candidates, check the review screen, submit. You will see a confirmation reference. **That reference does not show your choices, and nobody can use it to see how you voted.**
+**How to vote.** 1) Open the voting page. 2) Enter your member ID. 3) We send a 6-digit code to your registered email or phone — it lasts 10 minutes and works once. 4) Choose your candidates, check the review screen, submit. You will see a confirmation reference. **That reference does not show your choices, and nobody can use it to see how you voted.**
 
 **Check you are registered.** If your code does not arrive or your ID is not accepted, contact the election help desk (§4) *before* the voting window — not during the last hour.
 
@@ -20,7 +20,7 @@
 
 **An honest limit.** Voting on your own phone or computer means someone could look over your shoulder or pressure you. We cannot prevent that. If it is a concern, vote at an assisted voting station instead, where you mark your ballot in private.
 
-**Already voted?** You can check that your ballot was accepted on the status page with your student ID. It confirms acceptance only — never your selections.
+**Already voted?** You can check that your ballot was accepted on the status page with your member ID. It confirms acceptance only — never your selections.
 
 ## 2. Message Schedule (per election)
 
@@ -37,9 +37,9 @@ No message ever contains selections, full credentials, or anything reusable for 
 
 ## 3. Templates
 
-**3.1 Registration.** “Hello [first name], you are registered to vote in [election] at [university]. If your details look wrong, contact [help desk] before [date].”
+**3.1 Registration.** “Hello [first name], you are registered to vote in [election] at [organization]. If your details look wrong, contact [help desk] before [date].”
 
-**3.2 Before voting.** “Voting in [election] opens [date] at [time] and closes at [time]. You will need your student ID and access to your email/phone for a one-time code. How to vote: [link].”
+**3.2 Before voting.** “Voting in [election] opens [date] at [time] and closes at [time]. You will need your member ID and access to your email/phone for a one-time code. How to vote: [link].”
 
 **3.3 Open/closing.** “Voting is now open for [election] until [time]: [link].” / “Last call: [election] voting closes at [time]: [link].”
 
@@ -49,7 +49,7 @@ No message ever contains selections, full credentials, or anything reusable for 
 
 | Voter says | Do | Never |
 |---|---|---|
-| “My code didn't arrive” | Confirm student ID spelling; check register contact on file; resend; if channels fail, direct to an assisted station | Ask them to read a code to you and type it in for them |
+| “My code didn't arrive” | Confirm member ID spelling; check register contact on file; resend; if channels fail, direct to an assisted station | Ask them to read a code to you and type it in for them |
 | “It says I've already voted” | Check submission status; if they dispute it, open a registrar case and escalate to the committee with the audit record | Tell anyone what the recorded ballot contains (you cannot see it — say so) |
 | “The page won't load” | Try the station network/another device; check the incident board; log the report with time and station | Promise an extension — that is the committee's decision |
 | “Someone is pressuring me” | Offer the assisted station; give the committee contact; do not record selections or intervene in the choice | Repeat or report their intended choices to anyone |

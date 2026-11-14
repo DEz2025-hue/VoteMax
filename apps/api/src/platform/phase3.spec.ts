@@ -18,15 +18,15 @@ function future(days: number): string {
   return new Date(Date.now() + days * 86400_000).toISOString();
 }
 
-async function vote(studentId: string, candidateId: string | null, key?: string): Promise<string> {
-  const { devCode } = await svc.requestOtp(electionId, studentId);
-  const { ballotSession } = await svc.verifyOtp(electionId, studentId, devCode!);
+async function vote(memberId: string, candidateId: string | null, key?: string): Promise<string> {
+  const { devCode } = await svc.requestOtp(electionId, memberId);
+  const { ballotSession } = await svc.verifyOtp(electionId, memberId, devCode!);
   const ballot = await svc.ballotForSession(ballotSession);
   const posId = ballot.positions[0].id;
   const receipt = await svc.submitBallot(
     ballotSession,
     candidateId ? { [posId]: [candidateId] } : { [posId]: [] },
-    key ?? `key-${studentId}`,
+    key ?? `key-${memberId}`,
   );
   return receipt.receiptId;
 }
@@ -34,16 +34,16 @@ async function vote(studentId: string, candidateId: string | null, key?: string)
 beforeEach(async () => {
   svc = new PlatformService();
   store = svc.store as InMemoryStore;
-  orgId = (await svc.createOrganization(null, 'University of Liberia', 'ul')).id;
-  const admin = await svc.createUser(orgId, 'admin@ul.edu.lr', 'Admin', 'pw-long-enough');
+  orgId = (await svc.createOrganization(null, 'Example Organization', 'example')).id;
+  const admin = await svc.createUser(orgId, 'admin@example.org', 'Admin', 'pw-long-enough');
   executorId = admin.id;
-  chairId = (await svc.createUser(orgId, 'chair@ul.edu.lr', 'Chair', 'pw-long-enough')).id;
-  approver1 = (await svc.createUser(orgId, 'ap1@ul.edu.lr', 'Approver One', 'pw-long-enough')).id;
-  approver2 = (await svc.createUser(orgId, 'ap2@ul.edu.lr', 'Approver Two', 'pw-long-enough')).id;
-  const registrar = await svc.createUser(orgId, 'reg@ul.edu.lr', 'Registrar', 'pw-long-enough');
+  chairId = (await svc.createUser(orgId, 'chair@example.org', 'Chair', 'pw-long-enough')).id;
+  approver1 = (await svc.createUser(orgId, 'ap1@example.org', 'Approver One', 'pw-long-enough')).id;
+  approver2 = (await svc.createUser(orgId, 'ap2@example.org', 'Approver Two', 'pw-long-enough')).id;
+  const registrar = await svc.createUser(orgId, 'reg@example.org', 'Registrar', 'pw-long-enough');
 
   const election = await svc.createElection(admin.id, orgId, {
-    name: 'Student Union 2026', votingOpensAt: future(-1), votingClosesAt: future(1),
+    name: 'Organization Election 2026', votingOpensAt: future(-1), votingClosesAt: future(1),
   });
   electionId = election.id;
   await svc.assignRole(admin.id, orgId, chairId, 'committee_chair', electionId);
@@ -55,8 +55,8 @@ beforeEach(async () => {
   benId = (await svc.addCandidate(admin.id, electionId, positionId, 'Ben Kollie')).id;
   await svc.transition(admin.id, electionId, 'CONFIGURED');
   await svc.transition(admin.id, electionId, 'REGISTRATION');
-  const lines = ['studentId,fullName,email'];
-  for (let i = 1; i <= 6; i++) lines.push(`S00${i},Student ${i},s${i}@ul.edu.lr`);
+  const lines = ['memberId,fullName,email'];
+  for (let i = 1; i <= 6; i++) lines.push(`S00${i},Member ${i},m${i}@example.org`);
   await svc.importRegister(registrar.id, electionId, lines.join('\n'));
   await svc.freezeRegister(registrar.id, electionId);
   await svc.transition(admin.id, electionId, 'READY');
@@ -123,7 +123,7 @@ describe('Phase 3 voting and results (mock election)', () => {
     await vote('S001', adaId);
     const ballot = store.ballots[0];
     const keys = Object.keys(ballot);
-    for (const forbidden of ['voterId', 'studentId', 'sessionId', 'entitlementId', 'otp', 'selections']) {
+    for (const forbidden of ['voterId', 'memberId', 'sessionId', 'entitlementId', 'otp', 'selections']) {
       expect(keys).not.toContain(forbidden);
     }
     expect(store.audit.some((a) => JSON.stringify(a).includes(adaId))).toBe(false);
@@ -140,7 +140,7 @@ describe('Phase 3 voting and results (mock election)', () => {
   });
 
   it('assisted station flow requires the assigned officer', async () => {
-    const officer = await svc.createUser(orgId, 'officer@ul.edu.lr', 'Officer', 'pw-long-enough');
+    const officer = await svc.createUser(orgId, 'officer@example.org', 'Officer', 'pw-long-enough');
     const station = await svc.createStation(executorId, electionId, 'Main Hall Station');
     await expect(svc.startAssistedSession(officer.id, station.id, electionId, 'S003')).rejects.toThrow(/FORBIDDEN/);
     await svc.assignRole(executorId, orgId, officer.id, 'station_officer', electionId, station.id);
@@ -174,7 +174,7 @@ describe('Phase 3 voting and results (mock election)', () => {
   it('requires oversight roles for tally approvers and the certification second approver', async () => {
     await vote('S001', adaId);
     await svc.closeElection(executorId, electionId);
-    const nobody = await svc.createUser(orgId, 'nop@ul.edu.lr', 'No Role', 'pw-long-enough');
+    const nobody = await svc.createUser(orgId, 'nop@example.org', 'No Role', 'pw-long-enough');
 
     await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, nobody.id] }))
       .rejects.toThrow(/oversight role/);

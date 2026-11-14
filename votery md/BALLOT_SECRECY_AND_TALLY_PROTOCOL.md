@@ -26,7 +26,7 @@ Non-goals (stated limitations, SEC §6): protection against a compromised voter 
 | B. Homomorphic tally | Additively homomorphic encryption; only aggregates decrypted | Verifiable aggregate; no individual ballot ever decrypted | Limits ballot formats/result rules; multi-choice encoding care |
 | C. Sealed encrypted store (baseline) | Ballots encrypted under election key; split-key decryption at tally; published evidence hashes | Lowest of the three; unlinkability rests on separation + metadata discipline, not cryptography | Lowest; may fit pilot if assurance level is stated honestly |
 
-**Question for the reviewer (ARCH-Q1):** which option's assurance justifies its complexity for a 10,000-voter student election, and what claims may we publish for the chosen option (claims register, SEC-ASR-06)?
+**Question for the reviewer (ARCH-Q1):** which option's assurance justifies its complexity for a 10,000-voter organization election, and what claims may we publish for the chosen option (claims register, SEC-ASR-06)?
 
 ## 3. Design Constraints (any option must satisfy)
 

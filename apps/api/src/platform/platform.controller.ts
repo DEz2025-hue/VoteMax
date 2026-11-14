@@ -174,25 +174,25 @@ export class PlatformController {
 
   @Post('elections/:id/voting/otp/request')
   @Public()
-  requestOtp(@Param('id') id: string, @Body() body: { studentId: string }) {
-    return guard(() => this.platform.requestOtp(id, body.studentId));
+  requestOtp(@Param('id') id: string, @Body() body: { memberId: string }) {
+    return guard(() => this.platform.requestOtp(id, body.memberId));
   }
 
   @Post('elections/:id/voting/otp/verify')
   @Public()
-  verifyOtp(@Param('id') id: string, @Body() body: { studentId: string; code: string }) {
-    return guard(() => this.platform.verifyOtp(id, body.studentId, body.code));
+  verifyOtp(@Param('id') id: string, @Body() body: { memberId: string; code: string }) {
+    return guard(() => this.platform.verifyOtp(id, body.memberId, body.code));
   }
 
   @Post('elections/:id/stations/:stationId/session')
   @RequireCapability('station.runSession')
-  assistedSession(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('stationId') stationId: string, @Body() body: { officerUserId: string; studentId: string }) {
+  assistedSession(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('stationId') stationId: string, @Body() body: { officerUserId: string; memberId: string }) {
     // The officer identity asserted in the body must be the session user —
     // an officer cannot open sessions in another officer's name.
     if (body.officerUserId !== actor(req)) {
       throw new BadRequestException('FORBIDDEN: officerUserId must match the authenticated session');
     }
-    return guard(() => this.platform.startAssistedSession(body.officerUserId, stationId, id, body.studentId));
+    return guard(() => this.platform.startAssistedSession(body.officerUserId, stationId, id, body.memberId));
   }
 
   @Post('voting/ballot')
