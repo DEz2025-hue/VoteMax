@@ -163,7 +163,6 @@ export default function AdminPage() {
   const [fraudBlocks, setFraudBlocks] = useState<FraudBlockRow[] | null>(null);
   const [assignments, setAssignments] = useState<AssignmentInfo[]>([]);
   const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState('');
   const [csvText, setCsvText] = useState('');
   const [csvName, setCsvName] = useState('');
   const [dragOver, setDragOver] = useState(false);
@@ -397,7 +396,6 @@ export default function AdminPage() {
     if (!electionId) { setElection(null); return; }
     const data = await get(`/elections/${electionId}`) as unknown as ElectionDetail;
     setElection(data);
-    setDetail(JSON.stringify(data, null, 2));
   }
 
   async function refreshResults() {
@@ -972,8 +970,8 @@ export default function AdminPage() {
               </div>
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 void act('Run tally', async () => {
-                  const result = await call(`/elections/${electionId}/tally`, { authorizedBy: f.get('authorizedBy'), approvers: [f.get('approver1'), f.get('approver2')] });
-                  setDetail(JSON.stringify(result, null, 2)); await refreshResults();
+                  await call(`/elections/${electionId}/tally`, { authorizedBy: f.get('authorizedBy'), approvers: [f.get('approver1'), f.get('approver2')] });
+                  await refreshResults();
                 }); }}>
                 <div className="form-grid">
                   <Field label="Authorized by (owner)" htmlFor="tally-chair"><Select id="tally-chair" name="authorizedBy" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
@@ -982,15 +980,15 @@ export default function AdminPage() {
                 </div>
                 <div className="form-actions">
                   <Button type="submit" variant="primary" disabled={!electionId || users.length < 3 || !cap('tally.execute')}>Run tally</Button>
-                  <Button variant="secondary" disabled={!electionId || !cap('tally.verify')} onClick={() => void act('Verify tally', async () => { const r = await call(`/elections/${electionId}/tally/verify`, {}, 'POST'); setDetail(JSON.stringify(r, null, 2)); await refreshResults(); })}>Verify tally</Button>
+                  <Button variant="secondary" disabled={!electionId || !cap('tally.verify')} onClick={() => void act('Verify tally', async () => { await call(`/elections/${electionId}/tally/verify`, {}, 'POST'); await refreshResults(); })}>Verify tally</Button>
                   <Button variant="secondary" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('Refresh results', refreshResults)}>Refresh</Button>
                 </div>
               </form>
               <hr className="divider" />
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 void act('Recount', async () => {
-                  const r = await call(`/elections/${electionId}/tally/recount`, { authorizedBy: f.get('authorizedBy'), approvers: [f.get('approver1'), f.get('approver2')] });
-                  setDetail(JSON.stringify(r, null, 2)); await refreshResults();
+                  await call(`/elections/${electionId}/tally/recount`, { authorizedBy: f.get('authorizedBy'), approvers: [f.get('approver1'), f.get('approver2')] });
+                  await refreshResults();
                 }); }}>
                 <div className="form-grid">
                   <Field label="Recount authorized by (owner)" htmlFor="recount-chair"><Select id="recount-chair" name="authorizedBy" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
@@ -1002,8 +1000,8 @@ export default function AdminPage() {
               <hr className="divider" />
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 void act('Certify results', async () => {
-                  const r = await call(`/elections/${electionId}/certify`, { certifiedBy: userId, secondApprover: f.get('secondApprover') });
-                  setDetail(JSON.stringify(r, null, 2)); await refreshResults();
+                  await call(`/elections/${electionId}/certify`, { certifiedBy: userId, secondApprover: f.get('secondApprover') });
+                  await refreshResults();
                 }); }}>
                 <div className="form-grid">
                   <Field label="Certified by" htmlFor="certify-by"><Input id="certify-by" value={userId} readOnly /></Field>
@@ -1011,8 +1009,8 @@ export default function AdminPage() {
                 </div>
                 <div className="form-actions">
                   <Button type="submit" variant="primary" disabled={!electionId || !userId || users.length < 2 || !cap('results.certify')}>Certify results</Button>
-                  <Button variant="secondary" disabled={!electionId || !cap('results.publish')} onClick={() => setConfirm({ title: 'Publish results', message: 'Publish the certified report?', action: () => void act('Publish results', async () => { const r = await call(`/elections/${electionId}/publish`, {}, 'POST'); setDetail(JSON.stringify(r, null, 2)); await refreshResults(); }) })}>Publish results</Button>
-                  <Button variant="ghost" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('View report', async () => { const r = await get(`/elections/${electionId}/report`); setReport(r as unknown as Report); setDetail(JSON.stringify(r, null, 2)); })}>View report</Button>
+                  <Button variant="secondary" disabled={!electionId || !cap('results.publish')} onClick={() => setConfirm({ title: 'Publish results', message: 'Publish the certified report?', action: () => void act('Publish results', async () => { await call(`/elections/${electionId}/publish`, {}, 'POST'); await refreshResults(); }) })}>Publish results</Button>
+                  <Button variant="ghost" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('View report', async () => { const r = await get(`/elections/${electionId}/report`); setReport(r as unknown as Report); })}>View report</Button>
                 </div>
               </form>
               {report && (
@@ -1033,12 +1031,6 @@ export default function AdminPage() {
                     <div className="result-row"><span>Evidence root</span>{report.evidenceRoot ? <code>{report.evidenceRoot}</code> : <span className="muted small">available after tally</span>}</div>
                   </div>
                 </div>
-              )}
-              {detail && (
-                <details style={{ marginTop: 16 }}>
-                  <summary className="small muted" style={{ cursor: 'pointer' }}>Raw API response</summary>
-                  <pre className="detail">{detail}</pre>
-                </details>
               )}
             </Card>
           )}
