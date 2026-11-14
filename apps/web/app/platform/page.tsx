@@ -70,6 +70,7 @@ function electionPill(state: string): 'success' | 'warning' | 'error' | 'accent'
 
 export default function PlatformPage() {
   const [section, setSection] = useState<Section>('overview');
+  const [mobileNav, setMobileNav] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [denied, setDenied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,6 +83,11 @@ export default function PlatformPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [totp, setTotp] = useState('');
+
+  // Directory browsing
+  const [tenantQuery, setTenantQuery] = useState('');
+  const [tenantFilter, setTenantFilter] = useState<'all' | 'staffed' | 'unstaffed'>('all');
+  const [tenantPage, setTenantPage] = useState(0);
 
   // Directory + detail
   const [directory, setDirectory] = useState<TenantRow[] | null>(null);
@@ -244,6 +250,24 @@ export default function PlatformPage() {
   const totalElections = directory?.reduce((n, t) => n + t.electionCount, 0) ?? 0;
   const unstaffed = directory?.filter((t) => !t.staffed).length ?? 0;
 
+  const TENANTS_PER_PAGE = 8;
+  const filteredTenants = (directory ?? []).filter((t) =>
+    (tenantFilter === 'all' || (tenantFilter === 'staffed') === t.staffed) &&
+    `${t.name} ${t.slug}`.toLowerCase().includes(tenantQuery.trim().toLowerCase()));
+  const tenantPageCount = Math.max(1, Math.ceil(filteredTenants.length / TENANTS_PER_PAGE));
+  const tenantPageSafe = Math.min(tenantPage, tenantPageCount - 1);
+  const tenantRows = filteredTenants.slice(tenantPageSafe * TENANTS_PER_PAGE, tenantPageSafe * TENANTS_PER_PAGE + TENANTS_PER_PAGE);
+
+  async function copyVoterLink(slug: string) {
+    const url = `${window.location.origin}/vote?org=${encodeURIComponent(slug)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setToast({ message: `Voter link copied: ${url}`, kind: 'info' });
+    } catch {
+      setToast({ message: `Voter link: ${url}`, kind: 'info' });
+    }
+  }
+
   if (!signedIn) {
     return (
       <main className="auth-page">
@@ -279,26 +303,39 @@ export default function PlatformPage() {
   }
 
   return (
-    <main className="container" style={{ padding: '32px 20px 64px' }}>
-      <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h1>Platform administration</h1>
-          <p className="muted">Tenant governance and platform operations. Read-mostly by design; every action is audit-logged.</p>
+    <div className="admin-shell">
+      <aside className={`admin-sidebar ${mobileNav ? 'open' : ''}`}>
+        <div className="admin-brand">VoteMax Platform</div>
+        <nav className="admin-nav" aria-label="Platform sections">
+          {SECTIONS.map((s) => (
+            <button key={s.id} type="button" className={section === s.id ? 'active' : ''} onClick={() => { setSection(s.id); setMobileNav(false); }}>
+              {s.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
+      {mobileNav && <div className="drawer-backdrop" onClick={() => setMobileNav(false)} />}
+
+      <main className="admin-main">
+        <div className="admin-topbar">
+          <div>
+            <Button variant="secondary" size="sm" className="nav-toggle" onClick={() => setMobileNav((v) => !v)}>Sections</Button>
+            <h1>Platform administration</h1>
+            <div className="breadcrumbs">
+              <a href="/">Home</a><span>/</span><span>Platform</span><span>/</span><span>{SECTIONS.find((s) => s.id === section)?.label}</span>
+            </div>
+            <p className="muted small" style={{ margin: '4px 0 0' }}>Tenant governance and platform operations. Read-mostly by design; every action is audit-logged.</p>
+          </div>
+          <div className="card-actions">
+            <Badge tone="success">Signed in</Badge>
+            <Button variant="ghost" size="sm" onClick={() => void refreshAll().catch(() => undefined)} disabled={loading}>Refresh</Button>
+            <Button variant="secondary" size="sm" onClick={signOut}>Sign out</Button>
+          </div>
         </div>
-        <div className="form-actions" style={{ margin: 0 }}>
-          <Button variant="ghost" size="sm" onClick={() => void refreshAll().catch(() => undefined)} disabled={loading}>Refresh</Button>
-          <Button variant="secondary" size="sm" onClick={signOut}>Sign out</Button>
-        </div>
-      </div>
 
-      <nav className="tabs" aria-label="Platform sections" style={{ display: 'flex', gap: 8, margin: '16px 0 24px', flexWrap: 'wrap' }}>
-        {SECTIONS.map((s) => (
-          <Button key={s.id} size="sm" variant={section === s.id ? 'primary' : 'secondary'} onClick={() => setSection(s.id)}>{s.label}</Button>
-        ))}
-      </nav>
+        {status && <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>}
 
-      {status && <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>}
-
+        <div className="admin-content">
       {section === 'overview' && (
         <>
           {directory === null ? <Skeleton lines={4} /> : (
@@ -366,24 +403,52 @@ export default function PlatformPage() {
             </div>
           </Card>
 
-          <Card title="Tenants" actions={<Badge tone="neutral">{directory?.length ?? 0}</Badge>}>
+          <Card title="Tenants" actions={<Badge tone="neutral">{filteredTenants.length}{tenantQuery || tenantFilter !== 'all' ? ` of ${directory?.length ?? 0}` : ''}</Badge>}>
             {directory === null ? <Skeleton lines={4} /> : directory.length === 0 ? (
               <EmptyState title="No organizations yet">Create the first organization above.</EmptyState>
             ) : (
-              <Table head={['Name', 'Slug', 'Created', 'Users', 'Elections', 'States', 'Staffed', '']}>
-                {directory.map((t) => (
-                  <tr key={t.id}>
-                    <td>{t.name}</td>
-                    <td className="muted">{t.slug}</td>
-                    <td className="muted small">{fmtDate(t.createdAt)}</td>
-                    <td>{t.userCount}</td>
-                    <td>{t.electionCount}</td>
-                    <td className="small">{Object.entries(t.electionsByState).map(([s, n]) => `${s}×${n}`).join(' ') || '—'}</td>
-                    <td>{t.staffed ? <Badge tone="success">staffed</Badge> : <Badge tone="warning">unstaffed</Badge>}</td>
-                    <td><Button size="sm" variant="secondary" onClick={() => void openTenant(t.id)}>Manage</Button></td>
-                  </tr>
-                ))}
-              </Table>
+              <>
+                <div className="inline-form" style={{ marginBottom: 14 }}>
+                  <Field label="Search" htmlFor="tenant-search">
+                    <Input id="tenant-search" value={tenantQuery} onChange={(e) => { setTenantQuery(e.target.value); setTenantPage(0); }} placeholder="Name or slug…" />
+                  </Field>
+                  <Field label="Staffing" htmlFor="tenant-filter">
+                    <Select id="tenant-filter" value={tenantFilter} onChange={(e) => { setTenantFilter(e.target.value as typeof tenantFilter); setTenantPage(0); }}>
+                      <option value="all">All tenants</option>
+                      <option value="staffed">Staffed</option>
+                      <option value="unstaffed">Unstaffed</option>
+                    </Select>
+                  </Field>
+                </div>
+                {tenantRows.length === 0 ? (
+                  <EmptyState title="No matching organizations">Adjust the search or filter.</EmptyState>
+                ) : (
+                  <Table head={['Name', 'Slug', 'Created', 'Users', 'Elections', 'States', 'Staffed', '']}>
+                    {tenantRows.map((t) => (
+                      <tr key={t.id}>
+                        <td>{t.name}</td>
+                        <td className="muted">{t.slug}</td>
+                        <td className="muted small">{fmtDate(t.createdAt)}</td>
+                        <td>{t.userCount}</td>
+                        <td>{t.electionCount}</td>
+                        <td className="small">{Object.entries(t.electionsByState).map(([s, n]) => `${s}×${n}`).join(' ') || '—'}</td>
+                        <td>{t.staffed ? <Badge tone="success">staffed</Badge> : <Badge tone="warning">unstaffed</Badge>}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <Button size="sm" variant="secondary" onClick={() => void openTenant(t.id)}>Manage</Button>{' '}
+                          <Button size="sm" variant="ghost" onClick={() => void copyVoterLink(t.slug)}>Voter link</Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </Table>
+                )}
+                {tenantPageCount > 1 && (
+                  <div className="form-actions" style={{ marginTop: 14 }}>
+                    <Button size="sm" variant="secondary" disabled={tenantPageSafe === 0} onClick={() => setTenantPage(tenantPageSafe - 1)}>← Prev</Button>
+                    <span className="small muted">Page {tenantPageSafe + 1} of {tenantPageCount}</span>
+                    <Button size="sm" variant="secondary" disabled={tenantPageSafe >= tenantPageCount - 1} onClick={() => setTenantPage(tenantPageSafe + 1)}>Next →</Button>
+                  </div>
+                )}
+              </>
             )}
           </Card>
 
@@ -519,15 +584,18 @@ export default function PlatformPage() {
         </>
       )}
 
-      <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
-      <ConfirmDialog
-        open={confirm !== null}
-        title={confirm?.title ?? ''}
-        message={confirm?.message}
-        confirmLabel="Confirm"
-        onConfirm={() => { const c = confirm; setConfirm(null); c?.action(); }}
-        onCancel={() => setConfirm(null)}
-      />
-    </main>
+        </div>
+
+        <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
+        <ConfirmDialog
+          open={confirm !== null}
+          title={confirm?.title ?? ''}
+          message={confirm?.message}
+          confirmLabel="Confirm"
+          onConfirm={() => { const c = confirm; setConfirm(null); c?.action(); }}
+          onCancel={() => setConfirm(null)}
+        />
+      </main>
+    </div>
   );
 }
