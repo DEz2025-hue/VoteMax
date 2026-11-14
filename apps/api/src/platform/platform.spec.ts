@@ -87,6 +87,48 @@ describe('Phase 2 core workflows', () => {
     await expect(svc.registerStats(election.id)).resolves.toMatchObject({ eligible: 1, entitlements: 1 });
   });
 
+  it('auto-generates unique member IDs when the CSV omits them', async () => {
+    const election = await setupElection();
+    const position = await svc.addPosition(adminId, election.id, 'President', 1, 1);
+    await svc.addCandidate(adminId, election.id, position.id, 'Ada Kamara');
+    await svc.transition(adminId, election.id, 'CONFIGURED');
+    await svc.transition(adminId, election.id, 'REGISTRATION');
+    // No memberId column at all — every voter gets a generated VM- ID.
+    const csv = [
+      'fullName,email,phone',
+      'Alice Auto,alice.auto@example.org,',
+      'Bob Auto,,+23188000001',
+    ].join('\n');
+    const result = await svc.importRegister(registrarId, election.id, csv);
+    expect(result).toMatchObject({ eligible: 2, duplicates: 0 });
+    const voters = store.voters.filter((v) => v.electionId === election.id);
+    expect(voters).toHaveLength(2);
+    for (const v of voters) expect(v.memberId).toMatch(/^VM-[A-Z2-9]{8}$/);
+    expect(new Set(voters.map((v) => v.memberId)).size).toBe(2);
+    // A second batch generates IDs that do not collide with the first.
+    await svc.importRegister(registrarId, election.id, 'fullName,email\nCarol Auto,carol.auto@example.org');
+    const ids = store.voters.filter((v) => v.electionId === election.id).map((v) => v.memberId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('generates member IDs for blank memberId cells in a mixed CSV', async () => {
+    const election = await setupElection();
+    const position = await svc.addPosition(adminId, election.id, 'President', 1, 1);
+    await svc.addCandidate(adminId, election.id, position.id, 'Ada Kamara');
+    await svc.transition(adminId, election.id, 'CONFIGURED');
+    await svc.transition(adminId, election.id, 'REGISTRATION');
+    const csv = [
+      'memberId,fullName,email',
+      'EMP-1042,Alice Known,alice.known@example.org',
+      ',Bob Blank,bob.blank@example.org',
+    ].join('\n');
+    const result = await svc.importRegister(registrarId, election.id, csv);
+    expect(result).toMatchObject({ eligible: 2, duplicates: 0 });
+    const voters = store.voters.filter((v) => v.electionId === election.id);
+    expect(voters.find((v) => v.fullName === 'Alice Known')!.memberId).toBe('EMP-1042');
+    expect(voters.find((v) => v.fullName === 'Bob Blank')!.memberId).toMatch(/^VM-[A-Z2-9]{8}$/);
+  });
+
   it('enforces SoD-1 and audits the denied attempt (SoD-9)', async () => {
     const election = await setupElection();
     const user = await svc.createUser(orgId, 'dual@example.org', 'Dual Role', 'pw-long-enough');

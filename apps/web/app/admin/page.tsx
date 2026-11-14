@@ -622,8 +622,8 @@ export default function AdminPage() {
                   setDetail(JSON.stringify(result, null, 2));
                   await refreshVoters(); await refreshElection();
                 }); }}>
-                <Field label="Voter register CSV (memberId, fullName, email, phone)" htmlFor="register-csv">
-                  <Textarea id="register-csv" name="csv" required rows={7} placeholder={'memberId,fullName,email,phone\nM001,Alice Doe,alice@example.org,'} />
+                <Field label="Voter register CSV" hint="fullName is required; memberId is auto-generated (VM-XXXXXXXX) when blank; email or phone required for OTP delivery" htmlFor="register-csv">
+                  <Textarea id="register-csv" name="csv" required rows={7} placeholder={'fullName,email,phone\nAlice Doe,alice@example.org,+231 88 000 0000\nBob Smith,,+231 88 000 0001'} />
                 </Field>
                 <Button type="submit" variant="primary" disabled={!electionId || !cap('register.manage')}>Import register</Button>
               </form>

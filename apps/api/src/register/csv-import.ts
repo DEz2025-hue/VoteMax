@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 
 export interface VoterRow {
   memberId: string;
@@ -49,8 +49,8 @@ export function parseRegisterCsv(text: string): ParsedRegister {
     email: header.findIndex((h) => h === 'email'),
     phone: header.findIndex((h) => ['phone', 'mobile', 'tel'].includes(h)),
   };
-  if (idx.memberId < 0 || idx.fullName < 0) {
-    return { rows, errors: [{ line: 1, message: 'Header must include memberId and fullName columns' }] };
+  if (idx.fullName < 0) {
+    return { rows, errors: [{ line: 1, message: 'Header must include a fullName column' }] };
   }
 
   for (let i = 1; i < table.length; i++) {
@@ -60,8 +60,7 @@ export function parseRegisterCsv(text: string): ParsedRegister {
     const fullName = get(idx.fullName);
     const email = get(idx.email);
     const phone = get(idx.phone);
-    if (!memberId) { errors.push({ line: i + 1, message: 'Missing memberId' }); continue; }
-    if (!fullName) { errors.push({ line: i + 1, message: `Missing fullName for ${memberId}` }); continue; }
+    if (!fullName) { errors.push({ line: i + 1, message: `Missing fullName${memberId ? ` for ${memberId}` : ''}` }); continue; }
     if (email && !EMAIL_RE.test(email)) { errors.push({ line: i + 1, message: `Invalid email for ${memberId}` }); continue; }
     if (!email && !phone) { errors.push({ line: i + 1, message: `No contact (email or phone) for ${memberId}` }); continue; }
     rows.push({ memberId, fullName, email, phone });
@@ -84,8 +83,21 @@ export interface ImportResult {
   errors: { line: number; message: string }[];
 }
 
+// Unambiguous alphabet — no I, L, O, 0, or 1 — so IDs can be read aloud or handwritten.
+const MEMBER_ID_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+/** Generate a member ID that is not already present in `seen` (lowercased set). */
+function generateMemberId(seen: Set<string>): string {
+  for (;;) {
+    let id = 'VM-';
+    for (let i = 0; i < 8; i++) id += MEMBER_ID_ALPHABET[randomInt(MEMBER_ID_ALPHABET.length)];
+    if (!seen.has(id.toLowerCase())) return id;
+  }
+}
+
 /**
  * Validate and de-duplicate an import against existing records.
+ * Rows without a memberId are assigned a generated VM-XXXXXXXX ID.
  * Duplicates (same memberId, or same non-empty email) are never silently
  * dropped: they are stored as duplicate_unresolved (FR-VOT-002).
  */
@@ -101,18 +113,20 @@ export function importRows(
   const duplicates: VoterRecord[] = [];
 
   for (const row of rows) {
+    const memberId = row.memberId || generateMemberId(seenIds);
     const isDup =
-      seenIds.has(row.memberId.toLowerCase()) ||
+      seenIds.has(memberId.toLowerCase()) ||
       (row.email.length > 0 && seenEmails.has(row.email.toLowerCase()));
     const record: VoterRecord = {
       ...row,
+      memberId,
       id: randomUUID(),
       electionId,
       status: isDup ? 'duplicate_unresolved' : 'eligible',
       statusReason: isDup ? 'Duplicate memberId or email; registrar resolution required' : null,
     };
     (isDup ? duplicates : imported).push(record);
-    seenIds.add(row.memberId.toLowerCase());
+    seenIds.add(memberId.toLowerCase());
     if (row.email) seenEmails.add(row.email.toLowerCase());
   }
   return { imported, duplicates, errors };
