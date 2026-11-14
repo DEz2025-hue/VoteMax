@@ -230,6 +230,15 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn, section, electionId]);
 
+  // Resumed wizard sessions may land on step 3 while the election is still
+  // DRAFT/CONFIGURED — walk it forward to REGISTRATION so imports work.
+  useEffect(() => {
+    if (wizardStep === 3 && electionId && election && ['DRAFT', 'CONFIGURED'].includes(election.state)) {
+      void act('Open voter registration', async () => { await advanceToRegistration(); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardStep, election?.state]);
+
   async function act(label: string, fn: () => Promise<void>) {
     setStatus(`${label}: working…`);
     setStatusKind('info');
@@ -312,6 +321,19 @@ export default function AdminPage() {
     await refreshElection();
     await refreshElections();
     if (next) setWizardStep(next);
+  }
+
+  /** Walk the election forward to REGISTRATION so the register can be edited. */
+  async function advanceToRegistration() {
+    if (!electionId || !election) return;
+    const next: Record<string, string> = { DRAFT: 'CONFIGURED', CONFIGURED: 'REGISTRATION' };
+    let state = election.state;
+    for (let i = 0; i < 2 && next[state]; i++) {
+      await call(`/elections/${electionId}/transition`, { to: next[state] });
+      state = next[state];
+    }
+    await refreshElection();
+    await refreshElections();
   }
 
   function startNewElection() {
@@ -656,7 +678,11 @@ export default function AdminPage() {
               <div className="wizard-steps">
                 {([['Details', 1], ['Ballot', 2], ['Voter register', 3], ['Review & launch', 4]] as const).map(([label, step]) => (
                   <button key={step} type="button" className={`wizard-step ${wizardStep === step ? 'active' : ''} ${wizardStep > step ? 'done' : ''}`}
-                    onClick={() => goWizardStep(step)}>
+                    onClick={() => {
+                      if (step === 3 && electionId && election && ['DRAFT', 'CONFIGURED'].includes(election.state)) {
+                        void act('Open voter registration', async () => { await advanceToRegistration(); goWizardStep(3); });
+                      } else goWizardStep(step);
+                    }}>
                     <span className="wizard-step-num">{step}</span> {label}
                   </button>
                 ))}
@@ -730,7 +756,11 @@ export default function AdminPage() {
                   ) : null}
                   <div className="form-actions" style={{ marginTop: 16 }}>
                     <Button type="button" variant="ghost" onClick={() => goWizardStep(1)}>← Back</Button>
-                    <Button type="button" variant="primary" disabled={!electionId} onClick={() => goWizardStep(3)}>Save &amp; continue →</Button>
+                    <Button type="button" variant="primary" disabled={!electionId} onClick={() => {
+                      if (election && ['DRAFT', 'CONFIGURED'].includes(election.state)) {
+                        void act('Open voter registration', async () => { await advanceToRegistration(); goWizardStep(3); });
+                      } else goWizardStep(3);
+                    }}>Save &amp; continue →</Button>
                   </div>
                 </>
               )}
@@ -738,6 +768,9 @@ export default function AdminPage() {
               {wizardStep === 3 && (
                 <>
                   {!electionId && <Alert kind="info" title="Details first">Save the election details in step 1 before importing voters.</Alert>}
+                  {election && !['DRAFT', 'CONFIGURED', 'REGISTRATION'].includes(election.state) && (
+                    <Alert kind="info" title="Register sealed">This election is {election.state} — the voter register can no longer be changed.</Alert>
+                  )}
                   {election?.register && (
                     <div className="stat-grid" style={{ marginBottom: 16 }}>
                       <Stat label="Total" value={election.register.total} />
