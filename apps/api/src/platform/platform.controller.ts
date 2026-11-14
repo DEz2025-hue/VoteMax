@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -83,8 +84,18 @@ export class PlatformController {
   @RequireCapability('election.configure')
   createElection(@Req() req: { principal?: Principal }, @Body() body: {
     organizationId: string; name: string; description?: string; votingOpensAt?: string; votingClosesAt?: string; ballotOrderPolicy?: string;
+    voteType?: string; resultsMode?: string; announcement?: string;
   }) {
     return guard(() => this.platform.createElection(actor(req), body.organizationId, body));
+  }
+
+  @Patch('elections/:id')
+  @RequireCapability('election.configure')
+  updateElection(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: {
+    name?: string; description?: string; votingOpensAt?: string; votingClosesAt?: string;
+    voteType?: string; resultsMode?: string; announcement?: string;
+  }) {
+    return guard(() => this.platform.updateElectionDetails(actor(req), id, body));
   }
 
   @Get('elections')
@@ -193,8 +204,8 @@ export class PlatformController {
 
   @Get('elections/:id/participation')
   @RequireCapability('participation.viewAggregate')
-  participation(@Param('id') id: string) {
-    return guard(() => this.platform.participation(id));
+  participation(@Req() req: { principal?: Principal }, @Param('id') id: string) {
+    return guard(() => this.platform.participation(id, actor(req)));
   }
 
   @Post('elections/:id/close')
@@ -239,8 +250,8 @@ export class PlatformController {
 
   @Get('elections/:id/report')
   @RequireCapability('participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read')
-  report(@Param('id') id: string) {
-    return guard(() => this.platform.report(id));
+  report(@Req() req: { principal?: Principal }, @Param('id') id: string) {
+    return guard(() => this.platform.report(id, actor(req)));
   }
 
   @Get('audit')

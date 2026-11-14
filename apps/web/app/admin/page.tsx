@@ -57,14 +57,13 @@ const PLATFORM_UI_CAPS = new Set([
   'organization.create', 'platform.tenants.read', 'platform.tenants.provision', 'platform.health.read',
 ]);
 
-type Section = 'overview' | 'organization' | 'users' | 'election' | 'ballot' | 'voters' | 'results' | 'audit' | 'fraud' | 'session';
+type Section = 'overview' | 'organization' | 'users' | 'setup' | 'voters' | 'results' | 'audit' | 'fraud' | 'session';
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'organization', label: 'Organization' },
   { id: 'users', label: 'Users and roles' },
-  { id: 'election', label: 'Elections' },
-  { id: 'ballot', label: 'Ballot setup' },
+  { id: 'setup', label: 'Election setup' },
   { id: 'voters', label: 'Voter register' },
   { id: 'results', label: 'Results and reports' },
   { id: 'audit', label: 'Security and audit' },
@@ -78,8 +77,7 @@ const SECTION_CAPS: Record<Section, string[]> = {
   overview: [],
   organization: ['roles.assign', 'organization.create'],
   users: ['roles.assign'],
-  election: ['election.configure', 'register.manage', 'participation.viewAggregate', 'audit.read'],
-  ballot: ['election.configure', 'candidates.manage'],
+  setup: ['election.configure'],
   voters: ['register.manage', 'register.freeze', 'participation.viewAggregate'],
   results: ['participation.viewAggregate', 'tally.execute', 'tally.verify', 'results.certify', 'results.publish', 'audit.read'],
   audit: ['audit.read', 'fraud.read'],
@@ -92,6 +90,7 @@ interface VoterRow { id: string; memberId: string; fullName: string; status: str
 interface PositionRow { id: string; title: string; seats: number; maxChoices: number; candidates?: { id: string; fullName: string; statement: string | null }[] }
 interface ElectionDetail {
   id: string; name: string; state: string; organizationId: string;
+  description: string | null; voteType: string; resultsMode: string; announcement: string | null;
   votingOpensAt: string | null; votingClosesAt: string | null; timezone: string;
   positions: PositionRow[];
   register: { total: number; eligible: number; duplicatesUnresolved: number; entitlements: number };
@@ -129,6 +128,13 @@ function fmtDate(v: string | null | undefined) {
   return v ? new Date(v).toLocaleString() : '—';
 }
 
+function toLocalInput(v: string | null | undefined) {
+  if (!v) return '';
+  const d = new Date(v);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [section, setSection] = useState<Section>('overview');
@@ -137,6 +143,7 @@ export default function AdminPage() {
   const [orgSlug, setOrgSlug] = useState('');
   const [electionId, setElectionId] = useState('');
   const [positionId, setPositionId] = useState('');
+  const [wizardStep, setWizardStep] = useState(1);
   const [status, setStatus] = useState('Ready.');
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info');
   const [toast, setToast] = useState<{ message: string; kind: 'info' | 'error' } | null>(null);
@@ -195,6 +202,14 @@ export default function AdminPage() {
       if (s) setOrgSlug(s);
       const e = sessionStorage.getItem('votemax.election');
       if (e) setElectionId(e);
+      try {
+        const w = JSON.parse(sessionStorage.getItem('votemax.wizard') ?? 'null') as { electionId?: string; step?: number } | null;
+        if (w?.electionId) {
+          setElectionId(w.electionId);
+          sessionStorage.setItem('votemax.election', w.electionId);
+          if (w.step && w.step >= 1 && w.step <= 4) setWizardStep(w.step);
+        }
+      } catch { /* corrupted wizard state — start fresh */ }
       setSessionChecked(true);
     });
   }, [router]);
@@ -259,6 +274,52 @@ export default function AdminPage() {
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
     if (file) loadCsvFile(file);
+  }
+
+  function persistWizard(step: number, elId = electionId) {
+    if (elId) sessionStorage.setItem('votemax.wizard', JSON.stringify({ electionId: elId, step }));
+    else sessionStorage.removeItem('votemax.wizard');
+  }
+
+  function goWizardStep(step: number) {
+    setWizardStep(step);
+    persistWizard(step);
+  }
+
+  async function saveElectionDetails(f: FormData, next?: number) {
+    const payload = {
+      name: String(f.get('name') ?? '').trim(),
+      description: String(f.get('description') ?? '').trim() || undefined,
+      votingOpensAt: String(f.get('opens') ?? ''),
+      votingClosesAt: String(f.get('closes') ?? ''),
+      voteType: String(f.get('voteType') ?? 'online'),
+      resultsMode: String(f.get('resultsMode') ?? 'live'),
+      announcement: String(f.get('announcement') ?? '').trim() || undefined,
+    };
+    if (!payload.name || !payload.votingOpensAt || !payload.votingClosesAt) {
+      throw new Error('Election name and both voting times are required.');
+    }
+    let el: { id: string };
+    if (electionId) {
+      // The API only accepts detail edits while the election is DRAFT.
+      el = await call(`/elections/${electionId}`, payload, 'PATCH') as unknown as { id: string };
+    } else {
+      el = await call('/elections', { organizationId: orgId, ...payload }) as unknown as { id: string };
+      setElectionId(el.id);
+      sessionStorage.setItem('votemax.election', el.id);
+    }
+    persistWizard(next ?? wizardStep, el.id);
+    await refreshElection();
+    await refreshElections();
+    if (next) setWizardStep(next);
+  }
+
+  function startNewElection() {
+    setElectionId('');
+    setElection(null);
+    sessionStorage.removeItem('votemax.election');
+    sessionStorage.removeItem('votemax.wizard');
+    setWizardStep(1);
   }
 
   async function doRegisterImport(): Promise<void> {
@@ -359,6 +420,95 @@ export default function AdminPage() {
 
   const visibleSections = SECTIONS.filter((s) => sectionAllowed(SECTION_CAPS[s.id]));
   const activeSection: Section = visibleSections.some((s) => s.id === section) ? section : 'overview';
+
+  // Shared bulk-upload block — used by the setup wizard (step 3) and the
+  // Voter register management section.
+  const registerImportBox = (
+    <div className="import-box">
+      <div className="import-bar">
+        <Button variant="secondary" size="sm" onClick={downloadRegisterTemplate}>Download template</Button>
+        <span className="muted small">CSV · memberId optional (auto-generated VM- IDs) · email or phone required for OTP delivery</span>
+      </div>
+      <div
+        className={`dropzone ${dragOver ? 'drag-over' : ''}`}
+        role="button"
+        tabIndex={0}
+        onClick={() => csvFileRef.current?.click()}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') csvFileRef.current?.click(); }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onCsvDrop}
+      >
+        <input
+          ref={csvFileRef}
+          type="file"
+          accept=".csv,text/csv,text/plain"
+          hidden
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) loadCsvFile(f); e.target.value = ''; }}
+        />
+        <strong>{csvName || 'Drop your voter CSV here'}</strong>
+        <span className="muted small">or click to browse — you can also paste rows below</span>
+      </div>
+      <Field label="Or paste CSV" htmlFor="register-csv" hint="fullName is required. Blank memberId cells get an auto-generated VM- ID. Voters need an email or phone to receive their OTP code.">
+        <Textarea
+          id="register-csv"
+          name="csv"
+          rows={6}
+          value={csvText}
+          onChange={(e) => { setCsvText(e.target.value); setImportResult(null); }}
+          placeholder={'fullName,email,phone\nAlice Doe,alice@example.org,+231 88 000 0000\nBob Smith,,+231 88 000 0001'}
+        />
+      </Field>
+      {registerPreview && (
+        <div className="import-preview">
+          <div className="import-preview-stats">
+            <Badge tone="neutral">{registerPreview.rowCount.toLocaleString()} valid rows</Badge>
+            <Badge tone={registerPreview.issueCount ? 'warning' : 'success'}>
+              {registerPreview.issueCount ? `${registerPreview.issueCount} issue${registerPreview.issueCount === 1 ? '' : 's'}` : 'No issues detected'}
+            </Badge>
+            {!registerPreview.hasMemberId && <Badge tone="accent">memberId auto-generated</Badge>}
+          </div>
+          {registerPreview.sample.length > 0 && (
+            <Table head={registerPreview.headers.slice(0, 6)}>
+              {registerPreview.sample.map((r, i) => (
+                <tr key={i}>{registerPreview.headers.slice(0, 6).map((_, j) => <td key={j} className="small">{r[j] ?? ''}</td>)}</tr>
+              ))}
+            </Table>
+          )}
+          {registerPreview.issues.length > 0 && (
+            <ul className="import-issues">
+              {registerPreview.issues.map((iss, i) => <li key={i} className="small muted">Line {iss.line}: {iss.message}</li>)}
+              {registerPreview.issueCount > registerPreview.issues.length && (
+                <li className="small muted">…and {registerPreview.issueCount - registerPreview.issues.length} more</li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+      {importResult && (
+        <Alert kind={importResult.errors.length || importResult.duplicates ? 'warning' : 'success'} title="Import result">
+          {importResult.eligible.toLocaleString()} eligible · {importResult.duplicates} duplicates · {importResult.errors.length} row errors.
+          {importResult.errors.length > 0 && (
+            <ul className="import-issues">
+              {importResult.errors.slice(0, 8).map((err, i) => <li key={i} className="small">Line {err.line}: {err.message}</li>)}
+            </ul>
+          )}
+        </Alert>
+      )}
+      <div className="form-actions">
+        <Button
+          variant="primary"
+          disabled={!electionId || !csvText.trim() || !cap('register.manage')}
+          title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') ? undefined : 'Requires register.manage — assigned to organization_owner'}
+          onClick={() => setConfirm({
+            title: 'Import register',
+            message: `Import ${registerPreview?.rowCount ?? '?'} rows into the voter register?`,
+            action: () => void act('Import register', doRegisterImport),
+          })}
+        >Import register</Button>
+      </div>
+    </div>
+  );
 
   const nav = (
     <nav className="admin-nav" aria-label="Administration">
@@ -483,76 +633,157 @@ export default function AdminPage() {
             </Card>
           )}
 
-          {activeSection === 'election' && (
-            <Card title="Election">
-              <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                void act('Create election', async () => {
-                  const el = await call('/elections', { organizationId: orgId, name: f.get('name'), votingOpensAt: f.get('opens'), votingClosesAt: f.get('closes') }) as { id: string };
-                  setElectionId(el.id);
-                  sessionStorage.setItem('votemax.election', el.id);
-                  await refreshElection();
-                }); }}>
-                <div className="form-grid">
-                  <Field label="Election name" htmlFor="election-name"><Input id="election-name" name="name" required placeholder="Board Election 2026" /></Field>
-                  <Field label="Voting opens" htmlFor="election-opens"><Input id="election-opens" name="opens" type="datetime-local" required /></Field>
-                  <Field label="Voting closes" htmlFor="election-closes"><Input id="election-closes" name="closes" type="datetime-local" required /></Field>
-                </div>
-                <Button type="submit" variant="primary" disabled={!orgId || !capOrg('election.configure')}>Create election</Button>
-              </form>
-              <hr className="divider" />
-              <div className="inline-form">
-                <Field label="Load election" htmlFor="load-election" hint="All elections in this organization">
-                  <Select id="load-election" value={electionId} onChange={(e) => {
+          {activeSection === 'setup' && (
+            <Card title="Election setup">
+              <p className="muted small" style={{ marginTop: 0 }}>Guided setup — details, ballot, voter register, then review and launch. Progress saves automatically; exit anytime and resume where you left off.</p>
+              <div className="inline-form" style={{ marginBottom: 16 }}>
+                <Field label="Election" htmlFor="wizard-election" hint="Pick an existing election or start a new one">
+                  <Select id="wizard-election" value={electionId} onChange={(e) => {
                     const id = e.target.value;
                     setElectionId(id);
-                    if (id) sessionStorage.setItem('votemax.election', id);
+                    if (id) { sessionStorage.setItem('votemax.election', id); persistWizard(1, id); }
+                    else { sessionStorage.removeItem('votemax.election'); sessionStorage.removeItem('votemax.wizard'); setWizardStep(1); }
                     void refreshElection();
                   }}>
-                    <option value="">Select…</option>
+                    <option value="">New election…</option>
                     {elections.map((el) => <option key={el.id} value={el.id}>{el.name} — {el.state}</option>)}
                   </Select>
                 </Field>
                 <Button type="button" variant="secondary" onClick={() => void act('Refresh elections', refreshElections)}>Refresh</Button>
+                {electionId && <Button type="button" variant="ghost" onClick={startNewElection}>Start new</Button>}
               </div>
-              {election && (
-                <div style={{ marginTop: 18 }}>
-                  <div className="result-row"><div><strong>{election.name}</strong><div className="small muted">{fmtDate(election.votingOpensAt)} → {fmtDate(election.votingClosesAt)}</div></div><Badge tone={electionPill(election.state)}>{election.state}</Badge></div>
-                  <p className="small muted" style={{ marginTop: 10 }}>Election ID: <code>{election.id}</code></p>
-                </div>
-              )}
-            </Card>
-          )}
 
-          {activeSection === 'ballot' && (
-            <Card title="Ballot setup">
-              <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                void act('Add position', async () => {
-                  const p = await call(`/elections/${electionId}/positions`, { title: f.get('title'), seats: Number(f.get('seats') || 1), maxChoices: Number(f.get('maxChoices') || 1) }) as { id: string };
-                  setPositionId(p.id);
-                  await refreshElection();
-                }); }}>
-                <div className="form-grid">
-                  <Field label="Position title" htmlFor="position-title"><Input id="position-title" name="title" required placeholder="President" /></Field>
-                  <Field label="Seats" htmlFor="position-seats"><Input id="position-seats" name="seats" type="number" min={1} defaultValue={1} /></Field>
-                  <Field label="Max choices per voter" htmlFor="position-max"><Input id="position-max" name="maxChoices" type="number" min={1} defaultValue={1} /></Field>
-                </div>
-                <Button type="submit" variant="primary" disabled={!electionId || !cap('election.configure')}>Add position</Button>
-              </form>
-              <hr className="divider" />
-              <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                void act('Add candidate', async () => {
-                  await call(`/elections/${electionId}/candidates`, { positionId, fullName: f.get('candidate'), statement: f.get('statement') || undefined });
-                  await refreshElection();
-                }); }}>
-                <div className="form-grid">
-                  <Field label="Position" htmlFor="candidate-position"><Select id="candidate-position" name="positionId" required disabled={!positionOptions.length} onChange={(e) => setPositionId(e.target.value)} defaultValue={positionId}><option value="">Select…</option>{positionOptions}</Select></Field>
-                  <Field label="Candidate name" htmlFor="candidate-name"><Input id="candidate-name" name="candidate" required placeholder="Full name" /></Field>
-                  <Field label="Statement (optional)" htmlFor="candidate-statement"><Input id="candidate-statement" name="statement" /></Field>
-                </div>
-                <Button type="submit" variant="primary" disabled={!electionId || !positionId || !cap('candidates.manage')}>Add candidate</Button>
-              </form>
-              <hr className="divider" />
-              <p className="muted small" style={{ marginTop: 0 }}>Positions and candidates make up the ballot. Voters cast their own ballots online — there is no in-person voting.</p>
+              <div className="wizard-steps">
+                {([['Details', 1], ['Ballot', 2], ['Voter register', 3], ['Review & launch', 4]] as const).map(([label, step]) => (
+                  <button key={step} type="button" className={`wizard-step ${wizardStep === step ? 'active' : ''} ${wizardStep > step ? 'done' : ''}`}
+                    onClick={() => goWizardStep(step)}>
+                    <span className="wizard-step-num">{step}</span> {label}
+                  </button>
+                ))}
+              </div>
+
+              {wizardStep === 1 && (
+                <form key={election ? election.id : 'new'} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
+                  const intent = String(f.get('intent') ?? 'continue');
+                  void act('Save election details', async () => {
+                    await saveElectionDetails(f, intent === 'exit' ? undefined : 2);
+                    if (intent === 'exit') setSection('overview');
+                  }); }}>
+                  <p className="muted small">Name the vote, set the voting window, choose how results are released, and add an optional announcement shown with published results.</p>
+                  <div className="form-grid">
+                    <Field label="Vote title" htmlFor="wiz-name"><Input id="wiz-name" name="name" required defaultValue={election?.name ?? ''} placeholder="Board Election 2026" disabled={!!election && election.state !== 'DRAFT'} /></Field>
+                    <Field label="Vote type" htmlFor="wiz-vote-type" hint="Online secret ballot — the only voting channel"><Select id="wiz-vote-type" name="voteType" defaultValue={election?.voteType ?? 'online'} disabled={!!election && election.state !== 'DRAFT'}><option value="online">Online — secret ballot</option></Select></Field>
+                    <Field label="Voting opens" htmlFor="wiz-opens"><Input id="wiz-opens" name="opens" type="datetime-local" required defaultValue={toLocalInput(election?.votingOpensAt)} disabled={!!election && election.state !== 'DRAFT'} /></Field>
+                    <Field label="Voting closes" htmlFor="wiz-closes"><Input id="wiz-closes" name="closes" type="datetime-local" required defaultValue={toLocalInput(election?.votingClosesAt)} disabled={!!election && election.state !== 'DRAFT'} /></Field>
+                    <Field label="Results visibility" htmlFor="wiz-results-mode" hint="Applies to staff dashboards — the API enforces it"><Select id="wiz-results-mode" name="resultsMode" defaultValue={election?.resultsMode ?? 'live'} disabled={!!election && election.state !== 'DRAFT'}>
+                      <option value="live">Live counts — turnout visible while voting is open</option>
+                      <option value="final">Final results only — counts hidden until results are published</option>
+                    </Select></Field>
+                    <Field label="Results announcement (optional)" htmlFor="wiz-announcement" hint="Message shown with the published report"><Textarea id="wiz-announcement" name="announcement" rows={2} defaultValue={election?.announcement ?? ''} disabled={!!election && election.state !== 'DRAFT'} placeholder="e.g. Results certified by the election committee on …" /></Field>
+                  </div>
+                  {election && election.state !== 'DRAFT' && <Alert kind="info" title="Details locked">This election is {election.state} — details can only change while it is a draft.</Alert>}
+                  <div className="form-actions">
+                    <Button type="submit" name="intent" value="continue" variant="primary" disabled={!orgId || !capOrg('election.configure')}>Save &amp; continue →</Button>
+                    <Button type="submit" name="intent" value="exit" variant="secondary" disabled={!orgId || !capOrg('election.configure')}>Save &amp; exit</Button>
+                  </div>
+                </form>
+              )}
+
+              {wizardStep === 2 && (
+                <>
+                  <p className="muted small">Build the ballot: positions (what voters choose between) and candidates (the names on the ballot). Candidates are election records — they don&apos;t need accounts.</p>
+                  {!electionId && <Alert kind="info" title="Details first">Save the election details in step 1 before adding positions and candidates.</Alert>}
+                  <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
+                    void act('Add position', async () => {
+                      const p = await call(`/elections/${electionId}/positions`, { title: f.get('title'), seats: Number(f.get('seats') || 1), maxChoices: Number(f.get('maxChoices') || 1) }) as { id: string };
+                      setPositionId(p.id);
+                      await refreshElection();
+                    }); }}>
+                    <div className="form-grid">
+                      <Field label="Position title" htmlFor="position-title"><Input id="position-title" name="title" required placeholder="President" /></Field>
+                      <Field label="Seats" htmlFor="position-seats"><Input id="position-seats" name="seats" type="number" min={1} defaultValue={1} /></Field>
+                      <Field label="Max choices per voter" htmlFor="position-max"><Input id="position-max" name="maxChoices" type="number" min={1} defaultValue={1} /></Field>
+                    </div>
+                    <Button type="submit" variant="primary" disabled={!electionId || !cap('election.configure')}>Add position</Button>
+                  </form>
+                  <hr className="divider" />
+                  <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
+                    void act('Add candidate', async () => {
+                      await call(`/elections/${electionId}/candidates`, { positionId, fullName: f.get('candidate'), statement: f.get('statement') || undefined });
+                      await refreshElection();
+                    }); }}>
+                    <div className="form-grid">
+                      <Field label="Position" htmlFor="candidate-position"><Select id="candidate-position" name="positionId" required disabled={!positionOptions.length} onChange={(e) => setPositionId(e.target.value)} defaultValue={positionId}><option value="">Select…</option>{positionOptions}</Select></Field>
+                      <Field label="Candidate name" htmlFor="candidate-name"><Input id="candidate-name" name="candidate" required placeholder="Full name" /></Field>
+                      <Field label="Statement (optional)" htmlFor="candidate-statement"><Input id="candidate-statement" name="statement" /></Field>
+                    </div>
+                    <Button type="submit" variant="primary" disabled={!electionId || !positionId || !cap('candidates.manage')}>Add candidate</Button>
+                  </form>
+                  {election?.positions?.length ? (
+                    <div style={{ marginTop: 16 }}>
+                      <Table head={['Position', 'Seats', 'Candidates']}>
+                        {election.positions.map((p) => (
+                          <tr key={p.id}><td>{p.title}</td><td>{p.seats}</td><td>{(p.candidates ?? []).map((c) => c.fullName).join(', ') || '—'}</td></tr>
+                        ))}
+                      </Table>
+                    </div>
+                  ) : null}
+                  <div className="form-actions" style={{ marginTop: 16 }}>
+                    <Button type="button" variant="ghost" onClick={() => goWizardStep(1)}>← Back</Button>
+                    <Button type="button" variant="primary" disabled={!electionId} onClick={() => goWizardStep(3)}>Save &amp; continue →</Button>
+                  </div>
+                </>
+              )}
+
+              {wizardStep === 3 && (
+                <>
+                  {!electionId && <Alert kind="info" title="Details first">Save the election details in step 1 before importing voters.</Alert>}
+                  {election?.register && (
+                    <div className="stat-grid" style={{ marginBottom: 16 }}>
+                      <Stat label="Total" value={election.register.total} />
+                      <Stat label="Eligible" value={election.register.eligible} />
+                      <Stat label="Duplicates" value={election.register.duplicatesUnresolved} />
+                      <Stat label="Entitlements" value={election.register.entitlements} />
+                    </div>
+                  )}
+                  {registerImportBox}
+                  <div className="form-actions" style={{ marginTop: 16 }}>
+                    <Button type="button" variant="ghost" onClick={() => goWizardStep(2)}>← Back</Button>
+                    <Button type="button" variant="primary" disabled={!electionId} onClick={() => goWizardStep(4)}>Save &amp; continue →</Button>
+                  </div>
+                </>
+              )}
+
+              {wizardStep === 4 && election && (
+                <>
+                  <div className="result-row"><div><strong>{election.name}</strong><div className="small muted">{fmtDate(election.votingOpensAt)} → {fmtDate(election.votingClosesAt)} · {election.voteType === 'online' ? 'Online secret ballot' : election.voteType} · {election.resultsMode === 'final' ? 'Final results only' : 'Live counts'}</div></div><Badge tone={electionPill(election.state)}>{election.state}</Badge></div>
+                  {election.announcement && <p className="small muted" style={{ marginTop: 8 }}>Announcement: {election.announcement}</p>}
+                  <div className="stat-grid" style={{ margin: '16px 0' }}>
+                    <Stat label="Positions" value={election.positions.length} />
+                    <Stat label="Candidates" value={election.positions.reduce((n, p) => n + (p.candidates?.length ?? 0), 0)} />
+                    <Stat label="Eligible voters" value={election.register.eligible} />
+                    <Stat label="State" value={<Badge tone={electionPill(election.state)}>{election.state}</Badge>} />
+                  </div>
+                  <p className="muted small">Next lifecycle steps (each is audited and capability-checked):</p>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+                    {LIFECYCLE_STEPS.map(([to, label]) => (
+                      <Button key={to} variant="secondary" size="sm" disabled={!electionId || !cap(TRANSITION_CAPS[to])}
+                        onClick={() => setConfirm({ title: label, message: `Move election to ${to}?`, action: () => void act(label, async () => { await call(`/elections/${electionId}/transition`, { to }); await refreshElection(); await refreshElections(); }) })}>
+                        {label}
+                      </Button>
+                    ))}
+                    <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
+                    <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.freeze')}
+                      title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze — assigned to organization_owner'}
+                      onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting — imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
+                  </div>
+                  <div className="form-actions">
+                    <Button type="button" variant="ghost" onClick={() => goWizardStep(3)}>← Back</Button>
+                    <Button type="button" variant="secondary" onClick={() => { sessionStorage.removeItem('votemax.wizard'); setSection('overview'); }}>Done — back to overview</Button>
+                  </div>
+                </>
+              )}
+              {wizardStep === 4 && !election && <EmptyState title="No election selected">Go back to step 1 and save the election details first.</EmptyState>}
             </Card>
           )}
 
@@ -582,90 +813,7 @@ export default function AdminPage() {
                   onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting — imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
                 <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
               </div>
-              <div className="import-box">
-                <div className="import-bar">
-                  <Button variant="secondary" size="sm" onClick={downloadRegisterTemplate}>Download template</Button>
-                  <span className="muted small">CSV · memberId optional (auto-generated VM- IDs) · email or phone required for OTP delivery</span>
-                </div>
-                <div
-                  className={`dropzone ${dragOver ? 'drag-over' : ''}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => csvFileRef.current?.click()}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') csvFileRef.current?.click(); }}
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={onCsvDrop}
-                >
-                  <input
-                    ref={csvFileRef}
-                    type="file"
-                    accept=".csv,text/csv,text/plain"
-                    hidden
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) loadCsvFile(f); e.target.value = ''; }}
-                  />
-                  <strong>{csvName || 'Drop your voter CSV here'}</strong>
-                  <span className="muted small">or click to browse — you can also paste rows below</span>
-                </div>
-                <Field label="Or paste CSV" htmlFor="register-csv" hint="fullName is required. Blank memberId cells get an auto-generated VM- ID. Voters need an email or phone to receive their OTP code.">
-                  <Textarea
-                    id="register-csv"
-                    name="csv"
-                    rows={6}
-                    value={csvText}
-                    onChange={(e) => { setCsvText(e.target.value); setImportResult(null); }}
-                    placeholder={'fullName,email,phone\nAlice Doe,alice@example.org,+231 88 000 0000\nBob Smith,,+231 88 000 0001'}
-                  />
-                </Field>
-                {registerPreview && (
-                  <div className="import-preview">
-                    <div className="import-preview-stats">
-                      <Badge tone="neutral">{registerPreview.rowCount.toLocaleString()} valid rows</Badge>
-                      <Badge tone={registerPreview.issueCount ? 'warning' : 'success'}>
-                        {registerPreview.issueCount ? `${registerPreview.issueCount} issue${registerPreview.issueCount === 1 ? '' : 's'}` : 'No issues detected'}
-                      </Badge>
-                      {!registerPreview.hasMemberId && <Badge tone="accent">memberId auto-generated</Badge>}
-                    </div>
-                    {registerPreview.sample.length > 0 && (
-                      <Table head={registerPreview.headers.slice(0, 6)}>
-                        {registerPreview.sample.map((r, i) => (
-                          <tr key={i}>{registerPreview.headers.slice(0, 6).map((_, j) => <td key={j} className="small">{r[j] ?? ''}</td>)}</tr>
-                        ))}
-                      </Table>
-                    )}
-                    {registerPreview.issues.length > 0 && (
-                      <ul className="import-issues">
-                        {registerPreview.issues.map((iss, i) => <li key={i} className="small muted">Line {iss.line}: {iss.message}</li>)}
-                        {registerPreview.issueCount > registerPreview.issues.length && (
-                          <li className="small muted">…and {registerPreview.issueCount - registerPreview.issues.length} more</li>
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                )}
-                {importResult && (
-                  <Alert kind={importResult.errors.length || importResult.duplicates ? 'warning' : 'success'} title="Import result">
-                    {importResult.eligible.toLocaleString()} eligible · {importResult.duplicates} duplicates · {importResult.errors.length} row errors.
-                    {importResult.errors.length > 0 && (
-                      <ul className="import-issues">
-                        {importResult.errors.slice(0, 8).map((err, i) => <li key={i} className="small">Line {err.line}: {err.message}</li>)}
-                      </ul>
-                    )}
-                  </Alert>
-                )}
-                <div className="form-actions">
-                  <Button
-                    variant="primary"
-                    disabled={!electionId || !csvText.trim() || !cap('register.manage')}
-                    title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') ? undefined : 'Requires register.manage — assigned to organization_owner'}
-                    onClick={() => setConfirm({
-                      title: 'Import register',
-                      message: `Import ${registerPreview?.rowCount ?? '?'} rows into the voter register?`,
-                      action: () => void act('Import register', doRegisterImport),
-                    })}
-                  >Import register</Button>
-                </div>
-              </div>
+              {registerImportBox}
               <div style={{ marginTop: 18 }}>
                 {voters.length ? (
                   <Table head={['Member ID', 'Name', 'Status', 'Resolve']}>
@@ -689,7 +837,7 @@ export default function AdminPage() {
 
           {activeSection === 'results' && (
             <Card title="Results and reports">
-              <p className="muted small" style={{ marginTop: 0 }}>Tally requires a chair authorization and two approvers. Certification requires the session user and a second approver. All identifiers must be real organization members.</p>
+              <p className="muted small" style={{ marginTop: 0 }}>Tally requires an owner authorization and two approvers (at least one auditor). Certification requires the session user and an auditor as second approver. All identifiers must be real organization members.</p>
               <div className="stat-grid" style={{ marginBottom: 16 }}>
                 <Stat label="Eligible voters" value={participation?.eligible ?? '—'} />
                 <Stat label="Ballots cast" value={participation?.ballotsCast ?? '—'} />
@@ -702,7 +850,7 @@ export default function AdminPage() {
                   setDetail(JSON.stringify(result, null, 2)); await refreshResults();
                 }); }}>
                 <div className="form-grid">
-                  <Field label="Authorized by (chair)" htmlFor="tally-chair"><Select id="tally-chair" name="authorizedBy" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
+                  <Field label="Authorized by (owner)" htmlFor="tally-chair"><Select id="tally-chair" name="authorizedBy" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
                   <Field label="Approver 1" htmlFor="tally-a1"><Select id="tally-a1" name="approver1" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
                   <Field label="Approver 2" htmlFor="tally-a2"><Select id="tally-a2" name="approver2" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
                 </div>
@@ -719,7 +867,7 @@ export default function AdminPage() {
                   setDetail(JSON.stringify(r, null, 2)); await refreshResults();
                 }); }}>
                 <div className="form-grid">
-                  <Field label="Recount authorized by" htmlFor="recount-chair"><Select id="recount-chair" name="authorizedBy" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
+                  <Field label="Recount authorized by (owner)" htmlFor="recount-chair"><Select id="recount-chair" name="authorizedBy" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
                   <Field label="Approver 1" htmlFor="recount-a1"><Select id="recount-a1" name="approver1" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
                   <Field label="Approver 2" htmlFor="recount-a2"><Select id="recount-a2" name="approver2" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
                 </div>
@@ -866,7 +1014,7 @@ export default function AdminPage() {
                     <Button variant="secondary" block onClick={() => void refreshAll()}>Refresh all</Button>
                     <Button variant="secondary" block onClick={() => setSection('organization')}>Organization</Button>
                     <Button variant="secondary" block onClick={() => setSection('users')}>Users and roles</Button>
-                    <Button variant="secondary" block onClick={() => setSection('ballot')}>Ballot setup</Button>
+                    <Button variant="secondary" block onClick={() => setSection('setup')}>Election setup</Button>
                     <Button variant="secondary" block onClick={() => setSection('audit')}>Audit log</Button>
                   </div>
                 </Card>

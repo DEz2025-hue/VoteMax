@@ -177,6 +177,7 @@ export class PostgresStore implements PlatformStore {
       description: row.description, state: row.state, timezone: row.timezone,
       votingOpensAt: iso(row.votingOpensAt), votingClosesAt: iso(row.votingClosesAt),
       ballotOrderPolicy: row.ballotOrderPolicy, registerHash: row.registerHash,
+      voteType: row.voteType, resultsMode: row.resultsMode, announcement: row.announcement,
     };
   }
 
@@ -191,6 +192,9 @@ export class PostgresStore implements PlatformStore {
       votingOpensAt: date(election.votingOpensAt),
       votingClosesAt: date(election.votingClosesAt),
       ballotOrderPolicy: election.ballotOrderPolicy,
+      voteType: election.voteType,
+      resultsMode: election.resultsMode,
+      announcement: election.announcement,
       registerHash: election.registerHash,
     });
   }
@@ -215,6 +219,9 @@ export class PostgresStore implements PlatformStore {
       ...(patch.votingOpensAt !== undefined ? { votingOpensAt: date(patch.votingOpensAt) } : {}),
       ...(patch.votingClosesAt !== undefined ? { votingClosesAt: date(patch.votingClosesAt) } : {}),
       ...(patch.ballotOrderPolicy !== undefined ? { ballotOrderPolicy: patch.ballotOrderPolicy } : {}),
+      ...(patch.voteType !== undefined ? { voteType: patch.voteType } : {}),
+      ...(patch.resultsMode !== undefined ? { resultsMode: patch.resultsMode } : {}),
+      ...(patch.announcement !== undefined ? { announcement: patch.announcement } : {}),
     }).where(eq(schema.elections.id, id));
   }
 

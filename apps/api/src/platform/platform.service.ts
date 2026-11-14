@@ -305,17 +305,49 @@ export class PlatformService {
 
   async createElection(actorId: string, organizationId: string, input: {
     name: string; description?: string; votingOpensAt?: string; votingClosesAt?: string; ballotOrderPolicy?: string;
+    voteType?: string; resultsMode?: string; announcement?: string;
   }): Promise<Election> {
     if (!(await this.store.getOrganization(organizationId))) throw new Error('NOT_FOUND: organization');
+    const voteType = input.voteType ?? 'online';
+    if (voteType !== 'online') throw new Error(`INVALID_INPUT: unsupported voteType '${voteType}'`);
+    const resultsMode = input.resultsMode ?? 'live';
+    if (resultsMode !== 'live' && resultsMode !== 'final') {
+      throw new Error(`INVALID_INPUT: resultsMode must be 'live' or 'final'`);
+    }
     const election: Election = {
       id: randomUUID(), organizationId, name: input.name,
       description: input.description ?? null, state: 'DRAFT', timezone: 'Africa/Monrovia',
       votingOpensAt: input.votingOpensAt ?? null, votingClosesAt: input.votingClosesAt ?? null,
       ballotOrderPolicy: input.ballotOrderPolicy ?? 'fixed', registerHash: null,
+      voteType, resultsMode, announcement: input.announcement ?? null,
     };
     await this.store.createElection(election);
     await this.log(organizationId, actorId, 'election.create', `election:${election.id}`, 'success');
     return election;
+  }
+
+  /** Edit election details while still in DRAFT (wizard "save & continue"). */
+  async updateElectionDetails(actorId: string, electionId: string, input: {
+    name?: string; description?: string; votingOpensAt?: string; votingClosesAt?: string;
+    voteType?: string; resultsMode?: string; announcement?: string;
+  }): Promise<Election> {
+    const election = await this.electionOrThrow(electionId);
+    if (election.state !== 'DRAFT') {
+      throw new Error(`INVALID_STATE: election details can only change in DRAFT, current ${election.state}`);
+    }
+    if (input.voteType !== undefined && input.voteType !== 'online') {
+      throw new Error(`INVALID_INPUT: unsupported voteType '${input.voteType}'`);
+    }
+    if (input.resultsMode !== undefined && input.resultsMode !== 'live' && input.resultsMode !== 'final') {
+      throw new Error(`INVALID_INPUT: resultsMode must be 'live' or 'final'`);
+    }
+    const patch: Partial<Election> = {};
+    for (const key of ['name', 'description', 'votingOpensAt', 'votingClosesAt', 'voteType', 'resultsMode', 'announcement'] as const) {
+      if (input[key] !== undefined) (patch as Record<string, unknown>)[key] = input[key];
+    }
+    await this.store.updateElection(electionId, patch);
+    await this.log(election.organizationId, actorId, 'election.update', `election:${electionId}`, 'success');
+    return { ...election, ...patch };
   }
 
   private async electionOrThrow(electionId: string): Promise<Election> {
@@ -669,7 +701,29 @@ export class PlatformService {
     return { hasVoted: Boolean(entitlement?.consumedAt) };
   }
 
-  async participation(electionId: string) {
+  /**
+   * Live-results gate: an election configured with resultsMode 'final'
+   * withholds participation and report detail until PUBLISHED. Auditors
+   * keep read-only oversight regardless (they verify, not decide).
+   */
+  private async assertResultsVisible(election: Election, actorId: string | null): Promise<void> {
+    if (election.resultsMode !== 'final') return;
+    if (election.state === 'PUBLISHED' || election.state === 'ARCHIVED') return;
+    if (actorId) {
+      const assignments = await this.store.listAssignments();
+      const isAuditor = assignments.some(
+        (a) => a.userId === actorId && a.role === 'auditor' &&
+          a.organizationId === election.organizationId && isAssignmentActive(a) &&
+          (!a.electionId || a.electionId === election.id),
+      );
+      if (isAuditor) return;
+    }
+    throw new Error('RESULTS_RESTRICTED: live results are hidden until publication for this election');
+  }
+
+  async participation(electionId: string, actorId: string | null = null) {
+    const election = await this.electionOrThrow(electionId);
+    await this.assertResultsVisible(election, actorId);
     const eligible = await this.store.countEligibleVoters(electionId);
     const ballotsCast = await this.store.countBallots(electionId);
     // Aggregate only (FR-MON-001/002): no selections, no voter identities.
@@ -857,10 +911,11 @@ export class PlatformService {
   }
 
   /** Structured election report (FR-RES-007/009). */
-  async report(electionId: string) {
+  async report(electionId: string, actorId: string | null = null) {
     const election = await this.electionOrThrow(electionId);
+    await this.assertResultsVisible(election, actorId);
     const run = await this.store.latestTallyRun(electionId);
-    const part = await this.participation(electionId);
+    const part = await this.participation(electionId, actorId);
     const allCandidates = await this.store.listCandidates();
     const positions = (await this.store.listPositions(electionId)).map((p) => ({
       position: p.title,
@@ -873,7 +928,7 @@ export class PlatformService {
     }));
     const certification = await this.store.getCertification(electionId);
     return {
-      election: { id: election.id, name: election.name, state: election.state },
+      election: { id: election.id, name: election.name, state: election.state, announcement: election.announcement },
       eligibleVoters: part.eligible,
       ballotsCast: part.ballotsCast,
       turnoutPercent: part.turnoutPercent,

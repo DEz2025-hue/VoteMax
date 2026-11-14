@@ -308,3 +308,21 @@ pre.detail { overflow-x: auto; background: #0f172a; color: #e2e8f0; padding: 14p
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Election setup wizard */
+.wizard-steps { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.wizard-step {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text-secondary); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+}
+.wizard-step:hover { border-color: var(--blue-600); color: var(--text); }
+.wizard-step-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #eef2f7; color: var(--text-muted); font-size: 11px; font-weight: 800;
+}
+.wizard-step.active { border-color: var(--blue-600); background: var(--blue-50); color: var(--navy-900); }
+.wizard-step.active .wizard-step-num { background: var(--blue-600); color: #fff; }
+.wizard-step.done .wizard-step-num { background: #dcfce7; color: #15803d; }

@@ -16,6 +16,7 @@ export interface Election {
   state: ElectionState; timezone: string;
   votingOpensAt: string | null; votingClosesAt: string | null;
   ballotOrderPolicy: string; registerHash: string | null;
+  voteType: string; resultsMode: string; announcement: string | null;
 }
 export interface Position {
   id: string; electionId: string; title: string; seats: number; maxChoices: number; allowAbstain: boolean;

@@ -64,6 +64,13 @@
       "when": 1794645101515,
       "tag": "0008_four_role_model",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794649661920,
+      "tag": "0009_election_setup_fields",
+      "breakpoints": true
     }
   ]
 }

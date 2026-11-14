@@ -93,6 +93,9 @@ export const elections = adminSchema.table('elections', {
   votingOpensAt: timestamp('voting_opens_at', { withTimezone: true }),
   votingClosesAt: timestamp('voting_closes_at', { withTimezone: true }),
   ballotOrderPolicy: text('ballot_order_policy').notNull().default('fixed'),
+  voteType: text('vote_type').notNull().default('online'),
+  resultsMode: text('results_mode').notNull().default('live'),
+  announcement: text('announcement'),
   registerHash: text('register_hash'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
