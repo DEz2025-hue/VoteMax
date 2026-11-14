@@ -179,9 +179,15 @@ code, .mono-code { font-family: var(--mono); font-size: 12px; background: #f1f5f
 .modal { width: min(520px, 100%); background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 22px; }
 .modal h2 { margin-top: 0; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgb(15 23 42 / .45); z-index: 55; }
-.toast-stack { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 10px; z-index: 80; max-width: min(420px, calc(100vw - 32px)); }
-.toast { background: var(--navy-900); color: #fff; border-radius: var(--radius-sm); padding: 12px 14px; box-shadow: var(--shadow-md); font-size: 14px; }
-.toast.error { background: var(--danger); }
+.toast-overlay { position: fixed; inset: 0; background: rgb(15 23 42 / .45); display: grid; place-items: center; padding: 20px; z-index: 90; animation: toast-fade .15s ease-out; }
+.toast-card { display: flex; align-items: flex-start; gap: 12px; width: min(400px, 100%); background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 16px 18px; border-left: 4px solid var(--success, #16a34a); animation: toast-pop .2s ease-out; }
+.toast-card.error { border-left-color: var(--danger); }
+.toast-icon { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 800; color: #fff; background: var(--success, #16a34a); }
+.toast-card.error .toast-icon { background: var(--danger); }
+.toast-body { flex: 1; font-size: 14px; line-height: 1.45; color: var(--navy-900); padding-top: 3px; }
+.toast-close { font-size: 18px; padding: 0 4px; align-self: flex-start; }
+@keyframes toast-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes toast-pop { from { transform: translateY(10px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ---------- site header ---------- */
 .site-header { position: sticky; top: 0; z-index: 40; background: rgb(255 255 255 / .92); backdrop-filter: saturate(180%) blur(10px); border-bottom: 1px solid var(--border); }

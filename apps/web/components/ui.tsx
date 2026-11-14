@@ -107,9 +107,20 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
 export function Toast({ message, kind = 'info', onClose }: { message: string | null; kind?: 'info' | 'error'; onClose: () => void }) {
   useEffect(() => {
     if (!message) return;
-    const t = setTimeout(onClose, 5000);
-    return () => clearTimeout(t);
+    const t = setTimeout(onClose, 4500);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => { clearTimeout(t); window.removeEventListener('keydown', onKey); };
   }, [message, onClose]);
   if (!message) return null;
-  return <div className={`toast ${kind === 'error' ? 'error' : ''}`} role={kind === 'error' ? 'alert' : 'status'}>{message}</div>;
+  const isError = kind === 'error';
+  return (
+    <div className="toast-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={`toast-card ${isError ? 'error' : 'success'}`} role={isError ? 'alert' : 'status'} aria-live={isError ? 'assertive' : 'polite'}>
+        <span className="toast-icon" aria-hidden="true">{isError ? '✕' : '✓'}</span>
+        <div className="toast-body">{message}</div>
+        <button type="button" className="chip-remove toast-close" aria-label="Dismiss" onClick={onClose}>×</button>
+      </div>
+    </div>
+  );
 }
