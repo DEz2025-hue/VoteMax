@@ -18,6 +18,7 @@ import {
   type FraudSignal,
   type FraudSignalFilter,
   type NewFraudBlock,
+  type NotificationBatch,
   type OtpChallenge,
   type OtpVerifyResult,
   type Organization,
@@ -53,6 +54,7 @@ export class InMemoryStore implements PlatformStore {
   readonly fraudSignals: FraudSignal[] = [];
   readonly fraudEvents: FraudEvent[] = [];
   readonly fraudBlocks: FraudBlock[] = [];
+  readonly notificationBatches: NotificationBatch[] = [];
   private idempotency = new Map<string, string>(); // `${entitlementId}:${key}` -> receiptId
 
   async createOrganization(name: string, slug: string): Promise<Organization> {
@@ -207,6 +209,25 @@ export class InMemoryStore implements PlatformStore {
   async insertRegisterBatch(voters: VoterRecord[], entitlements: Entitlement[]): Promise<void> {
     this.voters.push(...voters);
     this.entitlements.push(...entitlements);
+  }
+
+  async insertNotificationBatch(batch: NotificationBatch): Promise<void> {
+    this.notificationBatches.push(batch);
+  }
+
+  async updateNotificationBatch(id: string, patch: Partial<NotificationBatch>): Promise<void> {
+    const batch = this.notificationBatches.find((b) => b.id === id);
+    if (batch) Object.assign(batch, patch);
+  }
+
+  async listNotificationBatches(electionId: string): Promise<NotificationBatch[]> {
+    return this.notificationBatches.filter((b) => b.electionId === electionId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async findNotificationBatch(electionId: string, kind: NotificationBatch['kind']): Promise<NotificationBatch | null> {
+    return this.notificationBatches.filter((b) => b.electionId === electionId && b.kind === kind)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
   }
 
   async upsertOtpChallenge(challenge: OtpChallenge & { key: string }): Promise<void> {

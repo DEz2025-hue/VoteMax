@@ -59,6 +59,14 @@ export interface OtpChallenge { voterId: string; electionId: string; codeHash: s
 export type OtpVerifyResult = 'ok' | 'invalid' | 'locked' | 'expired' | 'missing';
 export interface BallotSession { voterId: string; electionId: string; entitlementId: string; expiresAt: number; channel: 'online' }
 
+export type NotificationKind = 'invite' | 'reminder_open' | 'reminder_close';
+export type NotificationStatus = 'queued' | 'running' | 'completed' | 'failed';
+export interface NotificationBatch {
+  id: string; electionId: string; organizationId: string; kind: NotificationKind;
+  status: NotificationStatus; total: number; sent: number; failed: number; skipped: number;
+  createdAt: string; completedAt: string | null;
+}
+
 /** Parameters for the atomic ballot-acceptance critical section (SEC-VOT-02/04/05). */
 export interface AcceptBallotInput {
   electionId: string;
@@ -231,6 +239,13 @@ export interface PlatformStore {
   /** Persist a certification and the CERTIFIED state in one transaction. */
   recordCertification(certification: Certification): Promise<void>;
   getCertification(electionId: string): Promise<Certification | null>;
+
+  // ---- voter notifications ----
+  insertNotificationBatch(batch: NotificationBatch): Promise<void>;
+  updateNotificationBatch(id: string, patch: Partial<NotificationBatch>): Promise<void>;
+  listNotificationBatches(electionId: string): Promise<NotificationBatch[]>;
+  /** Latest batch of a kind for an election (reminder dedupe). */
+  findNotificationBatch(electionId: string, kind: NotificationKind): Promise<NotificationBatch | null>;
 
   // ---- audit (hash-chained, append-only) ----
   appendAudit(entry: AuditEntryInput): Promise<void>;

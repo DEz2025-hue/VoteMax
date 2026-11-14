@@ -161,6 +161,21 @@ export class PlatformController {
     return guard(() => this.platform.listVoters(id));
   }
 
+  // ---- Voter notifications ----
+
+  @Post('elections/:id/notify')
+  @RequireCapability('register.manage')
+  notifyVoters(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { kind?: string }) {
+    const kind = body?.kind === 'reminder_open' || body?.kind === 'reminder_close' ? body.kind : 'invite';
+    return guard(() => this.platform.notifyVoters(actor(req), id, kind));
+  }
+
+  @Get('elections/:id/notifications')
+  @RequireCapability('register.manage', 'participation.viewAggregate', 'audit.read')
+  listNotifications(@Param('id') id: string) {
+    return guard(() => this.platform.listNotificationBatches(id));
+  }
+
   // ---- Phase 3: voting & results ----
 
   // Public voter discovery: organization slug → voter-visible elections.

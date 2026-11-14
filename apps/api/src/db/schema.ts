@@ -362,4 +362,28 @@ export const fraudBlocks = fraudSchema.table('blocks', {
   index('fraud_blocks_lookup').on(t.kind, t.signalHash),
 ]);
 
+// ---- Voter notifications ----
+// One row per bulk-send batch (manual invite or scheduled reminder).
+// Counters are updated as delivery proceeds; automated reminder kinds are
+// deduplicated per election by the service layer.
+export const notificationBatches = adminSchema.table('notification_batches', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  electionId: uuid('election_id')
+    .notNull()
+    .references(() => elections.id),
+  organizationId: uuid('organization_id')
+    .notNull()
+    .references(() => organizations.id),
+  kind: text('kind', { enum: ['invite', 'reminder_open', 'reminder_close'] }).notNull(),
+  status: text('status', { enum: ['queued', 'running', 'completed', 'failed'] }).notNull().default('queued'),
+  total: integer('total').notNull().default(0),
+  sent: integer('sent').notNull().default(0),
+  failed: integer('failed').notNull().default(0),
+  skipped: integer('skipped').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+}, (t) => [
+  index('notification_batches_election').on(t.electionId),
+]);
+
 export type Role = (typeof roleEnum.enumValues)[number];

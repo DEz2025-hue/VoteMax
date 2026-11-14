@@ -31,6 +31,7 @@ import {
   type VoterRecord,
 } from '../register/csv-import';
 import { OtpDelivery } from '../otp/otp-delivery';
+import { renderVoterMessage, VoterNotifier } from '../notify/voter-notifier';
 import { InMemoryStore } from '../store/memory.store';
 import { StoreError, StoreErrorCode } from '../store/types';
 import type {
@@ -41,6 +42,8 @@ import type {
   Certification,
   Election,
   Entitlement,
+  NotificationBatch,
+  NotificationKind,
   Organization,
   PlatformStore,
   Position,
@@ -86,6 +89,7 @@ export class PlatformService {
   constructor(
     readonly store: PlatformStore = new InMemoryStore(),
     private readonly otpDelivery: OtpDelivery = new OtpDelivery(),
+    private readonly voterNotifier: VoterNotifier = new VoterNotifier(),
   ) {}
 
   private async log(organizationId: string | null, actorId: string | null, action: string, scope: string, outcome: string): Promise<void> {
@@ -474,6 +478,108 @@ export class PlatformService {
       duplicatesUnresolved: records.filter((v) => v.status === 'duplicate_unresolved').length,
       entitlements: entitlements.length,
     };
+  }
+
+  // ---- Voter notifications ----------------------------------------------------
+
+  private voterLink(orgSlug: string, electionId: string): string {
+    const base = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').replace(/\/$/, '');
+    return `${base}/vote?org=${encodeURIComponent(orgSlug)}&election=${electionId}`;
+  }
+
+  /** Queue a bulk email to every eligible voter (invite or reminder). */
+  async notifyVoters(actorId: string, electionId: string, kind: NotificationKind = 'invite'): Promise<NotificationBatch> {
+    const election = await this.electionOrThrow(electionId);
+    if (kind !== 'invite') {
+      const existing = await this.store.findNotificationBatch(electionId, kind);
+      if (existing) throw new Error(`NOTIFICATION_EXISTS: ${kind} already sent for this election`);
+    }
+    const org = await this.store.getOrganization(election.organizationId);
+    if (!org) throw new Error('NOT_FOUND: organization');
+    const voters = (await this.store.listVoters(electionId)).filter((v) => v.status === 'eligible');
+    const batch: NotificationBatch = {
+      id: randomUUID(), electionId, organizationId: election.organizationId, kind,
+      status: 'queued', total: voters.length, sent: 0, failed: 0, skipped: 0,
+      createdAt: new Date().toISOString(), completedAt: null,
+    };
+    await this.store.insertNotificationBatch(batch);
+    await this.log(election.organizationId, actorId, 'notify.queue', `election:${electionId}`, `success:${kind},total=${voters.length}`);
+    void this.runNotificationBatch(batch, election, org).catch(async (err) => {
+      await this.store.updateNotificationBatch(batch.id, { status: 'failed', completedAt: new Date().toISOString() });
+      await this.log(election.organizationId, actorId, 'notify.failed', `election:${electionId}`, `error:${err instanceof Error ? err.message : 'unknown'}`);
+    });
+    return batch;
+  }
+
+  private async runNotificationBatch(batch: NotificationBatch, election: Election, org: Organization): Promise<void> {
+    await this.store.updateNotificationBatch(batch.id, { status: 'running' });
+    const voters = (await this.store.listVoters(election.id)).filter((v) => v.status === 'eligible');
+    const link = this.voterLink(org.slug, election.id);
+    let sent = 0, failed = 0, skipped = 0;
+    const CONCURRENCY = 8;
+    for (let i = 0; i < voters.length; i += CONCURRENCY) {
+      await Promise.all(voters.slice(i, i + CONCURRENCY).map(async (voter) => {
+        if (!voter.email) { skipped += 1; return; }
+        const { subject, text } = renderVoterMessage(batch.kind, {
+          organizationName: org.name, electionName: election.name, memberId: voter.memberId,
+          link, votingOpensAt: election.votingOpensAt, votingClosesAt: election.votingClosesAt,
+        });
+        try {
+          await this.voterNotifier.send({ to: voter.email as string, subject, text });
+          sent += 1;
+        } catch { failed += 1; }
+      }));
+      await this.store.updateNotificationBatch(batch.id, { sent, failed, skipped });
+    }
+    const status = failed === voters.filter((v) => v.email).length && voters.length > 0 ? 'failed' : 'completed';
+    await this.store.updateNotificationBatch(batch.id, {
+      status, sent, failed, skipped, completedAt: new Date().toISOString(),
+    });
+    await this.log(election.organizationId, null, 'notify.complete', `election:${election.id}`,
+      `success:${batch.kind},sent=${sent},failed=${failed},skipped=${skipped}`);
+  }
+
+  /** Called by the reminder scheduler: queue open/close reminders when due. */
+  async maybeQueueReminder(electionId: string): Promise<void> {
+    const election = await this.store.getElection(electionId);
+    if (!election || !election.votingOpensAt || !election.votingClosesAt) return;
+    if (['CANCELLED', 'ARCHIVED', 'PUBLISHED'].includes(election.state)) return;
+    const now = Date.now();
+    const opens = new Date(election.votingOpensAt).getTime();
+    const closes = new Date(election.votingClosesAt).getTime();
+    const WINDOW = 5 * 60_000;
+    // Send once, inside a ±5-minute catch-up window around each boundary.
+    if (now >= opens - WINDOW && now <= opens + WINDOW) {
+      await this.queueReminder(election, 'reminder_open');
+    }
+    if (now >= closes - WINDOW && now <= closes + WINDOW &&
+        !['CLOSED', 'TALLIED', 'VERIFIED', 'RECOUNT', 'CERTIFIED'].includes(election.state)) {
+      await this.queueReminder(election, 'reminder_close');
+    }
+  }
+
+  private async queueReminder(election: Election, kind: NotificationKind): Promise<void> {
+    const existing = await this.store.findNotificationBatch(election.id, kind);
+    if (existing) return;
+    const org = await this.store.getOrganization(election.organizationId);
+    if (!org) return;
+    const voters = (await this.store.listVoters(election.id)).filter((v) => v.status === 'eligible');
+    const batch: NotificationBatch = {
+      id: randomUUID(), electionId: election.id, organizationId: election.organizationId, kind,
+      status: 'queued', total: voters.length, sent: 0, failed: 0, skipped: 0,
+      createdAt: new Date().toISOString(), completedAt: null,
+    };
+    await this.store.insertNotificationBatch(batch);
+    await this.log(election.organizationId, null, 'notify.queue', `election:${election.id}`, `success:${kind},total=${voters.length}`);
+    void this.runNotificationBatch(batch, election, org).catch(async (err) => {
+      await this.store.updateNotificationBatch(batch.id, { status: 'failed', completedAt: new Date().toISOString() });
+      await this.log(election.organizationId, null, 'notify.failed', `election:${election.id}`, `error:${err instanceof Error ? err.message : 'unknown'}`);
+    });
+  }
+
+  async listNotificationBatches(electionId: string): Promise<NotificationBatch[]> {
+    await this.electionOrThrow(electionId);
+    return this.store.listNotificationBatches(electionId);
   }
 
   // ---- Phase 3: stations, voting, tally, certification -------------------------

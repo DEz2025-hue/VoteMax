@@ -8,6 +8,8 @@ import { InMemoryStore } from './store/memory.store';
 import { PostgresStore } from './store/postgres.store';
 import { PLATFORM_STORE, type PlatformStore } from './store/types';
 import { OtpDelivery } from './otp/otp-delivery';
+import { VoterNotifier } from './notify/voter-notifier';
+import { ReminderScheduler } from './notify/reminder-scheduler';
 import { FraudService } from './fraud/fraud.service';
 import { FraudInterceptor } from './fraud/fraud.interceptor';
 import { logEvent } from './common/logger';
@@ -30,10 +32,11 @@ function createStore(): PlatformStore {
     { provide: PLATFORM_STORE, useFactory: createStore },
     {
       provide: PlatformService,
-      useFactory: (store: PlatformStore) => new PlatformService(store, new OtpDelivery()),
+      useFactory: (store: PlatformStore) => new PlatformService(store, new OtpDelivery(), new VoterNotifier()),
       inject: [PLATFORM_STORE],
     },
     OtpDelivery,
+    ReminderScheduler,
     { provide: FraudService, useFactory: (store: PlatformStore) => new FraudService(store), inject: [PLATFORM_STORE] },
     { provide: APP_INTERCEPTOR, useClass: FraudInterceptor },
   ],

@@ -106,6 +106,7 @@ interface Report {
 interface AuditRecord { organizationId: string | null; actorId: string | null; action: string; scope: string; outcome: string; createdAt: string; hash: string }
 interface ElectionSummary { id: string; name: string; state: string; votingOpensAt: string | null; votingClosesAt: string | null }
 interface AuditResponse { verified: boolean; records: AuditRecord[] }
+interface NotificationBatch { id: string; kind: string; status: string; total: number; sent: number; failed: number; skipped: number; createdAt: string; completedAt: string | null }
 interface FraudEventRow { electionId: string | null; rule: string; score: number; action: string; reasons: string[]; signalKind: string | null; signalHash: string | null; refHash: string | null; createdAt: string }
 interface FraudBlockRow { id: string; kind: string; signalHash: string; electionId: string | null; rule: string; reason: string; score: number; expiresAt: string; createdAt: string; liftedAt: string | null; liftedBy: string | null }
 
@@ -167,6 +168,8 @@ export default function AdminPage() {
   const [csvName, setCsvName] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [importResult, setImportResult] = useState<{ eligible: number; duplicates: number; errors: { line: number; message: string }[] } | null>(null);
+  const [notifyBatches, setNotifyBatches] = useState<NotificationBatch[]>([]);
+  const [copiedLink, setCopiedLink] = useState(false);
   const csvFileRef = useRef<HTMLInputElement>(null);
 
   const registerPreview = useMemo(() => (csvText.trim() ? previewRegisterCsv(csvText) : null), [csvText]);
@@ -221,7 +224,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (signedIn && orgId) { void refreshUsers().catch(() => undefined); void refreshElections().catch(() => undefined); }
-    if (signedIn && electionId) void refreshElection().catch(() => undefined);
+    if (signedIn && electionId) { void refreshElection().catch(() => undefined); void refreshNotifications().catch(() => undefined); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn, orgId, electionId]);
 
@@ -238,6 +241,14 @@ export default function AdminPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizardStep, election?.state]);
+
+  // Poll notification batches while any are still queued/running.
+  useEffect(() => {
+    if (!electionId || !notifyBatches.some((b) => b.status === 'queued' || b.status === 'running')) return;
+    const t = setInterval(() => void refreshNotifications().catch(() => undefined), 3000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [electionId, notifyBatches]);
 
   async function act(label: string, fn: () => Promise<void>) {
     setStatus(`${label}: working…`);
@@ -350,6 +361,30 @@ export default function AdminPage() {
     setImportResult(result);
     await refreshVoters();
     await refreshElection();
+  }
+
+  function voterLink(): string | null {
+    if (!orgSlug || !electionId) return null;
+    return `${window.location.origin}/vote?org=${encodeURIComponent(orgSlug)}&election=${electionId}`;
+  }
+
+  async function refreshNotifications() {
+    if (!electionId) { setNotifyBatches([]); return; }
+    const list = await get(`/elections/${electionId}/notifications`) as unknown as NotificationBatch[];
+    setNotifyBatches(Array.isArray(list) ? list : []);
+  }
+
+  async function doNotify() {
+    await call(`/elections/${electionId}/notify`, {});
+    await refreshNotifications();
+  }
+
+  async function copyVoterLink() {
+    const link = voterLink();
+    if (!link) return;
+    await navigator.clipboard.writeText(link).catch(() => undefined);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   }
 
   async function refreshElections() {
@@ -810,6 +845,43 @@ export default function AdminPage() {
                       title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze — assigned to organization_owner'}
                       onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting — imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
                   </div>
+
+                  <div className="import-box" style={{ marginBottom: 16 }}>
+                    <h3 className="card-title" style={{ marginTop: 0 }}>Voter invitations</h3>
+                    {voterLink() && (
+                      <div className="result-row" style={{ marginBottom: 10 }}>
+                        <div className="small muted" style={{ wordBreak: 'break-all' }}>{voterLink()}</div>
+                        <Button variant="secondary" size="sm" onClick={() => void copyVoterLink()}>{copiedLink ? 'Copied!' : 'Copy link'}</Button>
+                      </div>
+                    )}
+                    <p className="muted small">Share this link with voters — they&apos;ll enter their member ID and receive a one-time code. You can also email every eligible voter their member ID and this link directly.</p>
+                    <div className="form-actions">
+                      <Button variant="primary" size="sm" disabled={!electionId || !cap('register.manage')}
+                        title={cap('register.manage') ? 'Email every eligible voter their voting link and member ID' : 'Requires register.manage — assigned to organization_owner'}
+                        onClick={() => setConfirm({
+                          title: 'Email voters',
+                          message: `Send voting invitations by email to all eligible voters in ${election?.name}?`,
+                          action: () => void act('Email voters', doNotify),
+                        })}>Email all eligible voters</Button>
+                      <Button variant="ghost" size="sm" onClick={() => void refreshNotifications().catch(() => undefined)}>Refresh status</Button>
+                    </div>
+                    {notifyBatches.length > 0 && (
+                      <Table head={['Type', 'Status', 'Sent', 'Failed', 'Skipped', 'When']}>
+                        {notifyBatches.slice(0, 6).map((b) => (
+                          <tr key={b.id}>
+                            <td className="small">{b.kind === 'invite' ? 'Invitation' : b.kind === 'reminder_open' ? 'Opens soon' : 'Closes soon'}</td>
+                            <td><Badge tone={b.status === 'completed' ? 'success' : b.status === 'failed' ? 'error' : 'warning'}>{b.status}</Badge></td>
+                            <td>{b.sent}/{b.total}</td>
+                            <td>{b.failed}</td>
+                            <td>{b.skipped}</td>
+                            <td className="small muted">{fmtDate(b.createdAt)}</td>
+                          </tr>
+                        ))}
+                      </Table>
+                    )}
+                    {notifyBatches.length === 0 && <p className="small muted">No invitations sent yet. Reminders are sent automatically ~5 minutes before voting opens and closes.</p>}
+                  </div>
+
                   <div className="form-actions">
                     <Button type="button" variant="ghost" onClick={() => goWizardStep(3)}>← Back</Button>
                     <Button type="button" variant="secondary" onClick={() => { sessionStorage.removeItem('votemax.wizard'); setSection('overview'); }}>Done — back to overview</Button>

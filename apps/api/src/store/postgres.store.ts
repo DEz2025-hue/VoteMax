@@ -21,6 +21,7 @@ import {
   type FraudSignal,
   type FraudSignalFilter,
   type NewFraudBlock,
+  type NotificationBatch,
   type OtpChallenge,
   type OtpVerifyResult,
   type Organization,
@@ -331,6 +332,15 @@ export class PostgresStore implements PlatformStore {
     };
   }
 
+  private mapNotificationBatch(row: typeof schema.notificationBatches.$inferSelect): NotificationBatch {
+    return {
+      id: row.id, electionId: row.electionId, organizationId: row.organizationId,
+      kind: row.kind as NotificationBatch['kind'], status: row.status as NotificationBatch['status'],
+      total: row.total, sent: row.sent, failed: row.failed, skipped: row.skipped,
+      createdAt: row.createdAt.toISOString(), completedAt: iso(row.completedAt),
+    };
+  }
+
   async addEntitlement(entitlement: Entitlement): Promise<void> {
     await this.database.insert(schema.entitlements).values({
       id: entitlement.id, electionId: entitlement.electionId,
@@ -374,6 +384,46 @@ export class PostgresStore implements PlatformStore {
         })));
       }
     });
+  }
+
+  // ---- voter notifications ----
+
+  async insertNotificationBatch(batch: NotificationBatch): Promise<void> {
+    await this.database.insert(schema.notificationBatches).values({
+      id: batch.id, electionId: batch.electionId, organizationId: batch.organizationId,
+      kind: batch.kind, status: batch.status,
+      total: batch.total, sent: batch.sent, failed: batch.failed, skipped: batch.skipped,
+      createdAt: new Date(batch.createdAt), completedAt: batch.completedAt ? new Date(batch.completedAt) : undefined,
+    });
+  }
+
+  async updateNotificationBatch(id: string, patch: Partial<NotificationBatch>): Promise<void> {
+    await this.database.update(schema.notificationBatches).set({
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.total !== undefined ? { total: patch.total } : {}),
+      ...(patch.sent !== undefined ? { sent: patch.sent } : {}),
+      ...(patch.failed !== undefined ? { failed: patch.failed } : {}),
+      ...(patch.skipped !== undefined ? { skipped: patch.skipped } : {}),
+      ...(patch.completedAt !== undefined ? { completedAt: date(patch.completedAt) } : {}),
+    }).where(eq(schema.notificationBatches.id, id));
+  }
+
+  async listNotificationBatches(electionId: string): Promise<NotificationBatch[]> {
+    const rows = await this.database.select().from(schema.notificationBatches)
+      .where(eq(schema.notificationBatches.electionId, electionId))
+      .orderBy(desc(schema.notificationBatches.createdAt));
+    return rows.map((r) => this.mapNotificationBatch(r));
+  }
+
+  async findNotificationBatch(electionId: string, kind: NotificationBatch['kind']): Promise<NotificationBatch | null> {
+    const [row] = await this.database.select().from(schema.notificationBatches)
+      .where(and(
+        eq(schema.notificationBatches.electionId, electionId),
+        eq(schema.notificationBatches.kind, kind),
+      ))
+      .orderBy(desc(schema.notificationBatches.createdAt))
+      .limit(1);
+    return row ? this.mapNotificationBatch(row) : null;
   }
 
   // ---- OTP challenges / ballot sessions ----

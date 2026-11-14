@@ -69,9 +69,10 @@ function VoteFlow() {
 
   useEffect(() => {
     const org = params.get('org');
+    const election = params.get('election');
     if (org) {
       setOrgSlug(org);
-      void findElections(org);
+      void findElections(org, election ?? undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
@@ -84,14 +85,16 @@ function VoteFlow() {
     finally { setBusy(false); }
   }
 
-  async function findElections(slug = orgSlug) {
+  async function findElections(slug = orgSlug, electionParam?: string) {
     const clean = slug.trim();
     if (!clean) return;
     setSearched(true);
     const list = (await getJson(`/organizations/${encodeURIComponent(clean)}/elections`)) as PublicElection[];
     const arr = Array.isArray(list) ? list : [];
     setElections(arr);
-    if (arr.length === 1) setElectionId(arr[0].id);
+    const preselect = electionParam && arr.find((el) => el.id === electionParam);
+    if (preselect) setElectionId(preselect.id);
+    else if (arr.length === 1) setElectionId(arr[0].id);
   }
 
   function choose(candidateId: string, position: BallotData['positions'][number], checked: boolean) {
