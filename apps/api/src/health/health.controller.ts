@@ -6,7 +6,7 @@ export class HealthController {
   health() {
     return {
       status: 'ok',
-      service: 'votery-api',
+      service: 'votemax-api',
       phase: '1-foundations',
       // No election data is served in Phase 1. This endpoint reports
       // platform liveness only and contains no voter or ballot data.

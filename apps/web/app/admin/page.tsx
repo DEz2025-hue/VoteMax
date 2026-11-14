@@ -162,7 +162,7 @@ export default function AdminPage() {
   const [assistedLink, setAssistedLink] = useState('');
 
   useEffect(() => {
-    const t = sessionStorage.getItem('votery.session');
+    const t = sessionStorage.getItem('votemax.session');
     if (!t) {
       setSessionChecked(true);
       return;
@@ -185,12 +185,12 @@ export default function AdminPage() {
       setUserId(principal.userId);
       if (principal.organizationId) setOrgId(principal.organizationId);
       setAssignments(principal.assignments);
-      sessionStorage.setItem('votery.user', principal.userId);
-      if (principal.organizationId) sessionStorage.setItem('votery.org', principal.organizationId);
-      sessionStorage.setItem('votery.assignments', JSON.stringify(principal.assignments));
-      const s = sessionStorage.getItem('votery.orgSlug');
+      sessionStorage.setItem('votemax.user', principal.userId);
+      if (principal.organizationId) sessionStorage.setItem('votemax.org', principal.organizationId);
+      sessionStorage.setItem('votemax.assignments', JSON.stringify(principal.assignments));
+      const s = sessionStorage.getItem('votemax.orgSlug');
       if (s) setOrgSlug(s);
-      const e = sessionStorage.getItem('votery.election');
+      const e = sessionStorage.getItem('votemax.election');
       if (e) setElectionId(e);
       setSessionChecked(true);
     });
@@ -401,8 +401,8 @@ export default function AdminPage() {
                   const org = await call('/organizations', { name: f.get('name'), slug: f.get('slug') }) as { id: string; slug?: string };
                   setOrgId(org.id);
                   if (org.slug) setOrgSlug(org.slug);
-                  sessionStorage.setItem('votery.org', org.id);
-                  if (org.slug) sessionStorage.setItem('votery.orgSlug', org.slug);
+                  sessionStorage.setItem('votemax.org', org.id);
+                  if (org.slug) sessionStorage.setItem('votemax.orgSlug', org.slug);
                 }); }}>
                 <div className="form-grid">
                   <Field label="Organization name" htmlFor="org-name"><Input id="org-name" name="name" required placeholder="Example Organization" /></Field>
@@ -414,8 +414,8 @@ export default function AdminPage() {
               <form className="inline-form" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 const id = String(f.get('existingOrg') ?? '').trim();
                 const slug = String(f.get('existingSlug') ?? '').trim();
-                if (id) { setOrgId(id); sessionStorage.setItem('votery.org', id); }
-                if (slug) { setOrgSlug(slug); sessionStorage.setItem('votery.orgSlug', slug); }
+                if (id) { setOrgId(id); sessionStorage.setItem('votemax.org', id); }
+                if (slug) { setOrgSlug(slug); sessionStorage.setItem('votemax.orgSlug', slug); }
                 setStatus('Organization context updated.');
               }}>
                 <div className="form-grid">
@@ -479,7 +479,7 @@ export default function AdminPage() {
                 void act('Create election', async () => {
                   const el = await call('/elections', { organizationId: orgId, name: f.get('name'), votingOpensAt: f.get('opens'), votingClosesAt: f.get('closes') }) as { id: string };
                   setElectionId(el.id);
-                  sessionStorage.setItem('votery.election', el.id);
+                  sessionStorage.setItem('votemax.election', el.id);
                   await refreshElection();
                 }); }}>
                 <div className="form-grid">
@@ -495,7 +495,7 @@ export default function AdminPage() {
                   <Select id="load-election" value={electionId} onChange={(e) => {
                     const id = e.target.value;
                     setElectionId(id);
-                    if (id) sessionStorage.setItem('votery.election', id);
+                    if (id) sessionStorage.setItem('votemax.election', id);
                     void refreshElection();
                   }}>
                     <option value="">Select…</option>

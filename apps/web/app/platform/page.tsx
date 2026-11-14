@@ -120,7 +120,7 @@ export default function PlatformPage() {
   const [health, setHealth] = useState<PlatformHealth | null>(null);
 
   useEffect(() => {
-    const t = sessionStorage.getItem('votery.session');
+    const t = sessionStorage.getItem('votemax.session');
     if (!t) return;
     // Validate the stored session before trusting it — expired or revoked
     // tokens must return the visitor to sign-in, not the dashboard.
@@ -131,10 +131,10 @@ export default function PlatformPage() {
         return;
       }
       sessionToken = '';
-      sessionStorage.removeItem('votery.session');
-      sessionStorage.removeItem('votery.user');
-      sessionStorage.removeItem('votery.org');
-      sessionStorage.removeItem('votery.assignments');
+      sessionStorage.removeItem('votemax.session');
+      sessionStorage.removeItem('votemax.user');
+      sessionStorage.removeItem('votemax.org');
+      sessionStorage.removeItem('votemax.assignments');
       setStatus('Your session has expired. Please sign in again.');
       setStatusKind('info');
     });
@@ -200,9 +200,9 @@ export default function PlatformPage() {
       await fetch(`${API}/auth/logout`, { method: 'POST', headers: { ...authHeaders(), ...fh } }).catch(() => undefined);
     })();
     sessionToken = '';
-    sessionStorage.removeItem('votery.session');
-    sessionStorage.removeItem('votery.user');
-    sessionStorage.removeItem('votery.assignments');
+    sessionStorage.removeItem('votemax.session');
+    sessionStorage.removeItem('votemax.user');
+    sessionStorage.removeItem('votemax.assignments');
     setSignedIn(false);
     setDirectory(null);
     setDetail(null);

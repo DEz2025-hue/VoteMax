@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info');
 
   useEffect(() => {
-    const t = sessionStorage.getItem('votery.session');
+    const t = sessionStorage.getItem('votemax.session');
     if (!t) {
       setChecking(false);
       return;

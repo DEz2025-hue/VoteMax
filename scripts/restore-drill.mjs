@@ -63,7 +63,7 @@ for (const [s, t, identity] of TABLES) {
   snapshot[`${s}.${t}`] = { identity: Boolean(identity), rows };
   before[`${s}.${t}`] = rows.length;
 }
-const dir = join(tmpdir(), 'votery-restore-drill');
+const dir = join(tmpdir(), 'votemax-restore-drill');
 mkdirSync(dir, { recursive: true });
 const file = join(dir, `snapshot-${Date.now()}.json`);
 writeFileSync(file, JSON.stringify(snapshot));

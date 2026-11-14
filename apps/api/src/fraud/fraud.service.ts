@@ -91,8 +91,8 @@ export class FraudService {
   private warnedInsecureSalt = false;
 
   constructor(private readonly store: PlatformStore) {
-    this.salt = process.env.FRAUD_HASH_SALT ?? 'votery-dev-fraud-salt';
-    if (process.env.NODE_ENV === 'production' && this.salt === 'votery-dev-fraud-salt' && !this.warnedInsecureSalt) {
+    this.salt = process.env.FRAUD_HASH_SALT ?? 'votemax-dev-fraud-salt';
+    if (process.env.NODE_ENV === 'production' && this.salt === 'votemax-dev-fraud-salt' && !this.warnedInsecureSalt) {
       this.warnedInsecureSalt = true;
       logEvent('warn', 'fraud.insecure_salt', { reason: 'FRAUD_HASH_SALT unset; using dev salt in production' });
     }

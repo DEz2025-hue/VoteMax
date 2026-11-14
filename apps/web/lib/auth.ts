@@ -13,12 +13,12 @@ export interface SessionData {
 }
 
 const SESSION_KEYS = [
-  'votery.session',
-  'votery.user',
-  'votery.org',
-  'votery.orgSlug',
-  'votery.election',
-  'votery.assignments',
+  'votemax.session',
+  'votemax.user',
+  'votemax.org',
+  'votemax.orgSlug',
+  'votemax.election',
+  'votemax.assignments',
 ] as const;
 
 /** POST /auth/login — returns the session payload or throws with the API message. */
@@ -35,11 +35,11 @@ export async function signIn(email: string, password: string, totp?: string): Pr
 
 /** Persist the session exactly as the console pages expect it. */
 export function storeSession(data: SessionData): void {
-  sessionStorage.setItem('votery.session', data.token);
-  if (data.userId) sessionStorage.setItem('votery.user', data.userId);
-  if (data.organizationId) sessionStorage.setItem('votery.org', data.organizationId);
+  sessionStorage.setItem('votemax.session', data.token);
+  if (data.userId) sessionStorage.setItem('votemax.user', data.userId);
+  if (data.organizationId) sessionStorage.setItem('votemax.org', data.organizationId);
   if (Array.isArray(data.assignments)) {
-    sessionStorage.setItem('votery.assignments', JSON.stringify(data.assignments));
+    sessionStorage.setItem('votemax.assignments', JSON.stringify(data.assignments));
   }
 }
 

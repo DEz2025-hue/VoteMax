@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: votery
-      POSTGRES_PASSWORD: votery_dev_only
-      POSTGRES_DB: votery
+      POSTGRES_USER: votemax
+      POSTGRES_PASSWORD: votemax_dev_only
+      POSTGRES_DB: votemax
     ports:
       - "5432:5432"
     volumes:
-      - votery_pg:/var/lib/postgresql/data
+      - votemax_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U votery -d votery"]
+      test: ["CMD-SHELL", "pg_isready -U votemax -d votemax"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -26,4 +26,4 @@ services:
       retries: 10
 
 volumes:
-  votery_pg:
+  votemax_pg:

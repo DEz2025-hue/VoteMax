@@ -8,6 +8,6 @@ export default defineConfig({
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? 'postgres://votery:votery_dev_only@localhost:5432/votery',
+    url: process.env.DATABASE_URL ?? 'postgres://votemax:votemax_dev_only@localhost:5432/votemax',
   },
 });

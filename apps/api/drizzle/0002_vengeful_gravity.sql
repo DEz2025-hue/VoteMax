@@ -80,7 +80,7 @@ ALTER TABLE "identity"."otp_challenges" ADD CONSTRAINT "otp_challenges_voter_rec
 ALTER TABLE "results"."tally_runs" ADD CONSTRAINT "tally_runs_election_id_elections_id_fk" FOREIGN KEY ("election_id") REFERENCES "admin"."elections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 -- Append-only enforcement (SEC-BAL-03, SEC-AUD-02): ballots and audit records
 -- may be inserted but never updated or deleted, at the database level.
-CREATE OR REPLACE FUNCTION public.votery_reject_mutation() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION public.votemax_reject_mutation() RETURNS trigger AS $$
 BEGIN
   RAISE EXCEPTION 'append-only table: % does not allow %', TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, TG_OP;
 END;
@@ -88,12 +88,12 @@ $$ LANGUAGE plpgsql;
 --> statement-breakpoint
 CREATE TRIGGER ballots_append_only
   BEFORE UPDATE OR DELETE ON "ballot"."ballots"
-  FOR EACH ROW EXECUTE FUNCTION public.votery_reject_mutation();
+  FOR EACH ROW EXECUTE FUNCTION public.votemax_reject_mutation();
 --> statement-breakpoint
 CREATE TRIGGER audit_records_append_only
   BEFORE UPDATE OR DELETE ON "audit"."audit_records"
-  FOR EACH ROW EXECUTE FUNCTION public.votery_reject_mutation();
+  FOR EACH ROW EXECUTE FUNCTION public.votemax_reject_mutation();
 --> statement-breakpoint
 CREATE TRIGGER idempotency_keys_append_only
   BEFORE UPDATE OR DELETE ON "ballot"."idempotency_keys"
-  FOR EACH ROW EXECUTE FUNCTION public.votery_reject_mutation();
+  FOR EACH ROW EXECUTE FUNCTION public.votemax_reject_mutation();

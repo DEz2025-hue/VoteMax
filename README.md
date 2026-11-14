@@ -1,12 +1,12 @@
-# Votery — Election Management Platform (EMP)
+# Votemax — Election Management Platform (EMP)
 
-Secure, multi-tenant election platform for organizations. Pilot: organizational election. Governing documents live in `votery md/` — start with `PROJECT_OVERVIEW.md`; code must follow them (EMP-SEC-001 SEC-SDL-01/02).
+Secure, multi-tenant election platform for organizations. Pilot: organizational election. Governing documents live in `votemax md/` — start with `PROJECT_OVERVIEW.md`; code must follow them (EMP-SEC-001 SEC-SDL-01/02).
 
 ## Status
 
 Phases 1–4 implemented on a **repository abstraction**: `PostgresStore` (durable, transactional — required in production, verified against Neon) or `InMemoryStore` (tests/dev only, refused in production). **Deployed:** web on Vercel, API on Railway, database on Neon Postgres.
 
-**Still blocked for a live election:** DEC-006/007 external reviews, F-02 single-key custody, production OTP provider credentials (SMTP/SMS env vars), governance sign-offs — see `votery md/PHASE_5_EXECUTION_PLAN.md` §3.
+**Still blocked for a live election:** DEC-006/007 external reviews, F-02 single-key custody, production OTP provider credentials (SMTP/SMS env vars), governance sign-offs — see `votemax md/PHASE_5_EXECUTION_PLAN.md` §3.
 
 ## Stack
 
@@ -14,7 +14,7 @@ Phases 1–4 implemented on a **repository abstraction**: `PostgresStore` (durab
 - `apps/api` — NestJS + TypeScript modular monolith
 - PostgreSQL + Drizzle ORM (schema-per-domain: `admin`, `identity`, `ballot`, `results`, `audit`, `fraud`)
 - Auth: scrypt password hashing, bearer sessions, TOTP MFA for privileged roles
-- Decision record: `votery md/DEC-003_FRAMEWORK_ORM_DECISION.md`
+- Decision record: `votemax md/DEC-003_FRAMEWORK_ORM_DECISION.md`
 
 ## Features
 
@@ -76,7 +76,7 @@ Railway env: `DATABASE_URL`, `NODE_ENV=production`, `WEB_ORIGIN`, `FRAUD_HASH_SA
 ```powershell
 npm install
 Copy-Item .env.example .env.local   # set DATABASE_URL etc.
-npm run db:migrate -w @votery/api   # apply drizzle migrations
+npm run db:migrate -w @votemax/api   # apply drizzle migrations
 npm run dev                         # api :4000 + web :3000
 ```
 
@@ -97,4 +97,4 @@ Tests cover separation-of-duties rules, the permission matrix, tenant isolation,
 
 - `apps/api` — NestJS modular monolith (`auth`, `platform`, `fraud`, `otp`, `audit`, `register`, `elections`, `tenancy`, `db`, `store`, `health`)
 - `apps/web` — Next.js app (`/vote`, `/admin`, `/platform`, `/help`)
-- `votery md/` — foundation, decision, and phase documents (source of truth)
+- `votemax md/` — foundation, decision, and phase documents (source of truth)

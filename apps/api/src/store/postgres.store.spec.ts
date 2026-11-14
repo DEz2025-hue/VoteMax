@@ -11,7 +11,7 @@ import { PlatformService } from '../platform/platform.service';
 // every application table, so this suite must never run against a shared or
 // production database by accident. Point TEST_DATABASE_URL at a disposable
 // database and run explicitly, e.g. (Git Bash):
-//   TEST_DATABASE_URL=postgres://votery:votery_dev_only@localhost:5432/votery npm test
+//   TEST_DATABASE_URL=postgres://votemax:votemax_dev_only@localhost:5432/votemax npm test
 // DATABASE_URL is deliberately ignored here — it is the app's live database.
 // The suite applies the drizzle migrations itself, so the database must be
 // empty or already migrated. Deliberately not loaded from .env files: the

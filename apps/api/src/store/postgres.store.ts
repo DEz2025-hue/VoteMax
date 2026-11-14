@@ -659,7 +659,7 @@ export class PostgresStore implements PlatformStore {
   /** Returns the number of outbox rows chained by this batch. */
   private async drainAuditBatch(): Promise<number> {
     return this.database.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('votery.audit.drain'))`);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('votemax.audit.drain'))`);
       const pending = await tx.select().from(schema.auditOutbox)
         .orderBy(asc(schema.auditOutbox.id)).limit(200);
       if (pending.length === 0) return 0;

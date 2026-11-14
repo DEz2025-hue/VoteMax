@@ -28,7 +28,7 @@ export interface OtpSender {
 }
 
 function otpText(msg: OtpMessage): string {
-  return `Your Votery verification code is ${msg.code}. It expires in 10 minutes. Do not share it with anyone.`;
+  return `Your Votemax verification code is ${msg.code}. It expires in 10 minutes. Do not share it with anyone.`;
 }
 
 /** SMTP email sender (nodemailer). Configured via SMTP_* env vars. */
@@ -60,7 +60,7 @@ export class SmtpOtpSender implements OtpSender {
     await this.transporter.sendMail({
       from: this.from,
       to: msg.email,
-      subject: 'Your Votery verification code',
+      subject: 'Your Votemax verification code',
       text: otpText(msg),
     });
   }

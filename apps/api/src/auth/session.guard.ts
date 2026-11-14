@@ -10,9 +10,9 @@ import { Reflector } from '@nestjs/core';
 import { hasCapability, type Capability, type CapabilityScope, type RoleAssignment } from './roles';
 import { PlatformService } from '../platform/platform.service';
 
-export const PUBLIC_KEY = 'votery:public';
-export const CAPABILITY_KEY = 'votery:capabilities';
-export const TRANSITION_CAPABILITY_KEY = 'votery:transition-capability';
+export const PUBLIC_KEY = 'votemax:public';
+export const CAPABILITY_KEY = 'votemax:capabilities';
+export const TRANSITION_CAPABILITY_KEY = 'votemax:transition-capability';
 
 /** Marks a route as reachable without a session (login, voter-facing flows). */
 export const Public = () => SetMetadata(PUBLIC_KEY, true);

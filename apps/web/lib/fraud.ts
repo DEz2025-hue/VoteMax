@@ -38,10 +38,10 @@ function canvasHash(): string {
     g.fillStyle = '#f60';
     g.fillRect(10, 10, 80, 30);
     g.fillStyle = '#069';
-    g.fillText('Votery·fp·☃·01', 12, 14);
+    g.fillText('Votemax·fp·☃·01', 12, 14);
     g.globalCompositeOperation = 'multiply';
     g.fillStyle = 'rgba(102,204,0,0.7)';
-    g.fillText('Votery·fp·☃·01', 14, 16);
+    g.fillText('Votemax·fp·☃·01', 14, 16);
     return c.toDataURL().slice(-64);
   } catch {
     return 'na';
