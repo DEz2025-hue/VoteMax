@@ -6,7 +6,7 @@ import {
   Select, Skeleton, Stat, Table, Toast,
 } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
-import { API, sessionIsValid, signIn as apiSignIn, storeSession } from '../../lib/auth';
+import { API, sessionIsValid, signIn as apiSignIn, signOut as apiSignOut, storeSession } from '../../lib/auth';
 
 let sessionToken = '';
 
@@ -195,14 +195,9 @@ export default function PlatformPage() {
   }
 
   function signOut() {
-    void (async () => {
-      const fh = await fraudHeaders();
-      await fetch(`${API}/auth/logout`, { method: 'POST', headers: { ...authHeaders(), ...fh } }).catch(() => undefined);
-    })();
+    // Revokes the bearer session server-side, then clears local state.
+    void apiSignOut();
     sessionToken = '';
-    sessionStorage.removeItem('votemax.session');
-    sessionStorage.removeItem('votemax.user');
-    sessionStorage.removeItem('votemax.assignments');
     setSignedIn(false);
     setDirectory(null);
     setDetail(null);

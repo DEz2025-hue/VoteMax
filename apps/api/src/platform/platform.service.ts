@@ -188,14 +188,18 @@ export class PlatformService {
 
   /** Resolve a bearer session token to a principal (user + tenant + roles). */
   async principalForToken(token: string): Promise<{
-    userId: string; organizationId: string | null; assignments: (RoleAssignment & { userId: string })[];
+    userId: string; email: string; displayName: string;
+    organizationId: string | null; assignments: (RoleAssignment & { userId: string })[];
   } | null> {
     const session = await this.store.findSession(hashToken(token));
     if (!session) return null;
     const user = await this.store.findUser(session.userId);
     if (!user) return null;
     const assignments = (await this.store.listAssignments()).filter((a) => a.userId === user.id);
-    return { userId: user.id, organizationId: user.organizationId, assignments };
+    return {
+      userId: user.id, email: user.email, displayName: user.displayName,
+      organizationId: user.organizationId, assignments,
+    };
   }
 
   /**

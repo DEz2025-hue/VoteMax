@@ -7,7 +7,7 @@ import {
   Select, Skeleton, Stat, Table, Textarea, Toast,
 } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
-import { clearSession, fetchPrincipal, isPlatformOnly } from '../../lib/auth';
+import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut } from '../../lib/auth';
 import { hasCapability, type AssignmentInfo } from '../../lib/capabilities';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -298,14 +298,9 @@ export default function AdminPage() {
   }
 
   function signOut() {
-    // Revoke the session server-side; clearing storage alone leaves the
-    // bearer token valid until expiry.
-    void (async () => {
-      const fh = await fraudHeaders();
-      await fetch(`${API}/auth/logout`, { method: 'POST', headers: { ...authHeaders(), ...fh } }).catch(() => undefined);
-    })();
+    // Revokes the bearer session server-side, then clears local state.
+    void apiSignOut();
     sessionToken = '';
-    clearSession();
     setSignedIn(false); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]); setStations([]);
     setOrgId(''); setOrgSlug(''); setElectionId(''); setUserId(''); setAssignments([]);
   }
