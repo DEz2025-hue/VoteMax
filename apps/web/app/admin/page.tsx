@@ -1009,11 +1009,16 @@ export default function AdminPage() {
                       </div>
                     ))}
                     <div className="result-row"><span>Tally hash</span><code>{report.tallyHash ?? '—'}</code></div>
-                    <div className="result-row"><span>Evidence root</span><code>{report.evidenceRoot ?? '—'}</code></div>
+                    <div className="result-row"><span>Evidence root</span>{report.evidenceRoot ? <code>{report.evidenceRoot}</code> : <span className="muted small">available after tally</span>}</div>
                   </div>
                 </div>
               )}
-              {detail && <pre className="detail" style={{ marginTop: 16 }}>{detail}</pre>}
+              {detail && (
+                <details style={{ marginTop: 16 }}>
+                  <summary className="small muted" style={{ cursor: 'pointer' }}>Raw API response</summary>
+                  <pre className="detail">{detail}</pre>
+                </details>
+              )}
             </Card>
           )}
 
