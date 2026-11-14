@@ -68,6 +68,12 @@ function electionPill(state: string): 'success' | 'warning' | 'error' | 'accent'
   return 'accent';
 }
 
+function slugify(name: string) {
+  return name.toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export default function PlatformPage() {
   const [section, setSection] = useState<Section>('overview');
   const [mobileNav, setMobileNav] = useState(false);
@@ -96,6 +102,7 @@ export default function PlatformPage() {
   // New organization
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgSlug, setNewOrgSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
   const [orgAdminEmail, setOrgAdminEmail] = useState('');
   const [orgAdminName, setOrgAdminName] = useState('');
   const [orgAdminPassword, setOrgAdminPassword] = useState('');
@@ -217,7 +224,7 @@ export default function PlatformPage() {
     await act('Create organization', async () => {
       const withAdmin = Boolean(orgAdminEmail);
       const res = await call('/organizations', {
-        name: newOrgName, slug: newOrgSlug,
+        name: newOrgName, slug: newOrgSlug || slugify(newOrgName),
         ...(withAdmin ? {
           admin: {
             email: orgAdminEmail, displayName: orgAdminName || orgAdminEmail,
@@ -227,7 +234,7 @@ export default function PlatformPage() {
       });
       const enr = res.adminEnrollment as { email?: string; role?: string; totpSecret?: string } | undefined;
       setOrgEnrollment(enr?.totpSecret ? { email: String(enr.email), role: String(enr.role), totpSecret: String(enr.totpSecret) } : null);
-      setNewOrgName(''); setNewOrgSlug('');
+      setNewOrgName(''); setNewOrgSlug(''); setSlugTouched(false);
       setOrgAdminEmail(''); setOrgAdminName(''); setOrgAdminPassword(''); setOrgAdminRole('organization_owner');
       await refreshAll();
     });
@@ -371,8 +378,8 @@ export default function PlatformPage() {
           <Card title="New organization">
             <p className="muted small" style={{ marginTop: 0 }}>Creates a tenant. Optionally staff it immediately with its first administrator below — otherwise use “Provision admin” on the tenant afterwards.</p>
             <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-              <Field label="Name" htmlFor="org-name"><Input id="org-name" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)} placeholder="Example Organization" /></Field>
-              <Field label="Slug" hint="Used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => setNewOrgSlug(e.target.value)} placeholder="example-org" /></Field>
+              <Field label="Name" htmlFor="org-name"><Input id="org-name" value={newOrgName} onChange={(e) => { setNewOrgName(e.target.value); if (!slugTouched) setNewOrgSlug(slugify(e.target.value)); }} placeholder="Example Organization" /></Field>
+              <Field label="Slug" hint="Auto-generated from the name — used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => { setSlugTouched(true); setNewOrgSlug(slugify(e.target.value)); }} placeholder="example-org" /></Field>
             </div>
             <h3 style={{ marginTop: 16 }}>First administrator (optional)</h3>
             <p className="muted small">Leave blank to create an unstaffed tenant. When set, an MFA-enrolled account is created and assigned the selected role.</p>
