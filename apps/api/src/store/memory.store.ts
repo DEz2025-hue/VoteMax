@@ -24,7 +24,6 @@ import {
   type PlatformStore,
   type Position,
   type Session,
-  type Station,
   type TallyRun,
   type User,
 } from './types';
@@ -46,7 +45,6 @@ export class InMemoryStore implements PlatformStore {
   readonly audit: AuditEntry[] = [];
   readonly sessions = new Map<string, Session>();
   readonly ballots: BallotRecord[] = [];
-  readonly stations = new Map<string, Station>();
   readonly tallyRuns: TallyRun[] = [];
   readonly certifications = new Map<string, Certification>();
   readonly otpChallenges = new Map<string, OtpChallenge & { key: string }>();
@@ -163,18 +161,6 @@ export class InMemoryStore implements PlatformStore {
 
   async listCandidates(): Promise<Candidate[]> {
     return [...this.candidates.values()];
-  }
-
-  async addStation(station: Station): Promise<void> {
-    this.stations.set(station.id, station);
-  }
-
-  async getStation(id: string): Promise<Station | null> {
-    return this.stations.get(id) ?? null;
-  }
-
-  async listStations(electionId: string): Promise<Station[]> {
-    return [...this.stations.values()].filter((s) => s.electionId === electionId);
   }
 
   async listVoters(electionId: string): Promise<VoterRecord[]> {

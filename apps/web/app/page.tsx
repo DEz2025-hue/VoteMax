@@ -43,10 +43,9 @@ export default function HomePage() {
 
         <div className="section" style={{ textAlign: 'center' }}>
           <h2>Ready to participate?</h2>
-          <p className="muted">Election officers can manage registers, ballots, results, and audit evidence from the administration console.</p>
+          <p className="muted">Have your member ID and a phone or email from your organization&apos;s voter register.</p>
           <div className="hero-actions" style={{ justifyContent: 'center' }}>
             <Link href="/vote" className="btn btn-primary">Vote in an Election</Link>
-            <Link href="/admin" className="btn btn-secondary">Open Administration</Link>
           </div>
         </div>
       </section>

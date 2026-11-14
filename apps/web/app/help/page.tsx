@@ -40,18 +40,8 @@ export default function HelpPage() {
         </p>
         <p className="muted small" style={{ margin: '12px 0 0', lineHeight: 1.7 }}>
           Remote voting cannot prevent someone standing near you or pressuring
-          you. If you are worried about that, ask your election officer about
-          assisted voting stations — trained staff can help you vote privately.
-        </p>
-      </section>
-
-      <section className="card">
-        <h2>Assisted voting</h2>
-        <p className="muted" style={{ margin: 0, lineHeight: 1.7 }}>
-          Some elections offer assisted voting stations. A trained station officer
-          helps you verify your identity and mark your choices, but the ballot is
-          still submitted through the same private ballot system. You should never
-          share your verification code with anyone, including station staff.
+          you. If you are worried about that, step away and contact your
+          election officer — reports are recorded in the audit log.
         </p>
       </section>
 

@@ -27,7 +27,6 @@ import {
   type PlatformStore,
   type Position,
   type Session,
-  type Station,
   type TallyRun,
   type User,
 } from './types';
@@ -156,7 +155,7 @@ export class PostgresStore implements PlatformStore {
     const rows = await this.database.select().from(schema.roleAssignments);
     return rows.map((r) => ({
       userId: r.userId, role: r.role, organizationId: r.organizationId,
-      electionId: r.electionId, stationId: r.stationId,
+      electionId: r.electionId,
       validFrom: iso(r.validFrom), validTo: iso(r.validTo),
     }));
   }
@@ -167,7 +166,6 @@ export class PostgresStore implements PlatformStore {
       userId: assignment.userId,
       role: assignment.role,
       electionId: assignment.electionId ?? null,
-      stationId: assignment.stationId ?? null,
     });
   }
 
@@ -267,25 +265,6 @@ export class PostgresStore implements PlatformStore {
   async listCandidates(): Promise<Candidate[]> {
     const rows = await this.database.select().from(schema.candidates);
     return rows.map((r) => this.mapCandidate(r));
-  }
-
-  // ---- stations ----
-
-  async addStation(station: Station): Promise<void> {
-    await this.database.insert(schema.stations).values({
-      id: station.id, electionId: station.electionId, name: station.name,
-    });
-  }
-
-  async getStation(id: string): Promise<Station | null> {
-    const [row] = await this.database.select().from(schema.stations).where(eq(schema.stations.id, id));
-    return row ? { id: row.id, electionId: row.electionId, name: row.name } : null;
-  }
-
-  async listStations(electionId: string): Promise<Station[]> {
-    const rows = await this.database.select().from(schema.stations)
-      .where(eq(schema.stations.electionId, electionId));
-    return rows.map((r) => ({ id: r.id, electionId: r.electionId, name: r.name }));
   }
 
   // ---- voter register / entitlements ----

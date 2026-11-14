@@ -33,8 +33,7 @@ async function call(path: string, body: unknown, method = 'POST'): Promise<Recor
 const get = (path: string) => call(path, undefined, 'GET');
 
 const ROLES = [
-  'organization_owner', 'committee_chair', 'election_admin', 'voter_registrar',
-  'station_officer', 'observer', 'auditor', 'platform_admin',
+  'organization_owner', 'auditor',
 ] as const;
 
 const LIFECYCLE_STEPS = [
@@ -80,7 +79,7 @@ const SECTION_CAPS: Record<Section, string[]> = {
   organization: ['roles.assign', 'organization.create'],
   users: ['roles.assign'],
   election: ['election.configure', 'register.manage', 'participation.viewAggregate', 'audit.read'],
-  ballot: ['election.configure', 'candidates.manage', 'station.runSession'],
+  ballot: ['election.configure', 'candidates.manage'],
   voters: ['register.manage', 'register.freeze', 'participation.viewAggregate'],
   results: ['participation.viewAggregate', 'tally.execute', 'tally.verify', 'results.certify', 'results.publish', 'audit.read'],
   audit: ['audit.read', 'fraud.read'],
@@ -90,7 +89,6 @@ const SECTION_CAPS: Record<Section, string[]> = {
 
 interface AdminUser { id: string; email: string; displayName: string; mfaEnrolled: boolean }
 interface VoterRow { id: string; memberId: string; fullName: string; status: string; statusReason: string | null }
-interface StationRow { id: string; name: string }
 interface PositionRow { id: string; title: string; seats: number; maxChoices: number; candidates?: { id: string; fullName: string; statement: string | null }[] }
 interface ElectionDetail {
   id: string; name: string; state: string; organizationId: string;
@@ -139,7 +137,6 @@ export default function AdminPage() {
   const [orgSlug, setOrgSlug] = useState('');
   const [electionId, setElectionId] = useState('');
   const [positionId, setPositionId] = useState('');
-  const [stationId, setStationId] = useState('');
   const [status, setStatus] = useState('Ready.');
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info');
   const [toast, setToast] = useState<{ message: string; kind: 'info' | 'error' } | null>(null);
@@ -149,7 +146,6 @@ export default function AdminPage() {
   const [userId, setUserId] = useState('');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [voters, setVoters] = useState<VoterRow[]>([]);
-  const [stations, setStations] = useState<StationRow[]>([]);
   const [elections, setElections] = useState<ElectionSummary[]>([]);
   const [election, setElection] = useState<ElectionDetail | null>(null);
   const [participation, setParticipation] = useState<Participation | null>(null);
@@ -160,7 +156,6 @@ export default function AdminPage() {
   const [assignments, setAssignments] = useState<AssignmentInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState('');
-  const [assistedLink, setAssistedLink] = useState('');
   const [csvText, setCsvText] = useState('');
   const [csvName, setCsvName] = useState('');
   const [dragOver, setDragOver] = useState(false);
@@ -280,18 +275,11 @@ export default function AdminPage() {
     setElections(Array.isArray(list) ? list : []);
   }
 
-  async function refreshStations() {
-    if (!electionId) { setStations([]); return; }
-    const list = await get(`/elections/${electionId}/stations`) as unknown as StationRow[];
-    setStations(Array.isArray(list) ? list : []);
-  }
-
   async function refreshElection() {
-    if (!electionId) { setElection(null); setStations([]); return; }
+    if (!electionId) { setElection(null); return; }
     const data = await get(`/elections/${electionId}`) as unknown as ElectionDetail;
     setElection(data);
     setDetail(JSON.stringify(data, null, 2));
-    await refreshStations();
   }
 
   async function refreshResults() {
@@ -332,7 +320,7 @@ export default function AdminPage() {
     // Revokes the bearer session server-side, then clears local state.
     void apiSignOut();
     sessionToken = '';
-    setSignedIn(false); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]); setStations([]);
+    setSignedIn(false); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]);
     setOrgId(''); setOrgSlug(''); setElectionId(''); setUserId(''); setAssignments([]);
   }
 
@@ -351,17 +339,15 @@ export default function AdminPage() {
 
   const userOptions = users.map((u) => <option key={u.id} value={u.id}>{u.displayName} ({u.email})</option>);
   const positionOptions = (election?.positions ?? []).map((p) => <option key={p.id} value={p.id}>{p.title}</option>);
-  const stationOptions = stations.map((s) => <option key={s.id} value={s.id}>{s.name}</option>);
 
   // ---- capability-aware UI -------------------------------------------------
   // Mirrors the API guards closely enough to hide/disable what would be
   // rejected anyway. The server remains the enforcement point.
   const isPlatformAdmin = assignments.some((a) => a.role === 'platform_admin');
-  const cap = (capability: string, scope: { election?: boolean; stationId?: string | null } = {}) =>
+  const cap = (capability: string, scope: { election?: boolean } = {}) =>
     (isPlatformAdmin && PLATFORM_UI_CAPS.has(capability)) ||
     hasCapability(assignments, orgId, capability, {
       electionId: scope.election === false ? null : electionId || null,
-      stationId: scope.stationId ?? null,
     });
   const capOrg = (capability: string) => cap(capability, { election: false });
   const capAny = (capabilities: string[]) => capabilities.some((c) => cap(c));
@@ -477,15 +463,13 @@ export default function AdminPage() {
                   await call('/roles', {
                     organizationId: orgId, userId: f.get('userId'), role: f.get('role'),
                     electionId: scope === 'org' ? null : electionId,
-                    stationId: scope === 'station' ? f.get('roleStationId') : null,
                   });
                   await refreshUsers();
                 }); }}>
                 <div className="form-grid">
                   <Field label="User" htmlFor="role-user"><Select id="role-user" name="userId" required disabled={users.length === 0}><option value="">Select…</option>{userOptions}</Select></Field>
                   <Field label="Role" htmlFor="role-name"><Select id="role-name" name="role" required>{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</Select></Field>
-                  <Field label="Scope" htmlFor="role-scope"><Select id="role-scope" name="scope"><option value="org">Whole organization</option><option value="election" disabled={!electionId}>This election{electionId ? '' : ' (select one first)'}</option><option value="station" disabled={!electionId || stations.length === 0}>This station{!electionId || stations.length === 0 ? ' (needs election + station)' : ''}</option></Select></Field>
-                  <Field label="Station" htmlFor="role-station" hint="Used only for station scope"><Select id="role-station" name="roleStationId" disabled={stations.length === 0}><option value="">Select…</option>{stationOptions}</Select></Field>
+                  <Field label="Scope" htmlFor="role-scope"><Select id="role-scope" name="scope"><option value="org">Whole organization</option><option value="election" disabled={!electionId}>This election{electionId ? '' : ' (select one first)'}</option></Select></Field>
                 </div>
                 <Button type="submit" variant="primary" disabled={!orgId || !capOrg('roles.assign') || users.length === 0}>Assign role</Button>
               </form>
@@ -568,49 +552,7 @@ export default function AdminPage() {
                 <Button type="submit" variant="primary" disabled={!electionId || !positionId || !cap('candidates.manage')}>Add candidate</Button>
               </form>
               <hr className="divider" />
-              <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                void act('Create station', async () => {
-                  const s = await call(`/elections/${electionId}/stations`, { name: f.get('station') }) as unknown as StationRow;
-                  setStationId(s.id);
-                  await refreshStations();
-                }); }}>
-                <div className="form-grid">
-                  <Field label="Polling station name" htmlFor="station-name"><Input id="station-name" name="station" required placeholder="Main Hall Station" /></Field>
-                  <Field label="Station" htmlFor="station-select"><Select id="station-select" name="stationSelect" onChange={(e) => setStationId(e.target.value)}><option value="">Select…</option>{stationOptions}</Select></Field>
-                </div>
-                <Button type="submit" variant="primary" disabled={!electionId || !cap('election.configure')}>Create station</Button>
-              </form>
-              {stations.length > 0 && (
-                <div style={{ marginTop: 18 }}>
-                  <Table head={['Station', 'ID']}>
-                    {stations.map((s) => <tr key={s.id}><td>{s.name}</td><td><code>{s.id}</code></td></tr>)}
-                  </Table>
-                </div>
-              )}
-              <hr className="divider" />
-              <Card title="Assisted voting session" className="">
-                <p className="muted small" style={{ marginTop: 0 }}>Start a station session for a voter. The officer identity must match the signed-in user.</p>
-                <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                  void act('Start assisted session', async () => {
-                    const r = await call(`/elections/${electionId}/stations/${stationId}/session`, { officerUserId: userId, memberId: f.get('memberId') }) as { ballotSession?: string };
-                    setDetail(JSON.stringify(r, null, 2));
-                    setAssistedLink(r.ballotSession ? `${window.location.origin}/vote?session=${encodeURIComponent(r.ballotSession)}` : '');
-                  }); }}>
-                  <div className="form-grid">
-                    <Field label="Station" htmlFor="session-station"><Select id="session-station" name="sessionStation" required disabled={!stationOptions.length} onChange={(e) => setStationId(e.target.value)}><option value="">Select…</option>{stationOptions}</Select></Field>
-                    <Field label="Station ID" htmlFor="session-station-id" hint="Paste the station ID if it is not listed."><Input id="session-station-id" value={stationId} onChange={(e) => setStationId(e.target.value)} /></Field>
-                    <Field label="Member ID" htmlFor="session-member"><Input id="session-member" name="memberId" required /></Field>
-                  </div>
-                  <Button type="submit" variant="primary" disabled={!electionId || !stationId || !userId || !cap('station.runSession', { stationId })}
-                    title={cap('station.runSession', { stationId }) ? undefined : 'Requires the station_officer role assigned to this station'}>Start session</Button>
-                </form>
-                {assistedLink && (
-                  <Alert kind="success" title="Ballot session opened">
-                    Give this link to the voter (or open it on the voting device). It grants access to this ballot only and expires in 30 minutes.
-                    <div style={{ marginTop: 8 }}><a href={assistedLink} target="_blank" rel="noreferrer"><code>{assistedLink}</code></a></div>
-                  </Alert>
-                )}
-              </Card>
+              <p className="muted small" style={{ marginTop: 0 }}>Positions and candidates make up the ballot. Voters cast their own ballots online — there is no in-person voting.</p>
             </Card>
           )}
 
@@ -636,7 +578,7 @@ export default function AdminPage() {
                   </Button>
                 ))}
                 <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.freeze')}
-                  title={cap('register.freeze') ? 'Seal the imported register for voting (committee_chair)' : 'Requires register.freeze — assigned to committee_chair'}
+                  title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze — assigned to organization_owner'}
                   onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting — imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
                 <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
               </div>
@@ -715,7 +657,7 @@ export default function AdminPage() {
                   <Button
                     variant="primary"
                     disabled={!electionId || !csvText.trim() || !cap('register.manage')}
-                    title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') ? undefined : 'Requires register.manage — assigned to voter_registrar'}
+                    title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') ? undefined : 'Requires register.manage — assigned to organization_owner'}
                     onClick={() => setConfirm({
                       title: 'Import register',
                       message: `Import ${registerPreview?.rowCount ?? '?'} rows into the voter register?`,

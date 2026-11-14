@@ -8,7 +8,6 @@ export interface AssignmentInfo {
   role: string;
   organizationId: string | null;
   electionId?: string | null;
-  stationId?: string | null;
 }
 
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
@@ -19,38 +18,29 @@ export const ROLE_CAPABILITIES: Record<string, string[]> = {
     'platform.health.read',
     'audit.read',
   ],
-  organization_owner: ['roles.assign', 'participation.viewAggregate', 'fraud.read', 'audit.read'],
-  committee_chair: [
+  organization_owner: [
+    'roles.assign',
+    'election.configure',
+    'candidates.manage',
+    'register.manage',
     'register.freeze',
     'election.readiness.approve',
     'election.openClose',
     'participation.viewAggregate',
     'tally.authorize',
+    'tally.execute',
     'results.certify',
+    'results.publish',
     'fraud.read',
     'fraud.manage',
     'audit.read',
   ],
-  election_admin: [
-    'election.configure',
-    'candidates.manage',
-    'participation.viewAggregate',
-    'tally.execute',
-    'results.publish',
-    'fraud.read',
-    'fraud.manage',
-  ],
-  voter_registrar: ['register.manage', 'participation.viewAggregate'],
-  candidate: [],
-  voter: ['ballot.cast'],
-  station_officer: ['station.runSession'],
-  observer: ['participation.viewAggregate', 'fraud.read'],
   auditor: ['tally.verify', 'participation.viewAggregate', 'fraud.read', 'audit.read'],
+  voter: ['ballot.cast'],
 };
 
 export interface CapabilityScope {
   electionId?: string | null;
-  stationId?: string | null;
 }
 
 /** Mirrors hasCapability() in apps/api/src/auth/roles.ts. */
@@ -64,7 +54,6 @@ export function hasCapability(
     if (a.organizationId !== organizationId) return false;
     if (!ROLE_CAPABILITIES[a.role]?.includes(capability)) return false;
     if (scope.electionId && a.electionId && a.electionId !== scope.electionId) return false;
-    if (scope.stationId && a.stationId !== scope.stationId) return false;
     return true;
   });
 }

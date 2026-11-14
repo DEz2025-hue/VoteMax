@@ -13,6 +13,8 @@ let chairId: string;
 let executorId: string;
 let approver1: string;
 let approver2: string;
+let owner2Id: string;
+let owner3Id: string;
 
 function future(days: number): string {
   return new Date(Date.now() + days * 86400_000).toISOString();
@@ -40,15 +42,20 @@ beforeEach(async () => {
   chairId = (await svc.createUser(orgId, 'chair@example.org', 'Chair', 'pw-long-enough')).id;
   approver1 = (await svc.createUser(orgId, 'ap1@example.org', 'Approver One', 'pw-long-enough')).id;
   approver2 = (await svc.createUser(orgId, 'ap2@example.org', 'Approver Two', 'pw-long-enough')).id;
+  owner2Id = (await svc.createUser(orgId, 'owner2@example.org', 'Owner Two', 'pw-long-enough')).id;
+  owner3Id = (await svc.createUser(orgId, 'owner3@example.org', 'Owner Three', 'pw-long-enough')).id;
   const registrar = await svc.createUser(orgId, 'reg@example.org', 'Registrar', 'pw-long-enough');
 
   const election = await svc.createElection(admin.id, orgId, {
     name: 'Organization Election 2026', votingOpensAt: future(-1), votingClosesAt: future(1),
   });
   electionId = election.id;
-  await svc.assignRole(admin.id, orgId, chairId, 'committee_chair', electionId);
+  await svc.assignRole(admin.id, orgId, admin.id, 'organization_owner', electionId);
+  await svc.assignRole(admin.id, orgId, chairId, 'organization_owner', electionId);
+  await svc.assignRole(admin.id, orgId, owner2Id, 'organization_owner', electionId);
+  await svc.assignRole(admin.id, orgId, owner3Id, 'organization_owner', electionId);
   await svc.assignRole(admin.id, orgId, approver1, 'auditor', electionId);
-  await svc.assignRole(admin.id, orgId, approver2, 'observer', electionId);
+  await svc.assignRole(admin.id, orgId, approver2, 'auditor', electionId);
   const position = await svc.addPosition(admin.id, electionId, 'President', 1, 1);
   positionId = position.id;
   adaId = (await svc.addCandidate(admin.id, electionId, positionId, 'Ada Kamara')).id;
@@ -139,24 +146,16 @@ describe('Phase 3 voting and results (mock election)', () => {
     await expect(svc.requestOtp(electionId, 'S002')).rejects.toThrow(/ELECTION_NOT_OPEN/);
   });
 
-  it('assisted station flow requires the assigned officer', async () => {
-    const officer = await svc.createUser(orgId, 'officer@example.org', 'Officer', 'pw-long-enough');
-    const station = await svc.createStation(executorId, electionId, 'Main Hall Station');
-    await expect(svc.startAssistedSession(officer.id, station.id, electionId, 'S003')).rejects.toThrow(/FORBIDDEN/);
-    await svc.assignRole(executorId, orgId, officer.id, 'station_officer', electionId, station.id);
-    const { ballotSession } = await svc.startAssistedSession(officer.id, station.id, electionId, 'S003');
-    const receipt = await svc.submitBallot(ballotSession, { [positionId]: [benId] }, 'assisted-1');
-    expect(receipt.alreadyRecorded).toBe(false);
-    await expect(svc.submissionStatus(electionId, 'S003')).resolves.toEqual({ hasVoted: true });
-  });
-
-  it('tally enforces SoD: chair authorizes, executor separate, two approvers', async () => {
+  it('tally enforces SoD: owner authorizes, executor separate, two approvers incl. an auditor', async () => {
     await vote('S001', adaId);
     await svc.closeElection(executorId, electionId);
     await expect(svc.tally(chairId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] }))
       .rejects.toThrow(/SOD_VIOLATION/);
     await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1] }))
       .rejects.toThrow(/PRECONDITION/);
+    // Two owner approvers are not enough — at least one must be an auditor.
+    await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [owner2Id, owner3Id] }))
+      .rejects.toThrow(/auditor/);
     const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     expect(run.ballotCount).toBe(1);
   });

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PlatformService } from './platform.service';
-import { InMemoryStore } from '../store/memory.store';
 import { totpCode } from '../auth/credentials';
 
 let svc: PlatformService;
@@ -18,7 +17,6 @@ beforeEach(async () => {
   adminId = admin.id;
   adminTotp = admin.totpSecret;
   await svc.assignRole('bootstrap', orgId, adminId, 'organization_owner');
-  await svc.assignRole(adminId, orgId, adminId, 'election_admin');
   electionId = (await svc.createElection(adminId, orgId, { name: 'Election' })).id;
 });
 
@@ -29,14 +27,6 @@ describe('admin console wiring', () => {
     expect(list[0]).toMatchObject({ id: electionId, name: 'Election', state: 'DRAFT' });
     expect(list[0]).not.toHaveProperty('organizationId');
     await expect(svc.listOrgElections('missing')).rejects.toThrow(/NOT_FOUND/);
-  });
-
-  it('lists stations for an election', async () => {
-    expect(await svc.listStationsForElection(electionId)).toEqual([]);
-    const s = await svc.createStation(adminId, electionId, 'Main Hall');
-    const list = await svc.listStationsForElection(electionId);
-    expect(list).toEqual([s]);
-    await expect(svc.listStationsForElection('missing')).rejects.toThrow();
   });
 
   it('logout revokes the session token', async () => {
@@ -52,16 +42,12 @@ describe('admin console wiring', () => {
   it('rejects role assignments scoped to another tenant', async () => {
     const target = await svc.createUser(otherOrgId, 't@other', 'Target', 'correct horse battery');
     const foreignElection = (await svc.createElection(adminId, otherOrgId, { name: 'Foreign' })).id;
-    await expect(svc.assignRole(adminId, orgId, target.id, 'election_admin', foreignElection))
+    await expect(svc.assignRole(adminId, orgId, target.id, 'auditor', foreignElection))
       .rejects.toThrow(/FORBIDDEN: election does not belong/);
-    const foreignStation = await svc.createStation(adminId, foreignElection, 'Foreign Station');
-    await expect(svc.assignRole(adminId, orgId, target.id, 'station_officer', null, foreignStation.id))
-      .rejects.toThrow(/FORBIDDEN: station does not belong/);
-    // Same-tenant station scope still works.
-    const station = await svc.createStation(adminId, electionId, 'Station A');
-    const officer = await svc.createUser(orgId, 'officer@org', 'Officer', 'correct horse battery');
-    await svc.assignRole(adminId, orgId, officer.id, 'station_officer', electionId, station.id);
+    // Same-tenant election scope still works.
+    const auditor = await svc.createUser(orgId, 'auditor@org', 'Auditor', 'correct horse battery');
+    await svc.assignRole(adminId, orgId, auditor.id, 'auditor', electionId);
     const assignments = await svc.store.listAssignments();
-    expect(assignments.some((a) => a.userId === officer.id && a.stationId === station.id)).toBe(true);
+    expect(assignments.some((a) => a.userId === auditor.id && a.electionId === electionId)).toBe(true);
   });
 });

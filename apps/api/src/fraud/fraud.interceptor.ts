@@ -35,7 +35,7 @@ export function surfaceFor(method: string, path: string): FraudSurface {
   if (/\/voting\/otp\/verify$/.test(p)) return 'otp_verify';
   if (/\/voting\/submit$/.test(p)) return 'ballot_submit';
   if (/\/voting\/ballot$/.test(p)) return 'ballot_fetch';
-  if (/\/stations\/[^/]+\/session$/.test(p)) return 'station_session';
+
   if (/\/register\/import$/.test(p)) return 'register_import';
   if (/\/platform\/organizations\/[^/]+\/provision$/.test(p)) return 'provision';
   if (m === 'POST' && /\/organizations$/.test(p)) return 'org_create';

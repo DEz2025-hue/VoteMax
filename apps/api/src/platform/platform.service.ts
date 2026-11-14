@@ -44,19 +44,17 @@ import type {
   Organization,
   PlatformStore,
   Position,
-  Station,
   TallyRun,
   User,
 } from '../store/types';
 
 export type {
   BallotRecord, BallotSession, Candidate, Certification, Election, Entitlement,
-  Organization, Position, Station, TallyRun, User,
+  Organization, Position, TallyRun, User,
 };
 
 const PRIVILEGED: Role[] = [
-  'platform_admin', 'organization_owner', 'committee_chair', 'election_admin',
-  'voter_registrar', 'station_officer', 'auditor',
+  'platform_admin', 'organization_owner', 'auditor',
 ];
 
 // States that must be reached through their dedicated multi-party workflows,
@@ -65,13 +63,13 @@ const DEDICATED_TRANSITIONS = new Set<ElectionState>([
   'CLOSED', 'TALLIED', 'VERIFIED', 'RECOUNT', 'CERTIFIED', 'PUBLISHED',
 ]);
 
-// Oversight roles allowed to witness/approve tally and certification. Election
-// administrators execute; they do not approve their own tally.
+// Oversight roles allowed to witness/approve tally and certification. The
+// owner executes; auditors provide the independent check.
 const TALLY_APPROVER_ROLES = new Set<Role>([
-  'organization_owner', 'committee_chair', 'auditor', 'observer',
+  'organization_owner', 'auditor',
 ]);
 const CERTIFICATION_APPROVER_ROLES = new Set<Role>([
-  'organization_owner', 'auditor', 'observer',
+  'auditor',
 ]);
 
 const OTP_TTL_MS = 10 * 60_000;
@@ -143,7 +141,7 @@ export class PlatformService {
 
   async login(email: string, password: string, totp?: string): Promise<{
     token: string; userId: string; organizationId: string | null;
-    assignments: { role: Role; organizationId: string; electionId: string | null; stationId: string | null }[];
+    assignments: { role: Role; organizationId: string; electionId: string | null }[];
   }> {
     const lockKey = email.toLowerCase();
     const lock = loginFailures.get(lockKey);
@@ -176,7 +174,7 @@ export class PlatformService {
       token, userId: user.id, organizationId: user.organizationId,
       assignments: assignments.map((a) => ({
         role: a.role, organizationId: a.organizationId,
-        electionId: a.electionId ?? null, stationId: a.stationId ?? null,
+        electionId: a.electionId ?? null,
       })),
     };
   }
@@ -240,26 +238,16 @@ export class PlatformService {
     userId: string,
     role: Role,
     electionId: string | null = null,
-    stationId: string | null = null,
   ): Promise<RoleAssignment> {
     const user = await this.store.findUser(userId);
     if (!user) throw new Error('NOT_FOUND: user');
     // Scope references must point inside the target organization — a scoped
-    // assignment to another tenant's election/station would leak capabilities.
+    // assignment to another tenant's election would leak capabilities.
     if (electionId) {
       const election = await this.store.getElection(electionId);
       if (!election || election.organizationId !== organizationId) {
         await this.log(organizationId, actorId, 'role.assign', `user:${userId}`, 'denied:election_scope');
         throw new Error('FORBIDDEN: election does not belong to this organization');
-      }
-    }
-    if (stationId) {
-      const station = await this.store.getStation(stationId);
-      const stationElection = station ? await this.store.getElection(station.electionId) : null;
-      if (!station || !stationElection || stationElection.organizationId !== organizationId
-          || (electionId && station.electionId !== electionId)) {
-        await this.log(organizationId, actorId, 'role.assign', `user:${userId}`, 'denied:station_scope');
-        throw new Error('FORBIDDEN: station does not belong to this organization/election');
       }
     }
     // platform_admin holds platform-scoped capabilities (organization.create,
@@ -275,7 +263,7 @@ export class PlatformService {
       }
     }
     const existingForUser = (await this.store.listAssignments()).filter((a) => a.userId === userId);
-    const candidate: RoleAssignment & { userId: string } = { role, organizationId, electionId, stationId, userId };
+    const candidate: RoleAssignment & { userId: string } = { role, organizationId, electionId, userId };
     const violations = checkSeparationOfDuties(existingForUser, {
       ...candidate,
       isPlatformAdmin: existingForUser.some((a) => a.role === 'platform_admin') || role === 'platform_admin',
@@ -474,20 +462,6 @@ export class PlatformService {
     }));
   }
 
-  /** Stations for an election (admin/station-officer console). */
-  async listStationsForElection(electionId: string): Promise<Station[]> {
-    await this.electionOrThrow(electionId);
-    return this.store.listStations(electionId);
-  }
-
-  async createStation(actorId: string, electionId: string, name: string): Promise<Station> {
-    const election = await this.electionOrThrow(electionId);
-    const station: Station = { id: randomUUID(), electionId, name };
-    await this.store.addStation(station);
-    await this.log(election.organizationId, actorId, 'station.create', `election:${electionId}`, 'success');
-    return station;
-  }
-
   private async eligibleVoter(electionId: string, memberId: string): Promise<VoterRecord> {
     const voter = await this.store.findVoterByMemberId(electionId, memberId);
     if (!voter) throw new Error('NOT_ELIGIBLE: voter is not on the register for this election');
@@ -554,7 +528,7 @@ export class PlatformService {
     return channel === 'dev' ? { sent: true, devCode: code, channel } : { sent: true, channel };
   }
 
-  private async openBallotSession(voter: VoterRecord, electionId: string, channel: 'online' | 'assisted'): Promise<string> {
+  private async openBallotSession(voter: VoterRecord, electionId: string, channel: 'online'): Promise<string> {
     const entitlement = await this.entitlementFor(electionId, voter.id);
     const token = randomBytes(32).toString('base64url');
     await this.store.createBallotSession(hashToken(token), {
@@ -590,22 +564,6 @@ export class PlatformService {
     }
     otpVerifyFailures.delete(verifyKey);
     return { ballotSession: await this.openBallotSession(voter, electionId, 'online') };
-  }
-
-  /** Assisted flow: officer verifies identity, voter session opens privately. */
-  async startAssistedSession(officerUserId: string, stationId: string, electionId: string, memberId: string): Promise<{ ballotSession: string }> {
-    const election = await this.electionOrThrow(electionId);
-    this.assertVotingWindow(election);
-    const station = await this.store.getStation(stationId);
-    if (!station || station.electionId !== electionId) throw new Error('NOT_FOUND: station');
-    const assignments = await this.store.listAssignments();
-    const isOfficer = assignments.some(
-      (a) => a.userId === officerUserId && a.role === 'station_officer' && a.stationId === stationId,
-    );
-    if (!isOfficer) throw new Error('FORBIDDEN: user is not the station officer for this station');
-    const voter = await this.eligibleVoter(electionId, memberId);
-    await this.log(election.organizationId, officerUserId, 'station.sessionStart', `election:${electionId}`, 'success');
-    return { ballotSession: await this.openBallotSession(voter, electionId, 'assisted') };
   }
 
   async ballotForSession(ballotSession: string) {
@@ -682,7 +640,7 @@ export class PlatformService {
         audit: {
           organizationId: election.organizationId, actorId: null,
           action: 'ballot.accept', scope: `election:${election.id}`,
-          outcome: session.channel === 'assisted' ? 'success:assisted' : 'success',
+          outcome: 'success',
           createdAt: new Date().toISOString(),
         },
       });
@@ -789,21 +747,21 @@ export class PlatformService {
     }
   }
 
-  /** Multi-party tally (SoD-4/5): chair authorizes, executor differs, 2+ approvers. */
+  /** Multi-party tally (SoD-4/5): owner authorizes, executor differs, 2+ approvers incl. an auditor. */
   async tally(actorId: string, electionId: string, input: { authorizedBy: string; approvers: string[] }): Promise<TallyRun> {
     const election = await this.electionOrThrow(electionId);
     if (election.state !== 'CLOSED' && election.state !== 'RECOUNT') {
       throw new Error(`INVALID_STATE: tally requires CLOSED or RECOUNT, current ${election.state}`);
     }
     const assignments = await this.store.listAssignments();
-    const chairOk = assignments.some(
+    const ownerOk = assignments.some(
       (a) => a.userId === input.authorizedBy &&
-        a.role === 'committee_chair' &&
+        a.role === 'organization_owner' &&
         a.organizationId === election.organizationId &&
         isAssignmentActive(a) &&
         (!a.electionId || a.electionId === election.id),
     );
-    if (!chairOk) throw new Error('FORBIDDEN: tally must be authorized by the committee chair (T9)');
+    if (!ownerOk) throw new Error('FORBIDDEN: tally must be authorized by the organization owner (T9)');
     if (input.authorizedBy === actorId) throw new Error('SOD_VIOLATION: tally authorizer cannot execute the tally (SoD-5)');
     const approvers = [...new Set(input.approvers)];
     if (approvers.length < 2) throw new Error('PRECONDITION: tally requires at least two approvers (SoD-4)');
@@ -813,6 +771,14 @@ export class PlatformService {
     for (const approver of approvers) {
       await this.assertElectionParticipant(approver, election, TALLY_APPROVER_ROLES, 'tally approver', assignments);
     }
+    // Independent check: at least one approver must be an auditor so the
+    // owner-run tally is always co-signed by read-only oversight.
+    const auditorApproved = approvers.some((id) => assignments.some(
+      (a) => a.userId === id && a.role === 'auditor' &&
+        a.organizationId === election.organizationId && isAssignmentActive(a) &&
+        (!a.electionId || a.electionId === election.id),
+    ));
+    if (!auditorApproved) throw new Error('PRECONDITION: at least one tally approver must be an auditor');
     const computed = await this.computeTally(election);
     const run: TallyRun = {
       ...computed, id: randomUUID(), authorizedBy: input.authorizedBy,
@@ -866,7 +832,7 @@ export class PlatformService {
     if (!run) throw new Error('BLOCKER: no tally run (§9.1.2)');
     if (input.certifiedBy !== actorId) throw new Error('FORBIDDEN: certifiedBy must be the authenticated certifier');
     const assignments = await this.store.listAssignments();
-    await this.assertElectionParticipant(input.certifiedBy, election, new Set<Role>(['committee_chair']), 'certifier', assignments);
+    await this.assertElectionParticipant(input.certifiedBy, election, new Set<Role>(['organization_owner']), 'certifier', assignments);
     await this.assertElectionParticipant(input.secondApprover, election, CERTIFICATION_APPROVER_ROLES, 'second approver', assignments);
     if (run.executedBy === input.certifiedBy) throw new Error('SOD_VIOLATION: tally executor cannot certify (SoD-5)');
     if (input.certifiedBy === input.secondApprover) throw new Error('SOD_VIOLATION: certification needs a second, separate approver');
@@ -938,7 +904,7 @@ export class PlatformService {
 
   /** Roles whose presence means a tenant can actually operate elections. */
   private static readonly STAFFING_ROLES: ReadonlySet<Role> = new Set([
-    'organization_owner', 'committee_chair', 'election_admin',
+    'organization_owner',
   ]);
 
   /** Cross-tenant tenant directory: counts and states only, no user PII. */
@@ -989,7 +955,7 @@ export class PlatformService {
       roleAssignments: assignments
         .filter((a) => a.organizationId === organizationId)
         .map((a) => ({
-          userId: a.userId, role: a.role, electionId: a.electionId ?? null, stationId: a.stationId ?? null,
+          userId: a.userId, role: a.role, electionId: a.electionId ?? null,
         })),
     };
   }
@@ -998,13 +964,12 @@ export class PlatformService {
    * Provision a staff account for an organization. Platform admins staff
    * tenants directly: the account is MFA-enrolled (secret returned once) and
    * the selected role is assigned — organization_owner by default, or any
-   * tenant staff role optionally scoped to one election. platform_admin,
-   * voter, candidate, and station_officer are deliberately not provisionable
-   * here (delegation, non-staff, and station-scoped respectively).
+   * tenant staff role optionally scoped to one election. platform_admin and
+   * voter are deliberately not provisionable here (delegation and
+   * non-staff respectively).
    */
   private static readonly PROVISIONABLE_ROLES: ReadonlySet<Role> = new Set([
-    'organization_owner', 'committee_chair', 'election_admin', 'voter_registrar',
-    'auditor', 'observer',
+    'organization_owner', 'auditor',
   ]);
 
   async provisionTenantAdmin(

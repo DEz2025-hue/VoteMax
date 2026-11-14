@@ -62,7 +62,6 @@ function VoteFlow() {
   const [ballot, setBallot] = useState<BallotData | null>(null);
   const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [receipt, setReceipt] = useState('');
-  const [assisted, setAssisted] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -73,26 +72,6 @@ function VoteFlow() {
     if (org) {
       setOrgSlug(org);
       void findElections(org);
-    }
-    // Assisted voting: a station officer hands the voter a ?session= link.
-    // The token is a short-lived ballot capability — skip OTP entirely.
-    const s = params.get('session');
-    if (s) {
-      setSession(s);
-      setAssisted(true);
-      void act(async () => {
-        const b = await call('/voting/ballot', { ballotSession: s });
-        const ballotData = b as unknown as BallotData;
-        setBallot(ballotData);
-        setElectionId(ballotData.election.id);
-        const status = await getJson(`/elections/${ballotData.election.id}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
-        if (status.hasVoted) {
-          setError('Our records show a ballot was already accepted for this voter in this election. If you believe this is wrong, contact your election officer.');
-          return;
-        }
-        setNotice('Assisted voting session — review your selections carefully before submitting.');
-        setStep('ballot');
-      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
@@ -249,7 +228,7 @@ function VoteFlow() {
               </fieldset>
             ))}
             <div className="form-actions">
-              {!assisted && <Button type="button" variant="ghost" onClick={() => setStep('code')}>Back</Button>}
+              <Button type="button" variant="ghost" onClick={() => setStep('code')}>Back</Button>
               <Button type="submit" variant="primary" size="lg" block disabled={busy}>
                 {busy ? 'Loading…' : 'Review ballot'}
               </Button>

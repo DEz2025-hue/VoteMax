@@ -59,11 +59,11 @@ d('PostgresStore (F-01 durability)', () => {
     const chair = await svc.createUser(org.id, `c-${stamp}@x.edu`, 'Chair', 'pw-long-enough');
     const ap1 = await svc.createUser(org.id, `p1-${stamp}@x.edu`, 'Approver 1', 'pw-long-enough');
     const ap2 = await svc.createUser(org.id, `p2-${stamp}@x.edu`, 'Approver 2', 'pw-long-enough');
-    await svc.assignRole(admin.id, org.id, admin.id, 'election_admin');
-    await svc.assignRole(admin.id, org.id, reg.id, 'voter_registrar');
-    await svc.assignRole(admin.id, org.id, chair.id, 'committee_chair');
+    await svc.assignRole(admin.id, org.id, admin.id, 'organization_owner');
+    await svc.assignRole(admin.id, org.id, reg.id, 'organization_owner');
+    await svc.assignRole(admin.id, org.id, chair.id, 'organization_owner');
     await svc.assignRole(admin.id, org.id, ap1.id, 'auditor');
-    await svc.assignRole(admin.id, org.id, ap2.id, 'observer');
+    await svc.assignRole(admin.id, org.id, ap2.id, 'auditor');
 
     const el = await svc.createElection(admin.id, org.id, {
       name: 'PG Election', votingOpensAt: new Date(Date.now() - 3600_000).toISOString(),

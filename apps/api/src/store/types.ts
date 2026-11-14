@@ -54,17 +54,16 @@ export interface TallyRun {
 export interface Certification {
   electionId: string; certifiedBy: string; secondApprover: string; tallyHash: string; createdAt: string;
 }
-export interface Station { id: string; electionId: string; name: string }
 export interface OtpChallenge { voterId: string; electionId: string; codeHash: string; expiresAt: number; attempts: number }
 export type OtpVerifyResult = 'ok' | 'invalid' | 'locked' | 'expired' | 'missing';
-export interface BallotSession { voterId: string; electionId: string; entitlementId: string; expiresAt: number; channel: 'online' | 'assisted' }
+export interface BallotSession { voterId: string; electionId: string; entitlementId: string; expiresAt: number; channel: 'online' }
 
 /** Parameters for the atomic ballot-acceptance critical section (SEC-VOT-02/04/05). */
 export interface AcceptBallotInput {
   electionId: string;
   entitlementId: string;
   voterId: string;
-  channel: 'online' | 'assisted';
+  channel: 'online';
   idempotencyKey: string;
   receiptId: string;
   ballot: BallotRecord;
@@ -180,11 +179,6 @@ export interface PlatformStore {
   addCandidate(candidate: Candidate): Promise<void>;
   getCandidate(id: string): Promise<Candidate | null>;
   listCandidates(): Promise<Candidate[]>;
-
-  // ---- stations ----
-  addStation(station: Station): Promise<void>;
-  getStation(id: string): Promise<Station | null>;
-  listStations(electionId: string): Promise<Station[]>;
 
   // ---- voter register / entitlements ----
   listVoters(electionId: string): Promise<VoterRecord[]>;

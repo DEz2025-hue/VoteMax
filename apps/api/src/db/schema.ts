@@ -28,14 +28,8 @@ export const fraudSchema = pgSchema('fraud');
 export const roleEnum = pgEnum('role', [
   'platform_admin',
   'organization_owner',
-  'committee_chair',
-  'election_admin',
-  'voter_registrar',
-  'candidate',
-  'voter',
-  'station_officer',
-  'observer',
   'auditor',
+  'voter',
 ]);
 
 export const organizations = adminSchema.table('organizations', {
@@ -127,15 +121,6 @@ export const candidates = adminSchema.table('candidates', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const stations = adminSchema.table('stations', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  electionId: uuid('election_id')
-    .notNull()
-    .references(() => elections.id),
-  name: text('name').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
 export const voterStatusEnum = pgEnum('voter_status', [
   'pending',
   'eligible',
@@ -204,7 +189,7 @@ export const ballotSessions = identitySchema.table('ballot_sessions', {
     .notNull()
     .references(() => entitlements.id),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  channel: text('channel', { enum: ['online', 'assisted'] }).notNull(),
+  channel: text('channel', { enum: ['online'] }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -218,7 +203,6 @@ export const roleAssignments = adminSchema.table('role_assignments', {
     .references(() => users.id),
   role: roleEnum('role').notNull(),
   electionId: uuid('election_id'),
-  stationId: uuid('station_id'),
   grantedBy: uuid('granted_by').references(() => users.id),
   validFrom: timestamp('valid_from', { withTimezone: true }).notNull().defaultNow(),
   validTo: timestamp('valid_to', { withTimezone: true }),

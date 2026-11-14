@@ -66,8 +66,8 @@ export class PlatformController {
   @Post('roles')
   @Public()
   @RequireCapability('roles.assign')
-  assignRole(@Req() req: { principal?: Principal }, @Body() body: { organizationId: string; userId: string; role: Role; electionId?: string | null; stationId?: string | null }) {
-    return guard(() => this.platform.assignRole(actor(req), body.organizationId, body.userId, body.role, body.electionId ?? null, body.stationId ?? null));
+  assignRole(@Req() req: { principal?: Principal }, @Body() body: { organizationId: string; userId: string; role: Role; electionId?: string | null }) {
+    return guard(() => this.platform.assignRole(actor(req), body.organizationId, body.userId, body.role, body.electionId ?? null));
   }
 
   @Get('users')
@@ -160,18 +160,6 @@ export class PlatformController {
     return guard(() => this.platform.publicElections(slug));
   }
 
-  @Post('elections/:id/stations')
-  @RequireCapability('election.configure')
-  createStation(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { name: string }) {
-    return guard(() => this.platform.createStation(actor(req), id, body.name));
-  }
-
-  @Get('elections/:id/stations')
-  @RequireCapability('election.configure', 'station.runSession')
-  stations(@Param('id') id: string) {
-    return guard(() => this.platform.listStationsForElection(id));
-  }
-
   @Post('elections/:id/voting/otp/request')
   @Public()
   requestOtp(@Param('id') id: string, @Body() body: { memberId: string }) {
@@ -182,17 +170,6 @@ export class PlatformController {
   @Public()
   verifyOtp(@Param('id') id: string, @Body() body: { memberId: string; code: string }) {
     return guard(() => this.platform.verifyOtp(id, body.memberId, body.code));
-  }
-
-  @Post('elections/:id/stations/:stationId/session')
-  @RequireCapability('station.runSession')
-  assistedSession(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('stationId') stationId: string, @Body() body: { officerUserId: string; memberId: string }) {
-    // The officer identity asserted in the body must be the session user —
-    // an officer cannot open sessions in another officer's name.
-    if (body.officerUserId !== actor(req)) {
-      throw new BadRequestException('FORBIDDEN: officerUserId must match the authenticated session');
-    }
-    return guard(() => this.platform.startAssistedSession(body.officerUserId, stationId, id, body.memberId));
   }
 
   @Post('voting/ballot')

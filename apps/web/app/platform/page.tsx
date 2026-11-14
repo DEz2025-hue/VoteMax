@@ -44,7 +44,7 @@ interface TenantRow {
 interface TenantDetail extends Omit<TenantRow, 'staffed'> {
   users: { id: string; email: string; displayName: string; mfaEnrolled: boolean }[];
   elections: { id: string; name: string; state: string; votingOpensAt: string | null; votingClosesAt: string | null }[];
-  roleAssignments: { userId?: string; role: string; electionId: string | null; stationId: string | null }[];
+  roleAssignments: { userId?: string; role: string; electionId: string | null }[];
 }
 interface PlatformHealth {
   store: string; dbLatencyMs: number; pendingAuditEntries: number;
@@ -384,12 +384,8 @@ export default function PlatformPage() {
               <Field label="Password" hint="Minimum 12 characters" htmlFor="org-admin-password"><Input id="org-admin-password" type="password" value={orgAdminPassword} onChange={(e) => setOrgAdminPassword(e.target.value)} autoComplete="new-password" /></Field>
               <Field label="Role" htmlFor="org-admin-role">
                 <Select id="org-admin-role" value={orgAdminRole} onChange={(e) => setOrgAdminRole(e.target.value)}>
-                  <option value="organization_owner">organization_owner — full tenant staffing</option>
-                  <option value="committee_chair">committee_chair — readiness, certify</option>
-                  <option value="election_admin">election_admin — configure, tally, publish</option>
-                  <option value="voter_registrar">voter_registrar — register management</option>
-                  <option value="auditor">auditor — verify, read-only oversight</option>
-                  <option value="observer">observer — participation aggregates</option>
+                  <option value="organization_owner">organization_owner — runs the tenant</option>
+                  <option value="auditor">auditor — read-only oversight</option>
                 </Select>
               </Field>
             </div>
@@ -479,12 +475,8 @@ export default function PlatformPage() {
                 <Field label="Password" hint="Minimum 12 characters" htmlFor="prov-password"><Input id="prov-password" type="password" value={provPassword} onChange={(e) => setProvPassword(e.target.value)} autoComplete="new-password" /></Field>
                 <Field label="Role" htmlFor="prov-role">
                   <Select id="prov-role" value={provRole} onChange={(e) => setProvRole(e.target.value)}>
-                    <option value="organization_owner">organization_owner — full tenant staffing</option>
-                    <option value="election_admin">election_admin — configure, tally, publish</option>
-                    <option value="committee_chair">committee_chair — readiness, certify</option>
-                    <option value="voter_registrar">voter_registrar — register management</option>
-                    <option value="auditor">auditor — verify, read-only oversight</option>
-                    <option value="observer">observer — participation aggregates</option>
+                    <option value="organization_owner">organization_owner — runs the tenant</option>
+                    <option value="auditor">auditor — read-only oversight</option>
                   </Select>
                 </Field>
                 <Field label="Election scope" hint="Org-wide applies to every election" htmlFor="prov-election">
@@ -531,13 +523,12 @@ export default function PlatformPage() {
 
               <h3>Role assignments</h3>
               {detail.roleAssignments.length === 0 ? <p className="muted small">No role assignments.</p> : (
-                <Table head={['User', 'Role', 'Election', 'Station']}>
+                <Table head={['User', 'Role', 'Election']}>
                   {detail.roleAssignments.map((a, i) => (
                     <tr key={i}>
                       <td className="small">{a.userId ? a.userId.slice(0, 8) : '—'}</td>
                       <td><Badge tone="navy">{a.role}</Badge></td>
                       <td className="small muted">{a.electionId ? a.electionId.slice(0, 8) : 'org-wide'}</td>
-                      <td className="small muted">{a.stationId ? a.stationId.slice(0, 8) : '—'}</td>
                     </tr>
                   ))}
                 </Table>

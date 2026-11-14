@@ -105,28 +105,28 @@ describe('tenant provisioning', () => {
       .rejects.toThrow(/NOT_FOUND: organization/);
   });
 
-  it('provisions an election_admin scoped to a specific election', async () => {
+  it('provisions an auditor scoped to a specific election', async () => {
     const election = await svc.createElection(platformAdminId, orgB, { name: 'Org B Election' });
     const res = await svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'eadmin@orgb', displayName: 'Election Admin', password: 'correct horse battery',
-      role: 'election_admin', electionId: election.id,
+      email: 'auditor@orgb', displayName: 'Auditor', password: 'correct horse battery',
+      role: 'auditor', electionId: election.id,
     });
-    expect(res.role).toBe('election_admin');
+    expect(res.role).toBe('auditor');
     const detail = await svc.tenantDetail(orgB);
     const assignment = detail.roleAssignments.find((a) => a.userId === res.userId);
-    expect(assignment).toMatchObject({ role: 'election_admin', electionId: election.id });
+    expect(assignment).toMatchObject({ role: 'auditor', electionId: election.id });
   });
 
   it('rejects non-provisionable roles and foreign elections', async () => {
     const foreign = await svc.createElection(platformAdminId, orgA, { name: 'Org A Election' });
-    for (const role of ['platform_admin', 'voter', 'candidate', 'station_officer'] as const) {
+    for (const role of ['platform_admin', 'voter'] as const) {
       await expect(svc.provisionTenantAdmin(platformAdminId, orgB, {
         email: `${role}@orgb`, displayName: role, password: 'correct horse battery', role,
       })).rejects.toThrow(/FORBIDDEN: role/);
     }
     await expect(svc.provisionTenantAdmin(platformAdminId, orgB, {
       email: 'bad@orgb', displayName: 'Bad', password: 'correct horse battery',
-      role: 'election_admin', electionId: foreign.id,
+      role: 'auditor', electionId: foreign.id,
     })).rejects.toThrow(/FORBIDDEN: election does not belong/);
   });
 

@@ -1,5 +1,7 @@
 # DEC-004 — Voter Verification Method (Options Paper + Recommendation)
 
+> **Model update (v0.2):** the role model is now four roles — `platform_admin`, `organization_owner`, `auditor`, `voter` — per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
+
 **Document ID:** EMP-DEC004-001\
 **Version:** 0.1\
 **Status:** Recommendation — pending election committee approval\

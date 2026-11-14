@@ -129,12 +129,12 @@ describe('Phase 2 core workflows', () => {
     expect(voters.find((v) => v.fullName === 'Bob Blank')!.memberId).toMatch(/^VM-[A-Z2-9]{8}$/);
   });
 
-  it('enforces SoD-1 and audits the denied attempt (SoD-9)', async () => {
+  it('enforces SoD-8 and audits the denied attempt (SoD-9)', async () => {
     const election = await setupElection();
     const user = await svc.createUser(orgId, 'dual@example.org', 'Dual Role', 'pw-long-enough');
-    await svc.assignRole(adminId, orgId, user.id, 'election_admin', election.id);
+    await svc.assignRole(adminId, orgId, user.id, 'auditor', election.id);
     const auditBefore = store.audit.length;
-    await expect(svc.assignRole(adminId, orgId, user.id, 'voter_registrar', election.id)).rejects.toThrow(/SOD_VIOLATION/);
+    await expect(svc.assignRole(adminId, orgId, user.id, 'organization_owner', election.id)).rejects.toThrow(/SOD_VIOLATION/);
     expect(store.audit.length).toBe(auditBefore + 1);
     expect(store.audit[store.audit.length - 1].outcome).toContain('denied');
     await expect(svc.verifyAuditChain()).resolves.toBe(true);
@@ -142,13 +142,13 @@ describe('Phase 2 core workflows', () => {
 
   it('requires MFA for privileged login (FR-IAM-001)', async () => {
     await setupElection();
-    const user = await svc.createUser(orgId, 'chair@example.org', 'Chair Person', 'pw-long-enough');
-    await svc.assignRole(adminId, orgId, user.id, 'committee_chair', null);
-    await expect(svc.login('chair@example.org', 'pw-long-enough')).rejects.toThrow(/MFA_REQUIRED/);
+    const user = await svc.createUser(orgId, 'auditor@example.org', 'Auditor Person', 'pw-long-enough');
+    await svc.assignRole(adminId, orgId, user.id, 'auditor', null);
+    await expect(svc.login('auditor@example.org', 'pw-long-enough')).rejects.toThrow(/MFA_REQUIRED/);
     const stored = store.users.get(user.id)!;
-    const session = await svc.login('chair@example.org', 'pw-long-enough', totpCode(stored.totpSecret!));
+    const session = await svc.login('auditor@example.org', 'pw-long-enough', totpCode(stored.totpSecret!));
     expect(session.token).toBeTruthy();
-    await expect(svc.login('chair@example.org', 'wrong-password', totpCode(stored.totpSecret!))).rejects.toThrow(/AUTH_FAILED/);
+    await expect(svc.login('auditor@example.org', 'wrong-password', totpCode(stored.totpSecret!))).rejects.toThrow(/AUTH_FAILED/);
   });
 
   it('imports a 10,000-record register and reconciles entitlements', async () => {

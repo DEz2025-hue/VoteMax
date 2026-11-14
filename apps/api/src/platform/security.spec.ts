@@ -28,7 +28,7 @@ beforeEach(async () => {
     name: 'SU', votingOpensAt: future(-1), votingClosesAt: future(1),
   });
   electionId = election.id;
-  await svc.assignRole(admin.id, orgId, chairId, 'committee_chair', electionId);
+  await svc.assignRole(admin.id, orgId, chairId, 'organization_owner', electionId);
   posId = (await svc.addPosition(admin.id, electionId, 'President', 1, 1)).id;
   adaId = (await svc.addCandidate(admin.id, electionId, posId, 'Ada')).id;
   await svc.transition(admin.id, electionId, 'CONFIGURED');
@@ -93,7 +93,7 @@ describe('Phase 4 internal security assessment', () => {
     await expect(svc.submitBallot(ballotSession, { [posId]: ['nonexistent-candidate'] }, 'fk-1')).rejects.toThrow(/INVALID_BALLOT/);
   });
 
-  it('tally authorization cannot be forged by a non-chair', async () => {
+  it('tally authorization cannot be forged by a non-owner', async () => {
     await voteOnce('M001');
     await svc.closeElection(executorId, electionId);
     await expect(svc.tally(executorId, electionId, { authorizedBy: executorId, approvers: ['x', 'y'] })).rejects.toThrow(/FORBIDDEN/);

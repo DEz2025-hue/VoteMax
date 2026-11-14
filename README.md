@@ -28,11 +28,10 @@ Phases 1–4 implemented on a **repository abstraction**: `PostgresStore` (durab
 2. OTP requested (`POST /elections/:id/voting/otp/request`) — rate-limited and fraud-scored.
 3. OTP verified → short-lived ballot session → ballot (positions/candidates) fetched.
 4. Selections submitted encrypted (`POST /voting/submit`) with an idempotency key; retries return the original receipt, duplicate votes are impossible.
-5. Assisted voting: station officers open sessions for voters who can't vote remotely.
 
 ### Roles & capabilities
 
-Ten roles mapped to fine-grained capabilities, scoped organization-wide or per-election/station: `platform_admin`, `organization_owner`, `committee_chair`, `election_admin`, `voter_registrar`, `auditor`, `observer`, `station_officer`, `voter`, `candidate`. Separation of duties is enforced in code — tally executor ≠ authorizer, certifier ≠ second approver, officer identity must match the session.
+Four roles mapped to capabilities, scoped organization-wide or per-election: `platform_admin` (platform control plane — creates organizations and initial owner accounts), `organization_owner` (runs the whole tenant election lifecycle: staff, register, ballot, tally, certification), `auditor` (read-only oversight: turnout, audit records, results, tally verification), `voter` (authenticates and casts a ballot). Candidates are election records, not user roles, and there is no in-person voting. Separation of duties is enforced in code — the tally authorizer (owner) differs from the executor, approvers must include an auditor, and the certifier differs from the tally executor and second approver.
 
 ### Platform admin portal (`/platform`)
 

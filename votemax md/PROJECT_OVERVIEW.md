@@ -1,5 +1,7 @@
 # Election Management Platform (EMP)
 
+> **Model update (v0.2):** the role model is now four roles — `platform_admin`, `organization_owner`, `auditor`, `voter` — per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
+
 ## Project Overview
 
 **Document ID:** EMP-FOUND-001\

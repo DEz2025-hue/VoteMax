@@ -310,7 +310,7 @@ export class FraudService {
     }
 
     // ---- Admin / privileged-surface velocity ----
-    if (['register_import', 'station_session', 'provision', 'user_create', 'role_assign', 'org_create'].includes(s) && refHash) {
+    if (['register_import', 'provision', 'user_create', 'role_assign', 'org_create'].includes(s) && refHash) {
       const windowMs = s === 'register_import' ? 60 * MIN : 10 * MIN;
       const limit = s === 'register_import' ? 5 : 30;
       const n = await this.count({ kind: 'actor', signalHash: refHash, surface: s }, now, windowMs);

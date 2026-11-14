@@ -1,5 +1,7 @@
 # Readiness Checklist — Gate to READY (EMP-LIFE-001 §6)
 
+> **Model update (v0.2):** the role model is now four roles — `platform_admin`, `organization_owner`, `auditor`, `voter` — per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
+
 **Document ID:** EMP-READY-001\
 **Version:** 0.1\
 **Status:** Open — no item signed; live election blocked (Phase 5 plan §3)\

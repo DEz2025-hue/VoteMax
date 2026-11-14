@@ -160,11 +160,10 @@ export class CapabilityGuard implements CanActivate {
     const scope = await this.resolveScope(request);
     if (!scope.organizationId) throw new ForbiddenException('TENANT_REQUIRED: could not resolve organization');
 
-    // Least privilege: an assignment scoped to another election or station
+    // Least privilege: an assignment scoped to another election
     // must not satisfy a capability for this one.
     const capabilityScope: CapabilityScope = {
       electionId: scope.electionId,
-      stationId: scope.stationId,
     };
     const allowed = capabilities.some((cap) =>
       hasCapability(principal.assignments, cap, scope.organizationId as string, capabilityScope),
@@ -179,7 +178,7 @@ export class CapabilityGuard implements CanActivate {
     principal?: Principal;
     params: Record<string, string>;
     body: Record<string, unknown>;
-  }): Promise<{ organizationId: string | null; electionId: string | null; stationId: string | null }> {
+  }): Promise<{ organizationId: string | null; electionId: string | null }> {
     // Election-scoped routes: tenant and election scope come from the stored
     // election, never from client input (SEC-TEN-01).
     let organizationId: string | null = null;
@@ -197,7 +196,6 @@ export class CapabilityGuard implements CanActivate {
       if (typeof bodyOrg === 'string' && bodyOrg.length > 0) organizationId = bodyOrg;
     }
     if (!organizationId) organizationId = request.principal?.organizationId ?? null;
-    const stationId = typeof request.params['stationId'] === 'string' ? request.params['stationId'] : null;
-    return { organizationId, electionId, stationId };
+    return { organizationId, electionId };
   }
 }
