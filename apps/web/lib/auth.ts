@@ -47,12 +47,33 @@ export function clearSession(): void {
   for (const key of SESSION_KEYS) sessionStorage.removeItem(key);
 }
 
-/** True when the bearer token still resolves to a principal. */
-export async function sessionIsValid(token: string): Promise<boolean> {
+export interface Principal {
+  userId: string;
+  organizationId: string | null;
+  assignments: (AssignmentInfo & { userId?: string })[];
+}
+
+/** Resolve a bearer token to its principal, or null when invalid/expired. */
+export async function fetchPrincipal(token: string): Promise<Principal | null> {
   try {
     const res = await fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${token}` } });
-    return res.ok;
+    if (!res.ok) return null;
+    return (await res.json()) as Principal;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/** True when the bearer token still resolves to a principal. */
+export async function sessionIsValid(token: string): Promise<boolean> {
+  return (await fetchPrincipal(token)) !== null;
+}
+
+/**
+ * Platform-only accounts (every assignment is platform_admin, no tenant
+ * roles) belong to the control-plane portal, not the organization console.
+ */
+export function isPlatformOnly(principal: Principal): boolean {
+  return principal.assignments.length > 0 &&
+    principal.assignments.every((a) => a.role === 'platform_admin');
 }

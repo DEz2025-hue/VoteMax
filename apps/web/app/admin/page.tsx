@@ -7,7 +7,7 @@ import {
   Select, Skeleton, Stat, Table, Textarea, Toast,
 } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
-import { clearSession, sessionIsValid } from '../../lib/auth';
+import { clearSession, fetchPrincipal, isPlatformOnly } from '../../lib/auth';
 import { hasCapability, type AssignmentInfo } from '../../lib/capabilities';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -167,30 +167,34 @@ export default function AdminPage() {
       setSessionChecked(true);
       return;
     }
-    // Validate the stored session before trusting it — expired or revoked
-    // tokens must return the visitor to sign-in, not the dashboard.
-    void sessionIsValid(t).then((ok) => {
-      if (!ok) {
+    // Resolve the stored session before trusting it — expired or revoked
+    // tokens go to sign-in, and platform-only accounts belong to /platform.
+    void fetchPrincipal(t).then((principal) => {
+      if (!principal) {
         clearSession();
         setStatus('Your session has expired. Please sign in again.');
         setSessionChecked(true);
         return;
       }
+      if (isPlatformOnly(principal)) {
+        router.replace('/platform');
+        return;
+      }
       sessionToken = t;
       setSignedIn(true);
-      const u = sessionStorage.getItem('votery.user');
-      if (u) setUserId(u);
-      const o = sessionStorage.getItem('votery.org');
-      if (o) setOrgId(o);
+      setUserId(principal.userId);
+      if (principal.organizationId) setOrgId(principal.organizationId);
+      setAssignments(principal.assignments);
+      sessionStorage.setItem('votery.user', principal.userId);
+      if (principal.organizationId) sessionStorage.setItem('votery.org', principal.organizationId);
+      sessionStorage.setItem('votery.assignments', JSON.stringify(principal.assignments));
       const s = sessionStorage.getItem('votery.orgSlug');
       if (s) setOrgSlug(s);
       const e = sessionStorage.getItem('votery.election');
       if (e) setElectionId(e);
-      const a = sessionStorage.getItem('votery.assignments');
-      if (a) { try { setAssignments(JSON.parse(a) as AssignmentInfo[]); } catch { /* ignore corrupt cache */ } }
       setSessionChecked(true);
     });
-  }, []);
+  }, [router]);
 
   // Signed-out visitors go to the dedicated sign-in page.
   useEffect(() => {

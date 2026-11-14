@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Field, Input, Skeleton } from '../../components/ui';
-import { clearSession, sessionIsValid, signIn, storeSession } from '../../lib/auth';
+import { clearSession, fetchPrincipal, isPlatformOnly, signIn, storeSession } from '../../lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,10 +19,10 @@ export default function LoginPage() {
       setChecking(false);
       return;
     }
-    // Already signed in with a live session — go straight to the console.
-    void sessionIsValid(t).then((ok) => {
-      if (ok) {
-        router.replace('/admin');
+    // Already signed in with a live session — go straight to the right portal.
+    void fetchPrincipal(t).then((principal) => {
+      if (principal) {
+        router.replace(isPlatformOnly(principal) ? '/platform' : '/admin');
         return;
       }
       clearSession();
@@ -44,7 +44,10 @@ export default function LoginPage() {
         String(f.get('totp') ?? ''),
       );
       storeSession(data);
-      router.replace('/admin');
+      // Platform-only accounts belong to the control-plane portal.
+      const platformOnly = (data.assignments ?? []).length > 0 &&
+        (data.assignments ?? []).every((a) => a.role === 'platform_admin');
+      router.replace(platformOnly ? '/platform' : '/admin');
     } catch (err) {
       setStatus(`Sign in: ${err instanceof Error ? err.message : 'failed'}`);
       setStatusKind('error');
