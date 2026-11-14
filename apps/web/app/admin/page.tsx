@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input,
   Select, Skeleton, Stat, Table, Textarea, Toast,
@@ -9,6 +9,7 @@ import {
 import { fraudHeaders } from '../../lib/fraud';
 import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut } from '../../lib/auth';
 import { hasCapability, type AssignmentInfo } from '../../lib/capabilities';
+import { downloadRegisterTemplate, previewRegisterCsv } from '../../lib/register-csv';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -160,6 +161,13 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState('');
   const [assistedLink, setAssistedLink] = useState('');
+  const [csvText, setCsvText] = useState('');
+  const [csvName, setCsvName] = useState('');
+  const [dragOver, setDragOver] = useState(false);
+  const [importResult, setImportResult] = useState<{ eligible: number; duplicates: number; errors: { line: number; message: string }[] } | null>(null);
+  const csvFileRef = useRef<HTMLInputElement>(null);
+
+  const registerPreview = useMemo(() => (csvText.trim() ? previewRegisterCsv(csvText) : null), [csvText]);
 
   useEffect(() => {
     const t = sessionStorage.getItem('votemax.session');
@@ -241,6 +249,30 @@ export default function AdminPage() {
     if (!electionId) return;
     const list = await get(`/elections/${electionId}/register/voters`) as unknown as VoterRow[];
     setVoters(Array.isArray(list) ? list : []);
+  }
+
+  function loadCsvFile(file: File) {
+    void file.text().then((text) => {
+      setCsvText(text);
+      setCsvName(file.name);
+      setImportResult(null);
+    });
+  }
+
+  function onCsvDrop(e: DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) loadCsvFile(file);
+  }
+
+  async function doRegisterImport(freeze: boolean): Promise<void> {
+    const result = await call(`/elections/${electionId}/register/import`, { csv: csvText }) as unknown as
+      { eligible: number; duplicates: number; errors: { line: number; message: string }[] };
+    setImportResult(result);
+    if (freeze) await call(`/elections/${electionId}/register/freeze`, {});
+    await refreshVoters();
+    await refreshElection();
   }
 
   async function refreshElections() {
@@ -604,29 +636,94 @@ export default function AdminPage() {
                     {label}
                   </Button>
                 ))}
-                <Button variant="primary" size="sm" disabled={!electionId || !cap('register.manage') || !cap('register.freeze')}
-                  title={cap('register.manage') && cap('register.freeze') ? undefined : 'Requires register.manage and register.freeze (e.g. voter_registrar + committee_chair)'}
-                  onClick={() => setConfirm({ title: 'Import CSV + freeze register', message: 'Import the CSV and freeze the register?', action: () => void act('Import CSV + freeze register', async () => {
-                  const f = document.querySelector<HTMLTextAreaElement>('textarea[name="csv"]');
-                  const csv = f?.value.trim();
-                  if (!csv) throw new Error('Paste the voter register CSV before freezing.');
-                  await call(`/elections/${electionId}/register/import`, { csv });
-                  await call(`/elections/${electionId}/register/freeze`, {});
-                  await refreshVoters(); await refreshElection();
-                }) })}>Import CSV + freeze</Button>
+                <Button variant="primary" size="sm" disabled={!electionId || !csvText.trim() || !cap('register.manage') || !cap('register.freeze')}
+                  title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') && cap('register.freeze') ? undefined : 'Requires register.manage and register.freeze (e.g. voter_registrar + committee_chair)'}
+                  onClick={() => setConfirm({ title: 'Import CSV + freeze register', message: `Import ${registerPreview?.rowCount ?? '?'} rows and freeze the register? Voting cannot proceed until the register is frozen.`, action: () => void act('Import CSV + freeze register', () => doRegisterImport(true)) })}>Import CSV + freeze</Button>
                 <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
               </div>
-              <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                void act('Import register', async () => {
-                  const result = await call(`/elections/${electionId}/register/import`, { csv: f.get('csv') });
-                  setDetail(JSON.stringify(result, null, 2));
-                  await refreshVoters(); await refreshElection();
-                }); }}>
-                <Field label="Voter register CSV" hint="fullName is required; memberId is auto-generated (VM-XXXXXXXX) when blank; email or phone required for OTP delivery" htmlFor="register-csv">
-                  <Textarea id="register-csv" name="csv" required rows={7} placeholder={'fullName,email,phone\nAlice Doe,alice@example.org,+231 88 000 0000\nBob Smith,,+231 88 000 0001'} />
+              <div className="import-box">
+                <div className="import-bar">
+                  <Button variant="secondary" size="sm" onClick={downloadRegisterTemplate}>Download template</Button>
+                  <span className="muted small">CSV · memberId optional (auto-generated VM- IDs) · email or phone required for OTP delivery</span>
+                </div>
+                <div
+                  className={`dropzone ${dragOver ? 'drag-over' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => csvFileRef.current?.click()}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') csvFileRef.current?.click(); }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={onCsvDrop}
+                >
+                  <input
+                    ref={csvFileRef}
+                    type="file"
+                    accept=".csv,text/csv,text/plain"
+                    hidden
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) loadCsvFile(f); e.target.value = ''; }}
+                  />
+                  <strong>{csvName || 'Drop your voter CSV here'}</strong>
+                  <span className="muted small">or click to browse — you can also paste rows below</span>
+                </div>
+                <Field label="Or paste CSV" htmlFor="register-csv" hint="fullName is required. Blank memberId cells get an auto-generated VM- ID. Voters need an email or phone to receive their OTP code.">
+                  <Textarea
+                    id="register-csv"
+                    name="csv"
+                    rows={6}
+                    value={csvText}
+                    onChange={(e) => { setCsvText(e.target.value); setImportResult(null); }}
+                    placeholder={'fullName,email,phone\nAlice Doe,alice@example.org,+231 88 000 0000\nBob Smith,,+231 88 000 0001'}
+                  />
                 </Field>
-                <Button type="submit" variant="primary" disabled={!electionId || !cap('register.manage')}>Import register</Button>
-              </form>
+                {registerPreview && (
+                  <div className="import-preview">
+                    <div className="import-preview-stats">
+                      <Badge tone="neutral">{registerPreview.rowCount.toLocaleString()} valid rows</Badge>
+                      <Badge tone={registerPreview.issueCount ? 'warning' : 'success'}>
+                        {registerPreview.issueCount ? `${registerPreview.issueCount} issue${registerPreview.issueCount === 1 ? '' : 's'}` : 'No issues detected'}
+                      </Badge>
+                      {!registerPreview.hasMemberId && <Badge tone="accent">memberId auto-generated</Badge>}
+                    </div>
+                    {registerPreview.sample.length > 0 && (
+                      <Table head={registerPreview.headers.slice(0, 6)}>
+                        {registerPreview.sample.map((r, i) => (
+                          <tr key={i}>{registerPreview.headers.slice(0, 6).map((_, j) => <td key={j} className="small">{r[j] ?? ''}</td>)}</tr>
+                        ))}
+                      </Table>
+                    )}
+                    {registerPreview.issues.length > 0 && (
+                      <ul className="import-issues">
+                        {registerPreview.issues.map((iss, i) => <li key={i} className="small muted">Line {iss.line}: {iss.message}</li>)}
+                        {registerPreview.issueCount > registerPreview.issues.length && (
+                          <li className="small muted">…and {registerPreview.issueCount - registerPreview.issues.length} more</li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {importResult && (
+                  <Alert kind={importResult.errors.length || importResult.duplicates ? 'warning' : 'success'} title="Import result">
+                    {importResult.eligible.toLocaleString()} eligible · {importResult.duplicates} duplicates · {importResult.errors.length} row errors.
+                    {importResult.errors.length > 0 && (
+                      <ul className="import-issues">
+                        {importResult.errors.slice(0, 8).map((err, i) => <li key={i} className="small">Line {err.line}: {err.message}</li>)}
+                      </ul>
+                    )}
+                  </Alert>
+                )}
+                <div className="form-actions">
+                  <Button
+                    variant="primary"
+                    disabled={!electionId || !csvText.trim() || !cap('register.manage')}
+                    onClick={() => setConfirm({
+                      title: 'Import register',
+                      message: `Import ${registerPreview?.rowCount ?? '?'} rows into the voter register?`,
+                      action: () => void act('Import register', () => doRegisterImport(false)),
+                    })}
+                  >Import register</Button>
+                </div>
+              </div>
               <div style={{ marginTop: 18 }}>
                 {voters.length ? (
                   <Table head={['Member ID', 'Name', 'Status', 'Resolve']}>
