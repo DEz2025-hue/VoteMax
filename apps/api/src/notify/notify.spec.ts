@@ -72,6 +72,10 @@ describe('voter notifications', () => {
       votingClosesAt: new Date(Date.now() + 62 * 60_000).toISOString(),
     });
     void el;
+    // Still being registered: voters can't act yet, so no reminder goes out.
+    await svc.maybeQueueReminder(electionId);
+    expect((await store.listNotificationBatches(electionId)).filter((b) => b.kind === 'reminder_open')).toHaveLength(0);
+    await store.updateElection(electionId, { state: 'READY' });
     await svc.maybeQueueReminder(electionId);
     await svc.maybeQueueReminder(electionId); // second tick must not duplicate
     const batches = await store.listNotificationBatches(electionId);

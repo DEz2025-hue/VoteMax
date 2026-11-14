@@ -409,7 +409,7 @@ export class PlatformService {
     if (to === 'CONFIGURED') {
       const positions = await this.store.listPositions(electionId);
       if (positions.length === 0) throw new Error('PRECONDITION: at least one position is required (T1)');
-      const candidates = await this.store.listCandidates();
+      const candidates = await this.store.listCandidatesByElection(electionId);
       const hasCandidate = candidates.some((c) => positions.some((p) => p.id === c.positionId));
       if (!hasCandidate) throw new Error('PRECONDITION: at least one candidate is required (T1)');
       if (!election.votingOpensAt || !election.votingClosesAt) {
@@ -568,12 +568,16 @@ export class PlatformService {
     const opens = new Date(election.votingOpensAt).getTime();
     const closes = new Date(election.votingClosesAt).getTime();
     const WINDOW = 5 * 60_000;
-    // Send once, inside a ±5-minute catch-up window around each boundary.
-    if (now >= opens - WINDOW && now <= opens + WINDOW) {
+    // Send once, inside a ±5-minute catch-up window around each boundary —
+    // and only when voters can actually act on it: the opening reminder needs
+    // a ready/open election (never one still being configured or registered),
+    // the closing reminder needs voting still running.
+    if (now >= opens - WINDOW && now <= opens + WINDOW &&
+        ['READY', 'OPEN'].includes(election.state)) {
       await this.queueReminder(election, 'reminder_open');
     }
     if (now >= closes - WINDOW && now <= closes + WINDOW &&
-        !['CLOSED', 'TALLIED', 'VERIFIED', 'RECOUNT', 'CERTIFIED'].includes(election.state)) {
+        ['OPEN', 'SUSPENDED'].includes(election.state)) {
       await this.queueReminder(election, 'reminder_close');
     }
   }
@@ -595,6 +599,25 @@ export class PlatformService {
       await this.store.updateNotificationBatch(batch.id, { status: 'failed', completedAt: new Date().toISOString() });
       await this.log(election.organizationId, null, 'notify.failed', `election:${election.id}`, `error:${err instanceof Error ? err.message : 'unknown'}`);
     });
+  }
+
+  /**
+   * Batches run in-process; a restart mid-send leaves them 'queued'/'running'
+   * forever. Mark any that have been unfinished past the stale window as
+   * failed so the admin console reflects reality (voters can be re-invited).
+   */
+  async reapStaleNotificationBatches(electionId: string, staleMs = 30 * 60_000): Promise<number> {
+    const batches = await this.store.listNotificationBatches(electionId);
+    const cutoff = Date.now() - staleMs;
+    let reaped = 0;
+    for (const b of batches) {
+      if ((b.status === 'queued' || b.status === 'running') && new Date(b.createdAt).getTime() < cutoff) {
+        await this.store.updateNotificationBatch(b.id, { status: 'failed', completedAt: new Date().toISOString() });
+        await this.log(b.organizationId, null, 'notify.failed', `election:${electionId}`, 'error:stale_batch_reaped');
+        reaped += 1;
+      }
+    }
+    return reaped;
   }
 
   async listNotificationBatches(electionId: string): Promise<NotificationBatch[]> {
@@ -656,7 +679,14 @@ export class PlatformService {
     if (recent.length >= 5) throw new Error('OTP_RATE_LIMITED: too many code requests; wait before trying again');
     recent.push(now);
     otpRequestLog.set(throttleKey, recent);
-    const voter = await this.eligibleVoter(electionId, memberId);
+    const voter = await this.store.findVoterByMemberId(electionId, memberId);
+    if (!voter || voter.status !== 'eligible') {
+      // Anti-enumeration: respond exactly as for a registered voter so the
+      // endpoint cannot be used to discover who is on the register. Nothing
+      // is issued or delivered.
+      await this.log(election.organizationId, null, 'voting.otpRequest', `election:${electionId}`, 'ignored:not_eligible');
+      return { sent: true };
+    }
     const challengeKey = `${electionId}:${voter.id}`;
     const existing = await this.store.getOtpChallenge(challengeKey);
     const existingActive = existing && existing.expiresAt > Date.now();
@@ -699,14 +729,20 @@ export class PlatformService {
   async verifyOtp(electionId: string, memberId: string, code: string): Promise<{ ballotSession: string }> {
     const election = await this.electionOrThrow(electionId);
     this.assertVotingWindow(election);
-    const voter = await this.eligibleVoter(electionId, memberId);
-    const key = `${electionId}:${voter.id}`;
     const verifyKey = `${electionId}:${memberId.toLowerCase()}`;
     const now = Date.now();
     const failures = (otpVerifyFailures.get(verifyKey) ?? []).filter((t) => now - t < 10 * 60_000);
     if (failures.length >= 10) {
       throw new Error('OTP_RATE_LIMITED: too many failed verification attempts; wait before trying again');
     }
+    const voter = await this.store.findVoterByMemberId(electionId, memberId);
+    if (!voter || voter.status !== 'eligible') {
+      // Same error as a wrong code — no register enumeration via verify.
+      failures.push(now);
+      otpVerifyFailures.set(verifyKey, failures);
+      throw new Error('OTP_INVALID: code does not match');
+    }
+    const key = `${electionId}:${voter.id}`;
     const codeHash = createHash('sha256').update(code.trim()).digest('hex');
     const result = await this.store.consumeOtpChallenge(key, codeHash, 5);
     if (result === 'missing' || result === 'expired') throw new Error('OTP_EXPIRED: request a new code');
@@ -728,7 +764,7 @@ export class PlatformService {
     const session = await this.sessionOrThrow(ballotSession);
     const election = await this.electionOrThrow(session.electionId);
     this.assertVotingWindow(election);
-    const allCandidates = await this.store.listCandidates();
+    const allCandidates = await this.store.listCandidatesByElection(election.id);
     const positions = (await this.store.listPositions(election.id)).map((p) => ({
       id: p.id, title: p.title, seats: p.seats, maxChoices: p.maxChoices, allowAbstain: p.allowAbstain,
       candidates: allCandidates
@@ -757,7 +793,7 @@ export class PlatformService {
     // Structural validation against election rules (SEC-VOT-06).
     const normalized: Record<string, string[]> = {};
     const positions = await this.store.listPositions(election.id);
-    const allCandidates = await this.store.listCandidates();
+    const allCandidates = await this.store.listCandidatesByElection(election.id);
     for (const position of positions) {
       const chosen = selections[position.id] ?? [];
       if (chosen.length > position.maxChoices) {
@@ -933,6 +969,23 @@ export class PlatformService {
     if (election.state !== 'CLOSED' && election.state !== 'RECOUNT') {
       throw new Error(`INVALID_STATE: tally requires CLOSED or RECOUNT, current ${election.state}`);
     }
+    await this.assertTallyAuthorization(actorId, election, input);
+    const computed = await this.computeTally(election);
+    const run: TallyRun = {
+      ...computed, id: randomUUID(), authorizedBy: input.authorizedBy,
+      executedBy: actorId, approvers: [...new Set(input.approvers)], createdAt: new Date().toISOString(),
+    };
+    // Tally run + state transition commit atomically (Postgres transaction).
+    await this.store.recordTally(run, 'TALLIED');
+    election.state = 'TALLIED';
+    await this.log(election.organizationId, actorId, 'tally.execute', `election:${electionId}`, `success:ballots=${run.ballotCount},hash=${run.tallyHash}`);
+    return run;
+  }
+
+  /** SoD-4/5 checks for a tally or recount; throws before any state change. */
+  private async assertTallyAuthorization(
+    actorId: string, election: Election, input: { authorizedBy: string; approvers: string[] },
+  ): Promise<void> {
     const assignments = await this.store.listAssignments();
     const ownerOk = assignments.some(
       (a) => a.userId === input.authorizedBy &&
@@ -959,16 +1012,6 @@ export class PlatformService {
         (!a.electionId || a.electionId === election.id),
     ));
     if (!auditorApproved) throw new Error('PRECONDITION: at least one tally approver must be an auditor');
-    const computed = await this.computeTally(election);
-    const run: TallyRun = {
-      ...computed, id: randomUUID(), authorizedBy: input.authorizedBy,
-      executedBy: actorId, approvers, createdAt: new Date().toISOString(),
-    };
-    // Tally run + state transition commit atomically (Postgres transaction).
-    await this.store.recordTally(run, 'TALLIED');
-    election.state = 'TALLIED';
-    await this.log(election.organizationId, actorId, 'tally.execute', `election:${electionId}`, `success:ballots=${run.ballotCount},hash=${run.tallyHash}`);
-    return run;
   }
 
   /** Independent verification: recompute from ciphertexts and compare. */
@@ -993,6 +1036,9 @@ export class PlatformService {
     if (election.state !== 'TALLIED' && election.state !== 'VERIFIED') {
       throw new Error(`INVALID_STATE: recount requires TALLIED or VERIFIED, current ${election.state}`);
     }
+    // Validate authorization BEFORE changing state, so a rejected recount
+    // cannot strand the election in RECOUNT.
+    await this.assertTallyAuthorization(actorId, election, input);
     await this.store.updateElection(electionId, { state: 'RECOUNT' });
     election.state = 'RECOUNT';
     await this.log(election.organizationId, actorId, 'tally.recount', `election:${electionId}`, 'started');
@@ -1042,7 +1088,7 @@ export class PlatformService {
     await this.assertResultsVisible(election, actorId);
     const run = await this.store.latestTallyRun(electionId);
     const part = await this.participation(electionId, actorId);
-    const allCandidates = await this.store.listCandidates();
+    const allCandidates = await this.store.listCandidatesByElection(electionId);
     const positions = (await this.store.listPositions(electionId)).map((p) => ({
       position: p.title,
       seats: p.seats,
@@ -1067,7 +1113,7 @@ export class PlatformService {
 
   async electionDetail(electionId: string) {
     const election = await this.electionOrThrow(electionId);
-    const allCandidates = await this.store.listCandidates();
+    const allCandidates = await this.store.listCandidatesByElection(electionId);
     const positions = (await this.store.listPositions(electionId)).map((p) => ({
       ...p,
       candidates: allCandidates.filter((c) => c.positionId === p.id),
@@ -1216,11 +1262,37 @@ export class PlatformService {
     return this.store.listFraudEvents({ electionId, limit: 200 });
   }
 
-  async listFraudBlocks() {
-    return this.store.listActiveFraudBlocks();
+  /**
+   * Platform admins see every block. Tenant principals see only blocks
+   * scoped to their own organization's elections — global blocks and other
+   * tenants' blocks are invisible (SEC-TEN).
+   */
+  async listFraudBlocks(scope: { platform: boolean; organizationId: string | null }) {
+    const blocks = await this.store.listActiveFraudBlocks();
+    if (scope.platform) return blocks;
+    const out = [];
+    for (const b of blocks) {
+      if (await this.blockBelongsToOrg(b.electionId, scope.organizationId)) out.push(b);
+    }
+    return out;
   }
 
-  async liftFraudBlock(actorId: string, blockId: string): Promise<{ lifted: true }> {
+  private async blockBelongsToOrg(electionId: string | null, organizationId: string | null): Promise<boolean> {
+    if (!electionId || !organizationId) return false;
+    const election = await this.store.getElection(electionId);
+    return election?.organizationId === organizationId;
+  }
+
+  async liftFraudBlock(
+    actorId: string, blockId: string,
+    scope: { platform: boolean; organizationId: string | null } = { platform: true, organizationId: null },
+  ): Promise<{ lifted: true }> {
+    if (!scope.platform) {
+      const block = await this.store.getFraudBlock(blockId);
+      if (!block || !(await this.blockBelongsToOrg(block.electionId, scope.organizationId))) {
+        throw new Error('NOT_FOUND: no active fraud block with that id');
+      }
+    }
     const ok = await this.store.liftFraudBlock(blockId, actorId);
     if (!ok) throw new Error('NOT_FOUND: no active fraud block with that id');
     await this.log(null, actorId, 'fraud.blockLift', `fraudblock:${blockId}`, 'success');

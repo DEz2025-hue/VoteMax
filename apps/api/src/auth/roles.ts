@@ -56,6 +56,10 @@ export const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'platform.tenants.read',
     'platform.tenants.provision',
     'platform.health.read',
+    // Global (non-election) fraud blocks are cross-tenant; only the platform
+    // may view or lift them. Tenant owners see election-scoped blocks only.
+    'fraud.read',
+    'fraud.manage',
     'audit.read',
   ],
   organization_owner: [

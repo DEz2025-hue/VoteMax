@@ -33,6 +33,7 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
       for (const org of orgs) {
         const elections = await this.platform.store.listElections(org.id);
         for (const election of elections) {
+          await this.platform.reapStaleNotificationBatches(election.id).catch(() => undefined);
           await this.platform.maybeQueueReminder(election.id).catch((err) => {
             logEvent('warn', 'reminder.tick_failed', {
               electionId: election.id,

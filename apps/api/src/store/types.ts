@@ -188,6 +188,8 @@ export interface PlatformStore {
   addCandidate(candidate: Candidate): Promise<void>;
   getCandidate(id: string): Promise<Candidate | null>;
   listCandidates(): Promise<Candidate[]>;
+  /** Candidates of one election's positions (avoids whole-table reads). */
+  listCandidatesByElection(electionId: string): Promise<Candidate[]>;
   /** Delete a candidate record (config editable states only — enforced by service). */
   deleteCandidate(id: string): Promise<void>;
   /** Delete a position and all of its candidates atomically. */
@@ -275,6 +277,7 @@ export interface PlatformStore {
   countDistinctFraudRefs(filter: FraudSignalFilter): Promise<number>;
   listFraudEvents(filter: { electionId?: string; since?: string; limit?: number }): Promise<FraudEvent[]>;
   listActiveFraudBlocks(): Promise<FraudBlock[]>;
+  getFraudBlock(id: string): Promise<FraudBlock | null>;
   countFraudEventsSince(since: string): Promise<number>;
   countActiveFraudBlocks(): Promise<number>;
   /** Mark a block lifted; returns false if already lifted/expired/missing. */

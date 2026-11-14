@@ -138,7 +138,10 @@ describe('Phase 3 voting and results (mock election)', () => {
   });
 
   it('rejects ineligible voters, wrong OTP, and votes after close', async () => {
-    await expect(svc.requestOtp(electionId, 'S999')).rejects.toThrow(/NOT_ELIGIBLE/);
+    // Unknown IDs get the same success shape as real voters (no enumeration)
+    // but no code is issued, and verify fails like a wrong code.
+    await expect(svc.requestOtp(electionId, 'S999')).resolves.toEqual({ sent: true });
+    await expect(svc.verifyOtp(electionId, 'S999', '123456')).rejects.toThrow(/OTP_INVALID/);
     await svc.requestOtp(electionId, 'S001');
     await expect(svc.verifyOtp(electionId, 'S001', '000000')).rejects.toThrow(/OTP_INVALID|OTP_LOCKED/);
     await vote('S001', adaId);
@@ -168,6 +171,41 @@ describe('Phase 3 voting and results (mock election)', () => {
     expect((await svc.verifyTally(electionId)).verified).toBe(true);
     const recount = await svc.recount(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     expect(recount.tallyHash).toBe(first.tallyHash);
+  });
+
+  it('a rejected recount leaves the election in TALLIED, not RECOUNT', async () => {
+    await vote('S001', adaId);
+    await svc.closeElection(executorId, electionId);
+    await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    await expect(svc.recount(executorId, electionId, { authorizedBy: chairId, approvers: [approver1] }))
+      .rejects.toThrow(/PRECONDITION/);
+    expect((await store.getElection(electionId))!.state).toBe('TALLIED');
+  });
+
+  it('fraud blocks are tenant-scoped: owners see only their own elections\' blocks', async () => {
+    const future1 = new Date(Date.now() + 3600_000).toISOString();
+    const mine = await store.insertFraudBlock({ kind: 'device', signalHash: 'a', electionId, rule: 'r', reason: 'x', score: 100, expiresAt: future1 });
+    const global = await store.insertFraudBlock({ kind: 'ip', signalHash: 'b', electionId: null, rule: 'r', reason: 'x', score: 100, expiresAt: future1 });
+    const otherOrg = (await svc.createOrganization(null, 'Other', 'other')).id;
+    const otherElection = (await svc.createElection(executorId, otherOrg, { name: 'Other' })).id;
+    const foreign = await store.insertFraudBlock({ kind: 'device', signalHash: 'c', electionId: otherElection, rule: 'r', reason: 'x', score: 100, expiresAt: future1 });
+
+    const tenant = { platform: false, organizationId: orgId };
+    expect((await svc.listFraudBlocks(tenant)).map((b) => b.id)).toEqual([mine.id]);
+    expect(await svc.listFraudBlocks({ platform: true, organizationId: null })).toHaveLength(3);
+    await expect(svc.liftFraudBlock(executorId, global.id, tenant)).rejects.toThrow(/NOT_FOUND/);
+    await expect(svc.liftFraudBlock(executorId, foreign.id, tenant)).rejects.toThrow(/NOT_FOUND/);
+    await expect(svc.liftFraudBlock(executorId, mine.id, tenant)).resolves.toEqual({ lifted: true });
+  });
+
+  it('reaps notification batches left running by a restart', async () => {
+    const old = new Date(Date.now() - 2 * 3600_000).toISOString();
+    await store.insertNotificationBatch({
+      id: 'stale-1', electionId, organizationId: orgId, kind: 'invite', status: 'running',
+      total: 5, sent: 1, failed: 0, skipped: 0, createdAt: old, completedAt: null,
+    });
+    expect(await svc.reapStaleNotificationBatches(electionId)).toBe(1);
+    expect((await svc.listNotificationBatches(electionId))[0].status).toBe('failed');
   });
 
   it('requires oversight roles for tally approvers and the certification second approver', async () => {

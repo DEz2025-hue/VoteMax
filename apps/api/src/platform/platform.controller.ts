@@ -41,6 +41,13 @@ export function actor(req: { principal?: Principal }): string {
   return req.principal?.userId ?? 'bootstrap';
 }
 
+function fraudScope(req: { principal?: Principal }): { platform: boolean; organizationId: string | null } {
+  return {
+    platform: req.principal?.assignments.some((a) => a.role === 'platform_admin') ?? false,
+    organizationId: req.principal?.organizationId ?? null,
+  };
+}
+
 @UseGuards(SessionGuard, CapabilityGuard)
 @Controller()
 export class PlatformController {
@@ -202,7 +209,12 @@ export class PlatformController {
   @Post('elections/:id/voting/otp/request')
   @Public()
   requestOtp(@Param('id') id: string, @Body() body: { memberId: string }) {
-    return guard(() => this.platform.requestOtp(id, body.memberId));
+    // Uniform public shape (no channel) so responses cannot reveal whether
+    // a member ID is on the register.
+    return guard(async () => {
+      const r = await this.platform.requestOtp(id, body.memberId);
+      return r.devCode ? { sent: true, devCode: r.devCode } : { sent: true };
+    });
   }
 
   @Post('elections/:id/voting/otp/verify')
@@ -316,14 +328,14 @@ export class PlatformController {
 
   @Get('fraud/blocks')
   @RequireCapability('fraud.read')
-  fraudBlocks() {
-    return guard(() => this.platform.listFraudBlocks());
+  fraudBlocks(@Req() req: { principal?: Principal }) {
+    return guard(() => this.platform.listFraudBlocks(fraudScope(req)));
   }
 
   @Post('fraud/blocks/:id/lift')
   @RequireCapability('fraud.manage')
   liftFraudBlock(@Req() req: { principal?: Principal }, @Param('id') id: string) {
-    return guard(() => this.platform.liftFraudBlock(actor(req), id));
+    return guard(() => this.platform.liftFraudBlock(actor(req), id, fraudScope(req)));
   }
 }
 

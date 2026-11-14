@@ -275,6 +275,14 @@ export class PostgresStore implements PlatformStore {
     return rows.map((r) => this.mapCandidate(r));
   }
 
+  async listCandidatesByElection(electionId: string): Promise<Candidate[]> {
+    const rows = await this.database.select({ c: schema.candidates })
+      .from(schema.candidates)
+      .innerJoin(schema.positions, eq(schema.candidates.positionId, schema.positions.id))
+      .where(eq(schema.positions.electionId, electionId));
+    return rows.map((r) => this.mapCandidate(r.c));
+  }
+
   async deleteCandidate(id: string): Promise<void> {
     await this.database.delete(schema.candidates).where(eq(schema.candidates.id, id));
   }
@@ -567,6 +575,10 @@ export class PostgresStore implements PlatformStore {
         authTag: input.ballot.authTag,
         ciphertextHash: input.ballot.ciphertextHash,
         coarseTimestamp: new Date(`${input.ballot.coarseTimestamp}:00.000Z`),
+        // Explicit minute-bucket value instead of the now() default: a
+        // full-precision created_at would match the entitlement's consumedAt
+        // and let anyone with DB access link a voter to a ballot (SEC-BAL-05).
+        createdAt: new Date(`${input.ballot.coarseTimestamp}:00.000Z`),
       });
 
       await tx.update(schema.entitlements).set({
@@ -886,6 +898,11 @@ export class PostgresStore implements PlatformStore {
       .orderBy(desc(schema.fraudBlocks.createdAt))
       .limit(200);
     return rows.map((r) => this.mapFraudBlock(r));
+  }
+
+  async getFraudBlock(id: string): Promise<FraudBlock | null> {
+    const [row] = await this.database.select().from(schema.fraudBlocks).where(eq(schema.fraudBlocks.id, id));
+    return row ? this.mapFraudBlock(row) : null;
   }
 
   async countFraudEventsSince(since: string): Promise<number> {

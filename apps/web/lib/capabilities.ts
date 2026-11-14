@@ -16,6 +16,8 @@ export const ROLE_CAPABILITIES: Record<string, string[]> = {
     'platform.tenants.read',
     'platform.tenants.provision',
     'platform.health.read',
+    'fraud.read',
+    'fraud.manage',
     'audit.read',
   ],
   organization_owner: [

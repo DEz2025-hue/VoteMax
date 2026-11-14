@@ -53,6 +53,8 @@ const PLATFORM_SCOPED_CAPABILITIES = new Set<Capability>([
   'platform.tenants.read',
   'platform.tenants.provision',
   'platform.health.read',
+  'fraud.read',
+  'fraud.manage',
   'audit.read',
 ]);
 

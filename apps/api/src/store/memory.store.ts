@@ -165,6 +165,13 @@ export class InMemoryStore implements PlatformStore {
     return [...this.candidates.values()];
   }
 
+  async listCandidatesByElection(electionId: string): Promise<Candidate[]> {
+    const positionIds = new Set(
+      [...this.positions.values()].filter((p) => p.electionId === electionId).map((p) => p.id),
+    );
+    return [...this.candidates.values()].filter((c) => positionIds.has(c.positionId));
+  }
+
   async deleteCandidate(id: string): Promise<void> {
     this.candidates.delete(id);
   }
@@ -428,6 +435,10 @@ export class InMemoryStore implements PlatformStore {
   async listActiveFraudBlocks(): Promise<FraudBlock[]> {
     const now = Date.now();
     return this.fraudBlocks.filter((b) => !b.liftedAt && new Date(b.expiresAt).getTime() > now);
+  }
+
+  async getFraudBlock(id: string): Promise<FraudBlock | null> {
+    return this.fraudBlocks.find((b) => b.id === id) ?? null;
   }
 
   async countFraudEventsSince(since: string): Promise<number> {
