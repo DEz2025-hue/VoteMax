@@ -326,3 +326,27 @@ pre.detail { overflow-x: auto; background: #0f172a; color: #e2e8f0; padding: 14p
 .wizard-step.active { border-color: var(--blue-600); background: var(--blue-50); color: var(--navy-900); }
 .wizard-step.active .wizard-step-num { background: var(--blue-600); color: #fff; }
 .wizard-step.done .wizard-step-num { background: #dcfce7; color: #15803d; }
+
+.candidate-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 6px 4px 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  font-size: 13px;
+}
+
+.chip-remove {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--muted, #64748b);
+  padding: 0 2px;
+}
+
+.chip-remove:hover { color: var(--danger, #dc2626); }

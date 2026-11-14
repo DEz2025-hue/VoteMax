@@ -87,3 +87,23 @@ describe('voter notifications', () => {
     expect(batches.filter((b) => b.kind.startsWith('reminder'))).toHaveLength(0);
   });
 });
+
+describe('ballot config deletion', () => {
+  it('removes a candidate and cascades a position delete', async () => {
+    const election = await store.getElection(electionId);
+    const positions = await store.listPositions(electionId);
+    const position = positions[0];
+    const candidates = (await store.listCandidates()).filter((c) => c.positionId === position.id);
+    expect(candidates.length).toBe(1);
+
+    await svc.removeCandidate(adminId, electionId, candidates[0].id);
+    expect((await store.listCandidates()).filter((c) => c.positionId === position.id)).toHaveLength(0);
+
+    await svc.addPosition(adminId, electionId, 'Secretary', 1, 1);
+    const positionsAfter = await store.listPositions(electionId);
+    const extra = positionsAfter.find((p) => p.title === 'Secretary')!;
+    await svc.removePosition(adminId, electionId, extra.id);
+    expect((await store.listPositions(electionId)).map((p) => p.id)).not.toContain(extra.id);
+    void election;
+  });
+});

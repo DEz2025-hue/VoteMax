@@ -380,6 +380,26 @@ export class PlatformService {
     return candidate;
   }
 
+  async removePosition(actorId: string, electionId: string, positionId: string): Promise<void> {
+    const election = await this.electionOrThrow(electionId);
+    assertConfigEditable(election.state);
+    const position = await this.store.getPosition(positionId);
+    if (!position || position.electionId !== electionId) throw new Error('NOT_FOUND: position');
+    await this.store.deletePositionCascade(positionId);
+    await this.log(election.organizationId, actorId, 'position.delete', `election:${electionId}`, `success:${position.title}`);
+  }
+
+  async removeCandidate(actorId: string, electionId: string, candidateId: string): Promise<void> {
+    const election = await this.electionOrThrow(electionId);
+    assertConfigEditable(election.state);
+    const candidate = await this.store.getCandidate(candidateId);
+    if (!candidate) throw new Error('NOT_FOUND: candidate');
+    const position = await this.store.getPosition(candidate.positionId);
+    if (!position || position.electionId !== electionId) throw new Error('NOT_FOUND: candidate');
+    await this.store.deleteCandidate(candidateId);
+    await this.log(election.organizationId, actorId, 'candidate.delete', `election:${electionId}`, `success:${candidate.fullName}`);
+  }
+
   async transition(actorId: string, electionId: string, to: ElectionState): Promise<Election> {
     const election = await this.electionOrThrow(electionId);
     assertTransition(election.state, to);

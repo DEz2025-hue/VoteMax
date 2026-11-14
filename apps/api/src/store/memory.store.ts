@@ -165,6 +165,17 @@ export class InMemoryStore implements PlatformStore {
     return [...this.candidates.values()];
   }
 
+  async deleteCandidate(id: string): Promise<void> {
+    this.candidates.delete(id);
+  }
+
+  async deletePositionCascade(positionId: string): Promise<void> {
+    for (const [id, c] of this.candidates) {
+      if (c.positionId === positionId) this.candidates.delete(id);
+    }
+    this.positions.delete(positionId);
+  }
+
   async listVoters(electionId: string): Promise<VoterRecord[]> {
     return this.voters.filter((v) => v.electionId === electionId);
   }

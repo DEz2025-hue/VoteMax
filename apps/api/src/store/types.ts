@@ -188,6 +188,10 @@ export interface PlatformStore {
   addCandidate(candidate: Candidate): Promise<void>;
   getCandidate(id: string): Promise<Candidate | null>;
   listCandidates(): Promise<Candidate[]>;
+  /** Delete a candidate record (config editable states only — enforced by service). */
+  deleteCandidate(id: string): Promise<void>;
+  /** Delete a position and all of its candidates atomically. */
+  deletePositionCascade(positionId: string): Promise<void>;
 
   // ---- voter register / entitlements ----
   listVoters(electionId: string): Promise<VoterRecord[]>;

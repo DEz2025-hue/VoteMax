@@ -275,6 +275,17 @@ export class PostgresStore implements PlatformStore {
     return rows.map((r) => this.mapCandidate(r));
   }
 
+  async deleteCandidate(id: string): Promise<void> {
+    await this.database.delete(schema.candidates).where(eq(schema.candidates.id, id));
+  }
+
+  async deletePositionCascade(positionId: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await tx.delete(schema.candidates).where(eq(schema.candidates.positionId, positionId));
+      await tx.delete(schema.positions).where(eq(schema.positions.id, positionId));
+    });
+  }
+
   // ---- voter register / entitlements ----
 
   private mapVoter(row: typeof schema.voterRecords.$inferSelect): VoterRecord {

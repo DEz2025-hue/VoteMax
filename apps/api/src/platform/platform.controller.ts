@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
@@ -123,6 +124,18 @@ export class PlatformController {
   @RequireCapability('candidates.manage')
   addCandidate(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { positionId: string; fullName: string; statement?: string }) {
     return guard(() => this.platform.addCandidate(actor(req), id, body.positionId, body.fullName, body.statement));
+  }
+
+  @Delete('elections/:id/positions/:positionId')
+  @RequireCapability('election.configure')
+  removePosition(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('positionId') positionId: string) {
+    return guard(() => this.platform.removePosition(actor(req), id, positionId));
+  }
+
+  @Delete('elections/:id/candidates/:candidateId')
+  @RequireCapability('candidates.manage')
+  removeCandidate(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('candidateId') candidateId: string) {
+    return guard(() => this.platform.removeCandidate(actor(req), id, candidateId));
   }
 
   @Post('elections/:id/transition')

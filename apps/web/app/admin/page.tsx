@@ -477,6 +477,7 @@ export default function AdminPage() {
 
   const visibleSections = SECTIONS.filter((s) => sectionAllowed(SECTION_CAPS[s.id]));
   const activeSection: Section = visibleSections.some((s) => s.id === section) ? section : 'overview';
+  const configEditable = !!election && ['DRAFT', 'CONFIGURED', 'REGISTRATION'].includes(election.state);
 
   // Shared bulk-upload block — used by the setup wizard (step 3) and the
   // Voter register management section.
@@ -782,9 +783,29 @@ export default function AdminPage() {
                   </form>
                   {election?.positions?.length ? (
                     <div style={{ marginTop: 16 }}>
-                      <Table head={['Position', 'Seats', 'Candidates']}>
+                      <Table head={['Position', 'Seats', 'Candidates', '']}>
                         {election.positions.map((p) => (
-                          <tr key={p.id}><td>{p.title}</td><td>{p.seats}</td><td>{(p.candidates ?? []).map((c) => c.fullName).join(', ') || '—'}</td></tr>
+                          <tr key={p.id}>
+                            <td>{p.title}</td>
+                            <td>{p.seats}</td>
+                            <td>
+                              {(p.candidates ?? []).length === 0 ? '—' : (p.candidates ?? []).map((c) => (
+                                <span key={c.id} className="candidate-chip">
+                                  {c.fullName}
+                                  {configEditable && (
+                                    <button type="button" className="chip-remove" title={`Remove ${c.fullName}`}
+                                      onClick={() => setConfirm({ title: 'Remove candidate', message: `Remove ${c.fullName} from ${p.title}?`, action: () => void act('Remove candidate', async () => { await call(`/elections/${electionId}/candidates/${c.id}`, {}, 'DELETE'); await refreshElection(); }) })}>×</button>
+                                  )}
+                                </span>
+                              ))}
+                            </td>
+                            <td>
+                              {configEditable && (
+                                <Button variant="ghost" size="sm"
+                                  onClick={() => setConfirm({ title: 'Remove position', message: `Remove "${p.title}" and all its candidates?`, action: () => void act('Remove position', async () => { await call(`/elections/${electionId}/positions/${p.id}`, {}, 'DELETE'); await refreshElection(); }) })}>Remove</Button>
+                              )}
+                            </td>
+                          </tr>
                         ))}
                       </Table>
                     </div>
