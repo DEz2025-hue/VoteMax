@@ -66,7 +66,7 @@ Without a provider, OTP delivery fails closed in production; a dev-only outbox c
 | Piece | Host | Notes |
 |---|---|---|
 | Web | Vercel (`apps/web`) | `NEXT_PUBLIC_API_URL` points at the API |
-| API | Railway (`railpack.json` at repo root) | `node apps/api/dist/main.js`, `PORT` injected |
+| API | Railway (`railpack.json` at repo root) | `db:migrate` then `node apps/api/dist/main.js`, `PORT` injected |
 | Database | Neon Postgres | pooled `DATABASE_URL` |
 
 Railway env: `DATABASE_URL`, `NODE_ENV=production`, `WEB_ORIGIN`, `FRAUD_HASH_SALT`, `NODE_VERSION=22`, plus OTP provider vars when configured.

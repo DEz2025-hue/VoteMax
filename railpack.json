@@ -15,6 +15,6 @@
     }
   },
   "deploy": {
-    "startCommand": "node apps/api/dist/main.js"
+    "startCommand": "npm run db:migrate -w @votery/api && node apps/api/dist/main.js"
   }
 }
