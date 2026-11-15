@@ -662,6 +662,26 @@ export default function AdminPage() {
     >
       <>
         {statusKind === 'error' && <Alert kind="error" title="Console status">{status}</Alert>}
+        {(() => {
+          // An election opens by itself (and sends its reminder) only once it is READY. Warn
+          // when the opening time is near or past and it has not got that far.
+          if (!election?.votingOpensAt || !['DRAFT', 'CONFIGURED', 'REGISTRATION', 'REGISTER_FROZEN'].includes(election.state)) return null;
+          const mins = Math.round((new Date(election.votingOpensAt).getTime() - Date.now()) / 60_000);
+          if (mins > 60) return null;
+          const stage = election.state.replace('_', ' ').toLowerCase();
+          const closed = election.votingClosesAt && new Date(election.votingClosesAt).getTime() <= Date.now();
+          return mins <= 0 ? (
+            <Alert kind="warning" title={`"${election.name}" should have opened by now`}>
+              It is still in the <strong>{stage}</strong> stage, so it will not open on its own. Automatic start and the opening reminder only work once the election is marked <strong>Ready</strong>.
+              Go to Election setup, Review &amp; launch: freeze the register, then click Mark ready.{closed ? ' Its closing time has also passed, so after marking it Ready, extend the closing time in the Schedule panel.' : ''}
+            </Alert>
+          ) : (
+            <Alert kind="warning" title={`"${election.name}" opens in ${mins} minute${mins === 1 ? '' : 's'} but is not Ready yet`}>
+              It is still in the <strong>{stage}</strong> stage. It will only open automatically, and send its reminder, if it is marked <strong>Ready</strong> before then
+              (Election setup, Review &amp; launch: freeze the register, then Mark ready).
+            </Alert>
+          );
+        })()}
           {activeSection === 'session' && (
             <Card title="Session">
               <p>You are signed in as user <code>{userId || 'unknown'}</code>.</p>
@@ -1053,7 +1073,7 @@ export default function AdminPage() {
                         ))}
                       </Table>
                     )}
-                    {notifyBatches.length === 0 && <p className="small muted">No invitations sent yet. Reminders are sent automatically ~5 minutes before voting opens and closes.</p>}
+                    {notifyBatches.length === 0 && <p className="small muted">No invitations sent yet. Reminders are sent automatically 10 minutes before voting opens and closes, to voters who have not voted yet (the opening reminder needs the election to be Ready).</p>}
                   </div>
 
                   <div className="form-actions">

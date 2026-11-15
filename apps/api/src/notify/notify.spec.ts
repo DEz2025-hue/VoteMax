@@ -111,6 +111,44 @@ describe('voter notifications', () => {
     await waitForBatch(opens[0].id);
   });
 
+  it('sends the opening reminder 10 minutes ahead, not earlier, and only for a READY election', async () => {
+    const set = (opensInMin: number) => store.updateElection(electionId, {
+      state: 'READY',
+      votingOpensAt: new Date(Date.now() + opensInMin * 60_000).toISOString(),
+      votingClosesAt: new Date(Date.now() + (opensInMin + 60) * 60_000).toISOString(),
+    });
+    const count = async () => (await store.listNotificationBatches(electionId)).filter((b) => b.kind === 'reminder_open').length;
+
+    await set(11); // 11 minutes out: too early
+    await svc.maybeQueueReminder(electionId);
+    expect(await count()).toBe(0);
+
+    await set(9); // inside the 10-minute lead
+    await store.updateElection(electionId, { state: 'REGISTER_FROZEN' }); // not READY: voters can't act yet
+    await svc.maybeQueueReminder(electionId);
+    expect(await count()).toBe(0);
+
+    await store.updateElection(electionId, { state: 'READY' });
+    await svc.maybeQueueReminder(electionId);
+    expect(await count()).toBe(1);
+    await svc.maybeQueueReminder(electionId); // dedupes
+    expect(await count()).toBe(1);
+  });
+
+  it('sends the closing reminder 10 minutes ahead and never after voting ended', async () => {
+    const count = async () => (await store.listNotificationBatches(electionId)).filter((b) => b.kind === 'reminder_close').length;
+    await store.updateElection(electionId, {
+      state: 'OPEN',
+      votingOpensAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+      votingClosesAt: new Date(Date.now() - 60_000).toISOString(), // closed a minute ago
+    });
+    await svc.maybeQueueReminder(electionId);
+    expect(await count()).toBe(0);
+    await store.updateElection(electionId, { votingClosesAt: new Date(Date.now() + 8 * 60_000).toISOString() });
+    await svc.maybeQueueReminder(electionId);
+    expect(await count()).toBe(1);
+  });
+
   it('does not send a reminder when the window is far away', async () => {
     await svc.maybeQueueReminder(electionId); // opens in 60min, closes in 120min
     const batches = await store.listNotificationBatches(electionId);

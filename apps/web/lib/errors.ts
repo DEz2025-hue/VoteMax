@@ -46,7 +46,7 @@ const STATE_LABEL: Record<string, string> = {
   DRAFT: 'a draft',
   CONFIGURED: 'configured',
   REGISTRATION: 'in voter registration',
-  REGISTER_FROZEN: 'register locked',
+  REGISTER_FROZEN: 'waiting to be marked ready',
   READY: 'ready to open',
   OPEN: 'open for voting',
   SUSPENDED: 'paused',
@@ -132,8 +132,20 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
       return make(code, raw, 'guidance', 'Not available yet', `This step isn't available yet. ${where}${when}`.trim(),
         current ? STATE_NEXT_STEP[current] : undefined);
     }
-    case 'INVALID_TRANSITION':
-      return make(code, raw, 'guidance', 'Not available yet', "The election can't move to that stage from where it is now.", 'Use the guided steps in Election setup - they take you through each stage in order.');
+    case 'INVALID_TRANSITION': {
+      // Server detail looks like "REGISTRATION -> READY is not permitted (...)".
+      const m = /([A-Z_]+)\s*->\s*([A-Z_]+)/.exec(detail);
+      if (m) {
+        const [, from, to] = m;
+        if (from === to) {
+          return make(code, raw, 'guidance', 'Already done', `The election is already ${stateLabel(from)}, so there is nothing more to do for this step.`);
+        }
+        return make(code, raw, 'guidance', 'Not available yet',
+          `The election is currently ${stateLabel(from)}, so it can't move to ${stateLabel(to)} yet.`,
+          STATE_NEXT_STEP[from] ?? 'Use the guided steps in Election setup, they take you through each stage in order.');
+      }
+      return make(code, raw, 'guidance', 'Not available yet', "The election can't move to that stage from where it is now.", 'Use the guided steps in Election setup, they take you through each stage in order.');
+    }
     case 'CONFIG_FROZEN':
       return make(code, raw, 'guidance', 'Ballot is locked', "The ballot can't be changed any more because the voter register has been locked.");
     case 'REGISTER_FROZEN':

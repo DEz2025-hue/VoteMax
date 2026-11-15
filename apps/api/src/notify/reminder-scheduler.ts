@@ -10,7 +10,7 @@ const TICK_MS = 60_000;
  * closes OPEN ones at their scheduled times, then queues voter reminders.
  *
  * Scheduled voter reminders: queues reminder_open / reminder_close
- * notification batches ~5 minutes around each election's voting window.
+ * notification batches 10 minutes before each election's voting opens and closes.
  * Dedupe lives in the notification_batches table, so restarts and multiple
  * instances won't double-send (the check-then-insert race is benign: a rare
  * duplicate batch is possible but bounded by the tick cadence).

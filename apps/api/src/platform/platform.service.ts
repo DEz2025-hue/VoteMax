@@ -78,6 +78,9 @@ const CERTIFICATION_APPROVER_ROLES = new Set<Role>([
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Audit actor for changes made by the scheduler rather than a signed-in person. */
 const SCHEDULER_ACTOR = 'system:scheduler';
+/** Scheduled voter reminders: how long before opening/closing they are sent, and the catch-up after opening. */
+export const REMINDER_LEAD_MS = 10 * 60_000;
+export const REMINDER_GRACE_MS = 5 * 60_000;
 const OTP_TTL_MS = 10 * 60_000;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
 
@@ -700,16 +703,16 @@ export class PlatformService {
     const now = Date.now();
     const opens = new Date(election.votingOpensAt).getTime();
     const closes = new Date(election.votingClosesAt).getTime();
-    const WINDOW = 5 * 60_000;
-    // Send once, inside a ±5-minute catch-up window around each boundary -
-    // and only when voters can actually act on it: the opening reminder needs
-    // a ready/open election (never one still being configured or registered),
-    // the closing reminder needs voting still running.
-    if (now >= opens - WINDOW && now <= opens + WINDOW &&
+    // Reminders go out 10 minutes BEFORE each boundary, and still within 5 minutes
+    // after the opening time if the API missed it (restart, outage). Each is sent
+    // once (deduped per election) and only when voters can actually act on it: the
+    // opening reminder needs a ready/open election (never one still being set up),
+    // the closing reminder needs voting still running and not yet over.
+    if (now >= opens - REMINDER_LEAD_MS && now <= opens + REMINDER_GRACE_MS &&
         ['READY', 'OPEN'].includes(election.state)) {
       await this.queueReminder(election, 'reminder_open');
     }
-    if (now >= closes - WINDOW && now <= closes + WINDOW &&
+    if (now >= closes - REMINDER_LEAD_MS && now <= closes &&
         ['OPEN', 'SUSPENDED'].includes(election.state)) {
       await this.queueReminder(election, 'reminder_close');
     }
