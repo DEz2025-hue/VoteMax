@@ -651,6 +651,24 @@ body:has(.ps-shell) .site-footer, body:has(.auth-split) .site-footer { display: 
 .receipt code { font-size: 14px; background: transparent; border: 0; padding: 0; word-break: break-all; }
 .success-mark { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--success-soft); color: var(--success); margin: 0 auto 16px; box-shadow: 0 0 0 8px rgb(21 128 61 / .08); }
 
+/* status pages (error / not found) */
+.status-page { flex: 1 0 auto; display: grid; place-items: center; padding: 32px 16px; }
+.status-card { width: min(480px, 100%); text-align: center; }
+.status-card h1 { font-size: 26px; }
+.status-card .lede { font-size: 15px; margin-bottom: 22px; }
+.status-icon { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; margin: 0 auto 18px; background: var(--blue-100); color: var(--blue-600); }
+.status-icon.warn { background: var(--warning-soft); color: var(--warning); }
+
+/* friendly errors: guidance is calm amber, real failures are red */
+.toast-card.warning { border-left-color: var(--warning); }
+.toast-card.warning .toast-icon { background: var(--warning); }
+.toast-title { display: block; color: var(--navy-900); margin-bottom: 2px; }
+.toast-hint { margin-top: 6px; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.toast-tech { margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+.toast-tech summary { cursor: pointer; }
+.toast-tech code { display: block; margin-top: 4px; word-break: break-word; white-space: normal; }
+.alert-hint { margin-top: 4px; font-size: 13px; opacity: .9; }
+
 /* election lifecycle progress (admin overview) */
 .lifecycle { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
 .lifecycle li { padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 650; text-transform: capitalize; background: #eef2f7; color: var(--text-muted); border: 1px solid transparent; }

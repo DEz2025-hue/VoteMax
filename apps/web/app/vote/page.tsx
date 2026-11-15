@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Field, Input, Skeleton } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
+import { apiRequest } from '../../lib/http';
+import { AppError, friendlyFromUnknown, networkError, toFriendly, type FriendlyError } from '../../lib/errors';
 import { Icon } from '../../components/icons';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -22,20 +24,24 @@ interface PublicElection {
 }
 
 async function call(path: string, body: unknown): Promise<Record<string, unknown>> {
-  const res = await fetch(`${API}${path}`, {
+  return apiRequest(`${API}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(await fraudHeaders()) },
     body: JSON.stringify(body),
   });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : `Request failed (${res.status})`);
-  return data;
 }
 
 async function getJson(path: string): Promise<unknown> {
-  const res = await fetch(`${API}${path}`, { headers: await fraudHeaders() });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : `Request failed (${res.status})`);
+  // List endpoints return JSON arrays, which apiRequest's object type can't express.
+  let res: Response;
+  try { res = await fetch(`${API}${path}`, { headers: await fraudHeaders() }); } catch (err) {
+    throw new AppError(networkError(err instanceof Error ? err.message : undefined));
+  }
+  const data: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const m = (data as Record<string, unknown>).message;
+    throw new AppError(toFriendly(typeof m === 'string' ? m : `HTTP ${res.status}`, res.status), res.status);
+  }
   return data;
 }
 
@@ -63,7 +69,7 @@ function VoteFlow() {
   const [ballot, setBallot] = useState<BallotData | null>(null);
   const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [receipt, setReceipt] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -79,10 +85,10 @@ function VoteFlow() {
   }, [params]);
 
   async function act(fn: () => Promise<void>) {
-    setError('');
+    setError(null);
     setNotice('');
     setBusy(true);
-    try { await fn(); } catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.'); }
+    try { await fn(); } catch (err) { setError(friendlyFromUnknown(err)); }
     finally { setBusy(false); }
   }
 
@@ -130,7 +136,12 @@ function VoteFlow() {
       </ol>
       </div>
       <div className="vote-main">
-      {error && <Alert kind="error" title="Something needs attention">{error}</Alert>}
+      {error && (
+        <Alert kind={error.severity === 'guidance' ? 'warning' : 'error'} title={error.title}>
+          {error.message}
+          {error.hint && <div className="alert-hint">{error.hint}</div>}
+        </Alert>
+      )}
       {notice && <Alert kind="success">{notice}</Alert>}
 
       {step === 'identify' && (
@@ -193,7 +204,7 @@ function VoteFlow() {
             setSession(s);
             const status = await getJson(`/elections/${electionId}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
             if (status.hasVoted) {
-              setError('Our records show a ballot was already accepted for this voter in this election. If you believe this is wrong, contact your election officer.');
+              setError(toFriendly('ALREADY_VOTED: entitlement already consumed'));
               return;
             }
             const b = await call('/voting/ballot', { ballotSession: s });

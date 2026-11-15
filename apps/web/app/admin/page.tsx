@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input,
-  Select, Skeleton, Stat, Table, Textarea, Toast,
+  Select, Skeleton, Stat, Table, Textarea, Toast, errorToast, type ToastData,
 } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
+import { apiRequest } from '../../lib/http';
+import { friendlyFromUnknown } from '../../lib/errors';
 import { Icon } from '../../components/icons';
 import { ConsoleShell, Kpi, Panel } from '../../components/saas';
 import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut } from '../../lib/auth';
@@ -22,14 +24,11 @@ function authHeaders(): Record<string, string> {
 }
 
 async function call(path: string, body: unknown, method = 'POST'): Promise<Record<string, unknown>> {
-  const res = await fetch(`${API}${path}`, {
+  return apiRequest(`${API}${path}`, {
     method,
     headers: { 'content-type': 'application/json', ...authHeaders(), ...(await fraudHeaders()) },
     ...(method === 'GET' ? {} : { body: JSON.stringify(body) }),
   });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : `Request failed (${res.status})`);
-  return data;
 }
 
 const get = (path: string) => call(path, undefined, 'GET');
@@ -154,7 +153,7 @@ export default function AdminPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [status, setStatus] = useState('Ready.');
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info');
-  const [toast, setToast] = useState<{ message: string; kind: 'info' | 'error' } | null>(null);
+  const [toast, setToast] = useState<ToastData | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -267,10 +266,11 @@ export default function AdminPage() {
       setStatusKind('info');
       setToast({ message: `${label} completed.`, kind: 'info' });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'failed';
-      setStatus(`${label}: ${message}`);
-      setStatusKind('error');
-      setToast({ message: `${label} failed: ${message}`, kind: 'error' });
+      const f = friendlyFromUnknown(err);
+      setStatus(f.message);
+      // Expected situations (not ready yet, no permission) are guidance, not alarms.
+      setStatusKind(f.severity === 'guidance' ? 'info' : 'error');
+      setToast(errorToast(err, `${label} — ${f.title}`));
     } finally {
       setLoading(false);
     }
@@ -607,7 +607,7 @@ export default function AdminPage() {
           </form>
         </div>
       )}
-      <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
+      <Toast message={toast?.message ?? null} kind={toast?.kind} title={toast?.title} hint={toast?.hint} technical={toast?.technical} onClose={() => setToast(null)} />
     </>
   );
 

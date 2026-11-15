@@ -1,6 +1,8 @@
 'use client';
 
 import { fraudHeaders } from './fraud';
+import { apiRequest } from './http';
+import { AppError, toFriendly } from './errors';
 import type { AssignmentInfo } from './capabilities';
 
 export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -23,13 +25,12 @@ const SESSION_KEYS = [
 
 /** POST /auth/login — returns the session payload or throws with the API message. */
 export async function signIn(email: string, password: string, totp?: string): Promise<SessionData> {
-  const res = await fetch(`${API}/auth/login`, {
+  const data = await apiRequest(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(await fraudHeaders()) },
     body: JSON.stringify({ email, password, totp: totp || undefined }),
-  });
-  const data = (await res.json().catch(() => ({}))) as Partial<SessionData> & { message?: string };
-  if (!res.ok || !data.token) throw new Error(data.message ?? `Login failed (${res.status})`);
+  }) as Partial<SessionData>;
+  if (!data.token) throw new AppError(toFriendly('AUTH_FAILED: invalid email or password', 401), 401);
   return data as SessionData;
 }
 

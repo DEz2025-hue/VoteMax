@@ -1,5 +1,6 @@
 'use client';
 
+import { friendlyFromUnknown } from '../lib/errors';
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -104,21 +105,44 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
   );
 }
 
-export function Toast({ message, kind = 'info', onClose }: { message: string | null; kind?: 'info' | 'error'; onClose: () => void }) {
+export interface ToastData { message: string; kind: 'info' | 'error' | 'warning'; title?: string; hint?: string; technical?: string }
+
+/** Build a toast from anything thrown — friendly text, never raw codes. */
+export function errorToast(err: unknown, title?: string): ToastData {
+  const f = friendlyFromUnknown(err);
+  return {
+    kind: f.severity === 'guidance' ? 'warning' : 'error',
+    title: title ?? f.title, message: f.message, hint: f.hint, technical: f.technical,
+  };
+}
+
+export function Toast({ message, kind = 'info', title, hint, technical, onClose }: { message: string | null; kind?: 'info' | 'error' | 'warning'; title?: string; hint?: string; technical?: string; onClose: () => void }) {
   useEffect(() => {
     if (!message) return;
-    const t = setTimeout(onClose, 4500);
+    // Longer messages need longer to read; guidance with a hint stays up a bit more.
+    const t = setTimeout(onClose, kind === 'info' ? 4500 : hint ? 12000 : 8000);
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => { clearTimeout(t); window.removeEventListener('keydown', onKey); };
-  }, [message, onClose]);
+  }, [message, kind, hint, onClose]);
   if (!message) return null;
   const isError = kind === 'error';
+  const isWarning = kind === 'warning';
   return (
     <div className="toast-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={`toast-card ${isError ? 'error' : 'success'}`} role={isError ? 'alert' : 'status'} aria-live={isError ? 'assertive' : 'polite'}>
-        <span className="toast-icon" aria-hidden="true">{isError ? '✕' : '✓'}</span>
-        <div className="toast-body">{message}</div>
+      <div className={`toast-card ${isError ? 'error' : isWarning ? 'warning' : 'success'}`} role={isError ? 'alert' : 'status'} aria-live={isError ? 'assertive' : 'polite'}>
+        <span className="toast-icon" aria-hidden="true">{isError ? '!' : isWarning ? 'i' : '✓'}</span>
+        <div className="toast-body">
+          {title && <strong className="toast-title">{title}</strong>}
+          <div>{message}</div>
+          {hint && <div className="toast-hint">{hint}</div>}
+          {technical && (
+            <details className="toast-tech">
+              <summary>Details for support</summary>
+              <code>{technical}</code>
+            </details>
+          )}
+        </div>
         <button type="button" className="chip-remove toast-close" aria-label="Dismiss" onClick={onClose}>×</button>
       </div>
     </div>

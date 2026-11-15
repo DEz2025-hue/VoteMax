@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Field, Input, Skeleton } from '../../components/ui';
 import { AuthLayout } from '../../components/saas';
 import { clearSession, fetchPrincipal, isPlatformOnly, signIn, storeSession } from '../../lib/auth';
+import { friendlyFromUnknown } from '../../lib/errors';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,8 +51,9 @@ export default function LoginPage() {
         (data.assignments ?? []).every((a) => a.role === 'platform_admin');
       router.replace(platformOnly ? '/platform' : '/admin');
     } catch (err) {
-      setStatus(`Sign in: ${err instanceof Error ? err.message : 'failed'}`);
-      setStatusKind('error');
+      const f = friendlyFromUnknown(err);
+      setStatus(f.hint ? `${f.message} ${f.hint}` : f.message);
+      setStatusKind(f.severity === 'guidance' ? 'info' : 'error');
       setLoading(false);
     }
   }

@@ -3,11 +3,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   Alert, Badge, Button, ConfirmDialog, EmptyState, Field, Input,
-  Select, Skeleton, Table, Toast,
+  Select, Skeleton, Table, Toast, errorToast, type ToastData,
 } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { AuthLayout, ConsoleShell, Kpi, Panel, StatusRow } from '../../components/saas';
 import { fraudHeaders } from '../../lib/fraud';
+import { apiRequest } from '../../lib/http';
+import { friendlyFromUnknown } from '../../lib/errors';
 import { API, sessionIsValid, signIn as apiSignIn, signOut as apiSignOut, storeSession } from '../../lib/auth';
 
 let sessionToken = '';
@@ -17,14 +19,11 @@ function authHeaders(): Record<string, string> {
 }
 
 async function call(path: string, body: unknown, method = 'POST'): Promise<Record<string, unknown>> {
-  const res = await fetch(`${API}${path}`, {
+  return apiRequest(`${API}${path}`, {
     method,
     headers: { 'content-type': 'application/json', ...authHeaders(), ...(await fraudHeaders()) },
     ...(method === 'GET' ? {} : { body: JSON.stringify(body) }),
   });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : `Request failed (${res.status})`);
-  return data;
 }
 
 const get = (path: string) => call(path, undefined, 'GET');
@@ -119,7 +118,7 @@ export default function PlatformPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info');
-  const [toast, setToast] = useState<{ message: string; kind: 'info' | 'error' } | null>(null);
+  const [toast, setToast] = useState<ToastData | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: ReactNode; action: () => void } | null>(null);
 
   // Sign-in
@@ -194,8 +193,8 @@ export default function PlatformPage() {
   }, [showNewOrg]);
 
   function isAuthzError(err: unknown): boolean {
-    const m = err instanceof Error ? err.message : '';
-    return m.includes('FORBIDDEN') || m.includes('AUTH_REQUIRED');
+    const code = friendlyFromUnknown(err).code;
+    return code === 'FORBIDDEN' || code === 'AUTH_REQUIRED';
   }
 
   async function refreshAll() {
@@ -222,10 +221,10 @@ export default function PlatformPage() {
       setStatus('');
       setToast({ message: `${label} completed.`, kind: 'info' });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'failed';
-      setStatus(`${label}: ${message}`);
-      setStatusKind('error');
-      setToast({ message: `${label} failed: ${message}`, kind: 'error' });
+      const f = friendlyFromUnknown(err);
+      setStatus(f.message);
+      setStatusKind(f.severity === 'guidance' ? 'info' : 'error');
+      setToast(errorToast(err, `${label} — ${f.title}`));
       if (isAuthzError(err)) setDenied(true);
     } finally {
       setLoading(false);
@@ -263,7 +262,7 @@ export default function PlatformPage() {
     try {
       setDetail(await get(`/platform/organizations/${id}`) as unknown as TenantDetail);
     } catch (err) {
-      setToast({ message: err instanceof Error ? err.message : 'Could not load organization', kind: 'error' });
+      setToast(errorToast(err, "Couldn't open this organization"));
     } finally {
       setDetailLoading(false);
     }
@@ -417,7 +416,7 @@ export default function PlatformPage() {
         </>
       )}
 
-      <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
+      <Toast message={toast?.message ?? null} kind={toast?.kind} title={toast?.title} hint={toast?.hint} technical={toast?.technical} onClose={() => setToast(null)} />
       <ConfirmDialog
         open={confirm !== null}
         title={confirm?.title ?? ''}
