@@ -763,6 +763,14 @@ export class PlatformService {
       await this.log(election.organizationId, null, 'voting.otpRequest', `election:${electionId}`, 'ignored:not_eligible');
       return { sent: true };
     }
+    // One ballot per voter: once this ID has voted, say so straight away and send
+    // no code. (Unknown IDs still get the uniform "sent" reply above, so this does
+    // reveal that a valid ID has voted — an accepted trade-off for a clear message.)
+    const entitlement = await this.store.findEntitlement(electionId, voter.id);
+    if (entitlement?.consumedAt) {
+      await this.log(election.organizationId, null, 'voting.otpRequest', `election:${electionId}`, 'denied:already_voted');
+      throw new Error('ALREADY_VOTED: a ballot has already been submitted for this voter');
+    }
     const challengeKey = `${electionId}:${voter.id}`;
     const existing = await this.store.getOtpChallenge(challengeKey);
     const existingActive = existing && existing.expiresAt > Date.now();

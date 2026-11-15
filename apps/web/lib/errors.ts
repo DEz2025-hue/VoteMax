@@ -188,7 +188,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
     case 'OTP_INVALID':
       return make(code, raw, 'guidance', "That code doesn't match", "The code you entered isn't correct.", 'Check the latest message and try again.');
     case 'OTP_EXPIRED':
-      return make(code, raw, 'guidance', 'That code has expired', 'Codes only work for 10 minutes.', 'Go back and ask for a new code.');
+      return make(code, raw, 'guidance', "That code can't be used", 'It has timed out (codes last 10 minutes) or was already used — each code works once.', 'Go back and ask for a new code.');
     case 'OTP_LOCKED':
       return make(code, raw, 'guidance', 'Too many attempts', 'That code can no longer be used.', 'Go back and ask for a new one.');
     case 'OTP_RATE_LIMITED':
@@ -203,7 +203,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
     case 'NOT_ELIGIBLE':
       return make(code, raw, 'guidance', "We couldn't find you", "We couldn't find you on this election's voter list.", 'Check your member ID, or contact your election officer.');
     case 'ALREADY_VOTED':
-      return make(code, raw, 'guidance', 'Already voted', 'Our records show a ballot has already been submitted for you.', "If you didn't vote, contact your election officer.");
+      return make(code, raw, 'guidance', "You've already voted", 'Our records show a ballot has already been submitted for this member ID, so it can’t be used again.', "If you didn't vote, contact your election officer.");
     case 'SESSION_INVALID':
       return make(code, raw, 'guidance', 'Your session timed out', 'For your security, voting sessions only last a short while.', 'Please start again — it only takes a minute.');
     case 'INVALID_BALLOT':

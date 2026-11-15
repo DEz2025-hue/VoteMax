@@ -79,11 +79,21 @@ describe('Phase 4 internal security assessment', () => {
     await expect(svc.submitBallot(ballotSession, { [posId]: [adaId] }, 'reuse-2')).rejects.toThrow(/SESSION_INVALID/);
   });
 
-  it('a voter cannot vote twice with a fresh OTP (SEC-VOT-03)', async () => {
-    await voteOnce('M001');
-    const { devCode } = await svc.requestOtp(electionId, 'M001');
-    const { ballotSession } = await svc.verifyOtp(electionId, 'M001', devCode!);
-    await expect(svc.submitBallot(ballotSession, { [posId]: [adaId] }, 'second-attempt')).rejects.toThrow(/ALREADY_VOTED/);
+  it('a voter cannot vote twice (SEC-VOT-03): no new code once voted, and an earlier session is refused', async () => {
+    // Two ballot sessions obtained BEFORE the first vote (defence in depth).
+    const open = async () => {
+      const { devCode } = await svc.requestOtp(electionId, 'M001');
+      return (await svc.verifyOtp(electionId, 'M001', devCode!)).ballotSession;
+    };
+    const first = await open();
+    const second = await open();
+    await svc.submitBallot(first, { [posId]: [adaId] }, 'first-attempt');
+    await expect(svc.submitBallot(second, { [posId]: [adaId] }, 'second-attempt')).rejects.toThrow(/ALREADY_VOTED/);
+    // After voting, asking for a code is refused outright with a clear message — and no code is issued.
+    const outbox = (svc as unknown as { otpDelivery: { devOutbox: unknown[] } }).otpDelivery.devOutbox;
+    const before = outbox.length;
+    await expect(svc.requestOtp(electionId, 'M001')).rejects.toThrow(/ALREADY_VOTED/);
+    expect(outbox.length).toBe(before);
     expect(store.ballots.length).toBe(1);
   });
 

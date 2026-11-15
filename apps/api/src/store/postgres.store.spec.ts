@@ -119,19 +119,22 @@ d('PostgresStore (F-01 durability)', () => {
     await svc.transition(admin.id, el.id, 'READY');
     await svc.transition(admin.id, el.id, 'OPEN');
 
-    const { devCode } = await svc.requestOtp(el.id, 'X1');
-    const { ballotSession } = await svc.verifyOtp(el.id, 'X1', devCode!);
-    const r1 = await svc.submitBallot(ballotSession, { [pos.id]: [cand.id] }, 'idem-1');
+    // Three ballot sessions opened before the first vote; once voted, new codes are refused.
+    const open = async () => {
+      const { devCode } = await svc.requestOtp(el.id, 'X1');
+      return (await svc.verifyOtp(el.id, 'X1', devCode!)).ballotSession;
+    };
+    const s1 = await open();
+    const s2 = await open();
+    const s3 = await open();
+    const r1 = await svc.submitBallot(s1, { [pos.id]: [cand.id] }, 'idem-1');
     expect(r1.alreadyRecorded).toBe(false);
 
-    const { devCode: dc2 } = await svc.requestOtp(el.id, 'X1');
-    const { ballotSession: s2 } = await svc.verifyOtp(el.id, 'X1', dc2!);
     const r2 = await svc.submitBallot(s2, { [pos.id]: [cand.id] }, 'idem-1');
     expect(r2).toEqual({ receiptId: r1.receiptId, alreadyRecorded: true });
 
-    const { devCode: dc3 } = await svc.requestOtp(el.id, 'X1');
-    const { ballotSession: s3 } = await svc.verifyOtp(el.id, 'X1', dc3!);
     await expect(svc.submitBallot(s3, { [pos.id]: [cand.id] }, 'idem-2')).rejects.toThrow(/ALREADY_VOTED/);
+    await expect(svc.requestOtp(el.id, 'X1')).rejects.toThrow(/ALREADY_VOTED/);
   }, 180000);
 
   it('ballot and audit tables reject UPDATE/DELETE (append-only triggers)', async () => {

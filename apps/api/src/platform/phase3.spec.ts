@@ -117,10 +117,11 @@ describe('Phase 3 voting and results (mock election)', () => {
   it('idempotent retry returns the original receipt without a second ballot', async () => {
     const { devCode } = await svc.requestOtp(electionId, 'S002');
     const { ballotSession } = await svc.verifyOtp(electionId, 'S002', devCode!);
-    const first = await svc.submitBallot(ballotSession, { [positionId]: [benId] }, 'retry-key');
-    // Retry needs a fresh session (first was consumed); same idempotency key.
+    // A second session opened before the vote (e.g. a second tab); once voted,
+    // new codes are refused, so a retry has to come from an already-open session.
     const { devCode: devCode2 } = await svc.requestOtp(electionId, 'S002');
     const { ballotSession: s2 } = await svc.verifyOtp(electionId, 'S002', devCode2!);
+    const first = await svc.submitBallot(ballotSession, { [positionId]: [benId] }, 'retry-key');
     const second = await svc.submitBallot(s2, { [positionId]: [benId] }, 'retry-key');
     expect(second).toEqual({ receiptId: first.receiptId, alreadyRecorded: true });
     expect(store.ballots.length).toBe(1);
@@ -229,12 +230,12 @@ describe('Phase 3 voting and results (mock election)', () => {
     const { devCode } = await svc.requestOtp(electionId, 'S001');
     const { ballotSession } = await svc.verifyOtp(electionId, 'S001', devCode!);
     await expect(svc.submissionStatusForSession(electionId, ballotSession)).resolves.toEqual({ hasVoted: false });
+    // A second live session, opened before the vote.
+    const { devCode: devCode2 } = await svc.requestOtp(electionId, 'S001');
+    const { ballotSession: second } = await svc.verifyOtp(electionId, 'S001', devCode2!);
 
     await svc.submitBallot(ballotSession, { [positionId]: [adaId] }, 'status-key');
     await expect(svc.submissionStatusForSession(electionId, ballotSession)).rejects.toThrow(/SESSION_INVALID/);
-
-    const { devCode: devCode2 } = await svc.requestOtp(electionId, 'S001');
-    const { ballotSession: second } = await svc.verifyOtp(electionId, 'S001', devCode2!);
     await expect(svc.submissionStatusForSession(electionId, second)).resolves.toEqual({ hasVoted: true });
     await expect(svc.submissionStatusForSession(electionId, 'not-a-session')).rejects.toThrow(/SESSION_INVALID/);
   });
