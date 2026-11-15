@@ -92,6 +92,8 @@ interface SmsSender { readonly configured: boolean; sendText(to: string, text: s
 export class VoterNotifier {
   readonly configured: boolean;
   readonly outbox: OutboxEntry[] = [];
+  /** Most recent delivery problem since this process started (for ops visibility). */
+  lastError: { at: string; channel: 'email' | 'sms'; message: string } | null = null;
   private transporter: nodemailer.Transporter | null = null;
   private readonly from: string;
   private readonly smsSenders: SmsSender[];
@@ -106,10 +108,22 @@ export class VoterNotifier {
         port: Number(env.SMTP_PORT ?? 587),
         secure: env.SMTP_SECURE === 'true',
         auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+        // Fail fast: nodemailer's defaults wait ~2 minutes per message, so one
+        // unreachable mail server made a whole batch look stuck on "running".
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 20_000,
       });
     }
     this.smsSenders = [new AfricaTalkingSmsSender(env), new WebhookSmsSender(env)].filter((s) => s.configured);
     this.configured = this.transporter !== null || this.smsSenders.length > 0;
+  }
+
+  private noteError(channel: 'email' | 'sms', err: unknown): void {
+    this.lastError = {
+      at: new Date().toISOString(), channel,
+      message: (err instanceof Error ? err.message : 'unknown error').slice(0, 200),
+    };
   }
 
   async send(msg: VoterMessage): Promise<DeliveryChannel> {
@@ -119,6 +133,7 @@ export class VoterNotifier {
         return 'email';
       } catch (err) {
         // Fall through to SMS when the voter has a phone number.
+        this.noteError('email', err);
         logEvent('warn', 'notify.email_failed', { error: err instanceof Error ? err.message : 'unknown' });
       }
     }
@@ -128,6 +143,7 @@ export class VoterNotifier {
           await sender.sendText(msg.phone, msg.sms);
           return 'sms';
         } catch (err) {
+          this.noteError('sms', err);
           logEvent('warn', 'notify.sms_failed', { error: err instanceof Error ? err.message : 'unknown' });
         }
       }

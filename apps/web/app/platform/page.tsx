@@ -60,6 +60,10 @@ interface PlatformHealth {
   store: string; dbLatencyMs: number; pendingAuditEntries: number;
   uptimeSeconds: number; checkedAt: string;
   otpProviders: { email: boolean; smsAfricaTalking: boolean; smsWebhook: boolean; devAllowed: boolean };
+  delivery?: {
+    invitations: { at: string; channel: string; message: string } | null;
+    codes: { at: string; channel: string; message: string } | null;
+  };
   securitySignals: {
     loginFailureBuckets: number; lockedAccounts: number;
     otpRequestBuckets: number; otpVerifyFailureBuckets: number; scope: string;
@@ -753,6 +757,17 @@ export default function PlatformPage() {
                     <StatusRow label="Locked accounts (5-min window)" value={health.securitySignals.lockedAccounts} tone={health.securitySignals.lockedAccounts ? 'warn' : 'ok'} />
                     <StatusRow label="OTP request buckets" value={health.securitySignals.otpRequestBuckets} tone="off" />
                     <StatusRow label="OTP verify failures" value={health.securitySignals.otpVerifyFailureBuckets} tone="off" />
+                  </Panel>
+
+                  <Panel title="Email &amp; SMS delivery" subtitle="Most recent delivery problem since the API last started.">
+                    {([['Invitations and reminders', health.delivery?.invitations], ['Verification codes', health.delivery?.codes]] as const).map(([label, err]) => (
+                      <div key={label} className="ps-status-row" style={{ alignItems: 'flex-start' }}>
+                        <span className="ps-status-label"><i className={`ps-dot ${err ? 'bad' : 'ok'}`} />{label}</span>
+                        <span className="ps-status-value" style={{ fontWeight: 500, maxWidth: '60%' }}>
+                          {err ? (<>{err.channel} failed: {err.message}<div className="small muted">{fmtDate(err.at)}</div></>) : 'No problems since start'}
+                        </span>
+                      </div>
+                    ))}
                   </Panel>
                 </div>
               </>

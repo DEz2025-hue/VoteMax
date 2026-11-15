@@ -47,6 +47,10 @@ export class SmtpOtpSender implements OtpSender {
         port: Number(env.SMTP_PORT ?? 587),
         secure: env.SMTP_SECURE === 'true',
         auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+        // Fail fast so a voter isn't left waiting while the server is unreachable.
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 20_000,
       });
     }
   }
@@ -168,6 +172,8 @@ export interface OtpProviderStatus {
 
 export class OtpDelivery {
   readonly devOutbox: DevOutboxEntry[] = [];
+  /** Most recent one-time-code delivery problem since this process started. */
+  lastError: { at: string; channel: 'email' | 'sms'; message: string } | null = null;
   private readonly smtp: SmtpOtpSender;
   private readonly africasTalking: AfricaTalkingSmsSender;
   private readonly webhook: WebhookSmsSender;
@@ -200,6 +206,10 @@ export class OtpDelivery {
         logEvent('info', 'otp.delivered', { electionId: msg.electionId, channel: sender.channel });
         return sender.channel;
       } catch (err) {
+        this.lastError = {
+          at: new Date().toISOString(), channel: sender.channel,
+          message: (err instanceof Error ? err.message : 'unknown error').slice(0, 200),
+        };
         // Try the next channel before failing (DEC-004 fallback order).
         logEvent('warn', 'otp.delivery_failed', {
           electionId: msg.electionId, channel: sender.channel,

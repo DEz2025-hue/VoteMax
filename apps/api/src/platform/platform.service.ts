@@ -1315,6 +1315,12 @@ export class PlatformService {
       pendingAuditEntries: pendingAudit,
       uptimeSeconds: Math.round(process.uptime()),
       otpProviders: this.otpDelivery.describe(),
+      // Most recent email/SMS delivery problems since this process started —
+      // so a wrong mail password shows up here instead of only in server logs.
+      delivery: {
+        invitations: this.voterNotifier.lastError,
+        codes: this.otpDelivery.lastError,
+      },
       securitySignals: {
         loginFailureBuckets: loginFailures.size,
         lockedAccounts: [...loginFailures.values()].filter((l) => l.lockedUntil > Date.now()).length,
