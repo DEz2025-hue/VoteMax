@@ -83,7 +83,7 @@ export interface ImportResult {
   errors: { line: number; message: string }[];
 }
 
-// Unambiguous alphabet — no I, L, O, 0, or 1 — so IDs can be read aloud or handwritten.
+// Unambiguous alphabet - no I, L, O, 0, or 1 - so IDs can be read aloud or handwritten.
 const MEMBER_ID_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 /** Generate a member ID that is not already present in `seen` (lowercased set). */

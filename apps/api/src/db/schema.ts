@@ -16,12 +16,12 @@ import {
 export const adminSchema = pgSchema('admin');
 export const auditSchema = pgSchema('audit');
 export const identitySchema = pgSchema('identity');
-// ballot (D3) holds ciphertext only — never a voter/session identifier
+// ballot (D3) holds ciphertext only - never a voter/session identifier
 // (EMP-SEC-001 SEC-BAL-02). Append-only at the DB level (SEC-BAL-03).
 export const ballotSchema = pgSchema('ballot');
 export const resultsSchema = pgSchema('results');
 // fraud holds anti-abuse signals (SEC-VOT-10). All identifiers are salted
-// hashes — never raw IPs, device fingerprints, or voter IDs — and signals
+// hashes - never raw IPs, device fingerprints, or voter IDs - and signals
 // are never joined to ballot records (SEC-BAL-02).
 export const fraudSchema = pgSchema('fraud');
 
@@ -282,7 +282,7 @@ export const ballotIdempotencyKeys = ballotSchema.table('idempotency_keys', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.entitlementId, t.key] })]);
 
-// Per-election ballot encryption keys. MOCK single-key custody — DEC-006
+// Per-election ballot encryption keys. MOCK single-key custody - DEC-006
 // threshold custody is an open hold point (F-02); this table exists so keys
 // survive restarts, not as a custody approval.
 export const electionKeys = ballotSchema.table('election_keys', {
@@ -343,7 +343,7 @@ export const fraudSignals = fraudSchema.table('signals', {
   index('fraud_signals_election').on(t.electionId, t.kind, t.createdAt),
 ]);
 
-// Rule firings — the reviewable record behind every non-allow decision.
+// Rule firings - the reviewable record behind every non-allow decision.
 export const fraudEvents = fraudSchema.table('events', {
   id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
   electionId: uuid('election_id'),

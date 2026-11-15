@@ -25,7 +25,7 @@ interface FraudRequest {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Map method+path to a fraud surface. Order matters — first match wins. */
+/** Map method+path to a fraud surface. Order matters - first match wins. */
 export function surfaceFor(method: string, path: string): FraudSurface {
   const m = method.toUpperCase();
   const p = path.split('?')[0];
@@ -56,7 +56,7 @@ function clientIp(req: FraudRequest): string | undefined {
   return req.ip;
 }
 
-/** Best available actor identifier — always hashed by FraudService. */
+/** Best available actor identifier - always hashed by FraudService. */
 function deriveRef(req: FraudRequest): string | undefined {
   const b = req.body ?? {};
   const candidates = [

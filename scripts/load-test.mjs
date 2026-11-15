@@ -1,5 +1,5 @@
 /**
- * Local load harness (dev machine) — NOT gate evidence.
+ * Local load harness (dev machine) - NOT gate evidence.
  * Gate evidence requires k6 on production-like infrastructure
  * (load/k6-voting.js, EMP-SCALE-001 s.7). This harness checks functional
  * behaviour under concurrency: no duplicates, no lost accepted ballots.

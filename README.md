@@ -1,17 +1,17 @@
-# Votemax — Election Management Platform (EMP)
+# Votemax - Election Management Platform (EMP)
 
-Secure, multi-tenant election platform for organizations. Pilot: organizational election. Governing documents live in `votemax md/` — start with `PROJECT_OVERVIEW.md`; code must follow them (EMP-SEC-001 SEC-SDL-01/02).
+Secure, multi-tenant election platform for organizations. Pilot: organizational election. Governing documents live in `votemax md/` - start with `PROJECT_OVERVIEW.md`; code must follow them (EMP-SEC-001 SEC-SDL-01/02).
 
 ## Status
 
-Phases 1–4 implemented on a **repository abstraction**: `PostgresStore` (durable, transactional — required in production, verified against Neon) or `InMemoryStore` (tests/dev only, refused in production). **Deployed:** web on Vercel, API on Railway, database on Neon Postgres.
+Phases 1-4 implemented on a **repository abstraction**: `PostgresStore` (durable, transactional - required in production, verified against Neon) or `InMemoryStore` (tests/dev only, refused in production). **Deployed:** web on Vercel, API on Railway, database on Neon Postgres.
 
-**Still blocked for a live election:** DEC-006/007 external reviews, F-02 single-key custody, production OTP provider credentials (SMTP/SMS env vars), governance sign-offs — see `votemax md/PHASE_5_EXECUTION_PLAN.md` §3.
+**Still blocked for a live election:** DEC-006/007 external reviews, F-02 single-key custody, production OTP provider credentials (SMTP/SMS env vars), governance sign-offs - see `votemax md/PHASE_5_EXECUTION_PLAN.md` §3.
 
 ## Stack
 
-- `apps/web` — Next.js 15 + React 19 + TypeScript (public vote, admin console, platform portal)
-- `apps/api` — NestJS + TypeScript modular monolith
+- `apps/web` - Next.js 15 + React 19 + TypeScript (public vote, admin console, platform portal)
+- `apps/api` - NestJS + TypeScript modular monolith
 - PostgreSQL + Drizzle ORM (schema-per-domain: `admin`, `identity`, `ballot`, `results`, `audit`, `fraud`)
 - Auth: scrypt password hashing, bearer sessions, TOTP MFA for privileged roles
 - Decision record: `votemax md/DEC-003_FRAMEWORK_ORM_DECISION.md`
@@ -25,28 +25,28 @@ Phases 1–4 implemented on a **repository abstraction**: `PostgresStore` (durab
 ### Voting flow
 
 1. Voter enters organization slug + member ID on `/vote`.
-2. OTP requested (`POST /elections/:id/voting/otp/request`) — rate-limited and fraud-scored.
+2. OTP requested (`POST /elections/:id/voting/otp/request`) - rate-limited and fraud-scored.
 3. OTP verified → short-lived ballot session → ballot (positions/candidates) fetched.
 4. Selections submitted encrypted (`POST /voting/submit`) with an idempotency key; retries return the original receipt, duplicate votes are impossible.
 
 ### Roles & capabilities
 
-Four roles mapped to capabilities, scoped organization-wide or per-election: `platform_admin` (platform control plane — creates organizations and initial owner accounts), `organization_owner` (runs the whole tenant election lifecycle: staff, register, ballot, tally, certification), `auditor` (read-only oversight: turnout, audit records, results, tally verification), `voter` (authenticates and casts a ballot). Candidates are election records, not user roles, and there is no in-person voting. Separation of duties is enforced in code — the tally authorizer (owner) differs from the executor, approvers must include an auditor, and the certifier differs from the tally executor and second approver.
+Four roles mapped to capabilities, scoped organization-wide or per-election: `platform_admin` (platform control plane - creates organizations and initial owner accounts), `organization_owner` (runs the whole tenant election lifecycle: staff, register, ballot, tally, certification), `auditor` (read-only oversight: turnout, audit records, results, tally verification), `voter` (authenticates and casts a ballot). Candidates are election records, not user roles, and there is no in-person voting. Separation of duties is enforced in code - the tally authorizer (owner) differs from the executor, approvers must include an auditor, and the certifier differs from the tally executor and second approver.
 
 ### Platform admin portal (`/platform`)
 
 - Tenant directory: per-org user/election counts, elections-by-state, staffed status.
-- One-step organization creation with **optional first-admin provisioning** — creates an MFA-enrolled account and returns its one-time TOTP secret.
+- One-step organization creation with **optional first-admin provisioning** - creates an MFA-enrolled account and returns its one-time TOTP secret.
 - Platform health dashboard: store type, DB latency, OTP provider availability, security-signal counts, uptime.
 
 ## Security
 
 - **AuthN/Z:** scrypt (memory-hard KDF) password hashing; revocable bearer sessions; mandatory TOTP MFA for all privileged accounts; tenant resolved from the session principal, never client input.
-- **Secret ballot by architecture:** no role or capability can link a ballot selection to a voter — ballots are stored against election keys only. Audit records contain no selections.
+- **Secret ballot by architecture:** no role or capability can link a ballot selection to a voter - ballots are stored against election keys only. Audit records contain no selections.
 - **Anti-fraud engine (SEC-VOT-10):** evaluates OTP requests/verifies, logins, ballot fetches, and submissions against rules such as `otp_harvest_device`, `login_stuffing_device`, `ip_otp_sweep`, `submit_replay`. Emits allow/throttle/block decisions with salted hashes only (no raw IPs or device fingerprints persisted). Blocks are reviewable and liftable from the admin console's Fraud signals section.
 - **Audit trail:** append-only, hash-chained records via a transactional outbox; tamper-evident and verifiable (`GET /audit` reports `verified`).
 - **Brute-force protection:** account lockouts on repeated failed logins, OTP attempt limits, per-voter/IP/device velocity limits.
-- **Admin UI capability gating:** the console hides/disables actions a role can't perform (display convenience only — the API enforces everything).
+- **Admin UI capability gating:** the console hides/disables actions a role can't perform (display convenience only - the API enforces everything).
 
 ## OTP delivery
 
@@ -54,7 +54,7 @@ Configured via environment variables on the API:
 
 | Provider | Variables |
 |---|---|
-| Email API (Brevo, Resend or SendGrid) — **preferred** | `EMAIL_PROVIDER` (`brevo`\|`resend`\|`sendgrid`), `EMAIL_API_KEY`, `EMAIL_FROM` (a verified sender, e.g. `VoteMax <elections@your-domain>`) |
+| Email API (Brevo, Resend or SendGrid) - **preferred** | `EMAIL_PROVIDER` (`brevo`\|`resend`\|`sendgrid`), `EMAIL_API_KEY`, `EMAIL_FROM` (a verified sender, e.g. `VoteMax <elections@your-domain>`) |
 | SMTP email (fallback) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
 | Africa's Talking SMS | `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID` |
 | SMS webhook | `SMS_WEBHOOK_URL`, `SMS_WEBHOOK_AUTH` |
@@ -82,9 +82,9 @@ npm run db:migrate -w @votemax/api   # apply drizzle migrations
 npm run dev                         # api :4000 + web :3000
 ```
 
-Without `DATABASE_URL` the API falls back to the in-memory store (development only — accepted ballots do not survive restart). In production `DATABASE_URL` is required and the in-memory store is refused.
+Without `DATABASE_URL` the API falls back to the in-memory store (development only - accepted ballots do not survive restart). In production `DATABASE_URL` is required and the in-memory store is refused.
 
-**First run:** with zero role assignments, `POST /organizations`, `POST /users`, and `POST /roles` are open (bootstrap window, audited as actor `bootstrap`). The platform portal also handles first-run provisioning — sign in as `platform_admin` and create the first organization with its admin.
+**First run:** with zero role assignments, `POST /organizations`, `POST /users`, and `POST /roles` are open (bootstrap window, audited as actor `bootstrap`). The platform portal also handles first-run provisioning - sign in as `platform_admin` and create the first organization with its admin.
 
 ## Verify
 
@@ -93,10 +93,10 @@ npm run build
 npm test
 ```
 
-Tests cover separation-of-duties rules, the permission matrix, tenant isolation, audit-chain tamper detection, fraud rules, and end-to-end election workflows (`apps/api/src/**/*.spec.ts` — 77 tests).
+Tests cover separation-of-duties rules, the permission matrix, tenant isolation, audit-chain tamper detection, fraud rules, and end-to-end election workflows (`apps/api/src/**/*.spec.ts` - 77 tests).
 
 ## Layout
 
-- `apps/api` — NestJS modular monolith (`auth`, `platform`, `fraud`, `otp`, `audit`, `register`, `elections`, `tenancy`, `db`, `store`, `health`)
-- `apps/web` — Next.js app (`/vote`, `/admin`, `/platform`, `/help`)
-- `votemax md/` — foundation, decision, and phase documents (source of truth)
+- `apps/api` - NestJS modular monolith (`auth`, `platform`, `fraud`, `otp`, `audit`, `register`, `elections`, `tenancy`, `db`, `store`, `health`)
+- `apps/web` - Next.js app (`/vote`, `/admin`, `/platform`, `/help`)
+- `votemax md/` - foundation, decision, and phase documents (source of truth)

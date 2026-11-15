@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-// Minimal stroke icon set (24px grid, 1.8 stroke) — no extra dependency.
+// Minimal stroke icon set (24px grid, 1.8 stroke) - no extra dependency.
 const PATHS: Record<string, ReactNode> = {
   grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
   building: <><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /><path d="M16 9h2a2 2 0 0 1 2 2v10" /><path d="M2 21h20" /><path d="M8 7h4M8 11h4M8 15h4" /></>,

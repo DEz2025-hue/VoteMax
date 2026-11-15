@@ -7,7 +7,7 @@ import { Icon } from '../components/icons';
 /** Catches unexpected rendering errors in any page and shows a calm recovery screen. */
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    // Keep the technical detail for support/logs — never in the headline.
+    // Keep the technical detail for support/logs - never in the headline.
     console.error('[votemax] page error', error);
   }, [error]);
 

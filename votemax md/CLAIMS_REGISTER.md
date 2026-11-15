@@ -2,7 +2,7 @@
 
 **Document ID:** EMP-CLAIMS-001\
 **Version:** 0.1\
-**Status:** Living document — every public claim must appear here with evidence\
+**Status:** Living document - every public claim must appear here with evidence\
 **Document Type:** Claims and Limitations Register\
 **Last Updated:** 11 November 2026\
 **Parent Documents:** EMP-SEC-001 §13 (SEC-ASR-06), EMP-FOUND-001 §10\

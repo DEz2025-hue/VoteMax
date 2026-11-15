@@ -1,7 +1,7 @@
 /**
  * Prepare a candidate photo in the browser: centre-crop to a square, shrink to
  * at most 400 px and re-encode as JPEG. A phone photo of several MB becomes
- * roughly 40–80 KB, which keeps ballots fast to load on slow connections and
+ * roughly 40-80 KB, which keeps ballots fast to load on slow connections and
  * means nothing oversized (or odd, like a huge PNG or HEIC) ever reaches the API.
  */
 

@@ -1,8 +1,8 @@
-# Accessibility Review — Voter Flow (Internal)
+# Accessibility Review - Voter Flow (Internal)
 
 **Document ID:** EMP-A11Y-001\
 **Version:** 0.1\
-**Status:** Internal review complete — external audit still required for a conformance claim\
+**Status:** Internal review complete - external audit still required for a conformance claim\
 **Document Type:** Accessibility Review (NFR-ACC-001…004, WCAG 2.2 AA target)\
 **Last Updated:** 11 November 2026\
 **Owner:** Technical Lead

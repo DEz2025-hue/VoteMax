@@ -2,7 +2,7 @@
 
 **Document ID:** EMP-GOV-001\
 **Version:** 0.1\
-**Status:** Template — names pending (blocks Phase 0 exit)\
+**Status:** Template - names pending (blocks Phase 0 exit)\
 **Document Type:** Governance Record\
 **Last Updated:** 11 November 2026\
 **Parent Documents:** EMP-FOUND-001 §17, EMP-STAKE-001 §2.1/§6, EMP-PRD-001 FR-IAM-004\
@@ -12,7 +12,7 @@
 
 ## 1. Purpose
 
-EMP-FOUND-001 §17 and EMP-STAKE-001 §2.1 require named owners before the pilot. Phase 0 exit requires the document set **approved by** Product Owner, Technical Lead, and Security Lead — impossible until those people are named. This sheet is filled in one meeting.
+EMP-FOUND-001 §17 and EMP-STAKE-001 §2.1 require named owners before the pilot. Phase 0 exit requires the document set **approved by** Product Owner, Technical Lead, and Security Lead - impossible until those people are named. This sheet is filled in one meeting.
 
 > These are **project governance** assignments (who builds/runs EMP), distinct from per-election roles in EMP-STAKE-001 §3 (committee chair, registrar, custodians…), which are assigned per election later.
 
@@ -25,7 +25,7 @@ EMP-FOUND-001 §17 and EMP-STAKE-001 §2.1 require named owners before the pilot
 | Security Lead | | | | | ☐ |
 | Election Operations Lead | | | | | ☐ |
 | Platform administrator (first) | | | | | ☐ |
-| Independent Reviewer (external) | | | | | — (DEC-007) |
+| Independent Reviewer (external) | | | | | - (DEC-007) |
 
 Rules that apply immediately on appointment (EMP-STAKE-001 §6): platform administrator holds no election role (SoD-3); role grants are audited (FR-IAM-006); conflict-of-interest declarations collected for privileged roles (SEC-PER-04).
 
@@ -48,7 +48,7 @@ Each approver signs the set, or records exceptions. Signing means: *reviewed; ap
 
 Exceptions (document, section, reason, approver): ______
 
-On completion: bump signed drafts to v1.0, record approval date here, and update each document's Document Control block by new version (never silent edit — EMP-FOUND-001 §15).
+On completion: bump signed drafts to v1.0, record approval date here, and update each document's Document Control block by new version (never silent edit - EMP-FOUND-001 §15).
 
 ## 4. Decision Authority (until amended in writing)
 
@@ -58,7 +58,7 @@ On completion: bump signed drafts to v1.0, record approval date here, and update
 | Hosting ratification (DEC-002) | Technical Lead | Security Lead (residency), Product Owner (cost) |
 | Verification method (DEC-004) | Election committee (pilot); interim: Product Owner | Security Lead |
 | Security exception (EMP-SEC §3) | Security Lead | Independent reviewer acknowledgment for secrecy/eligibility/uniqueness/integrity weakening |
-| Live election authorization (G8) | Organization election committee | All leads (G1–G7 evidence) |
+| Live election authorization (G8) | Organization election committee | All leads (G1-G7 evidence) |
 
 ## Document Control
 
@@ -67,7 +67,7 @@ On completion: bump signed drafts to v1.0, record approval date here, and update
 | Document | Governance Roles Assignment |
 | ID | EMP-GOV-001 |
 | Version | 0.1 |
-| Status | Template — names pending |
+| Status | Template - names pending |
 | Owner | Product Owner |
 | Change control | New version on any appointment change |
 

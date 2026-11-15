@@ -1,10 +1,10 @@
-# Acceptance Traceability Matrix — Gate G1 Evidence
+# Acceptance Traceability Matrix - Gate G1 Evidence
 
-> **Model update (v0.2):** the role model is now four roles — `platform_admin`, `organization_owner`, `auditor`, `voter` — per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
+> **Model update (v0.2):** the role model is now four roles - `platform_admin`, `organization_owner`, `auditor`, `voter` - per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
 
 **Document ID:** EMP-TRACE-001\
 **Version:** 0.1\
-**Status:** Compiled 12 November 2026 — G1 **not yet passable** (see §4)\
+**Status:** Compiled 12 November 2026 - G1 **not yet passable** (see §4)\
 **Document Type:** Requirements Traceability Matrix (EMP-PRD-001 §6, EMP-SCOPE-001 §5 G1)\
 **Last Updated:** 12 November 2026\
 **Parent Documents:** EMP-PRD-001, EMP-SCOPE-001 §5, EMP-AUTHZ-001 §2\
@@ -32,13 +32,13 @@
 | FR-ELE-002 | Implemented | Positions with seats + maxChoices | `platform.spec.ts` |
 | FR-ELE-003 | Implemented | Single/multi-choice via `maxChoices` | `phase3.spec.ts` ballot flow |
 | FR-ELE-004 | Partial | Abstain counted; `allowAbstain` always true, not rule-configurable | `platform.service.ts:computeTally` |
-| FR-ELE-005 | Implemented | T1–T16 transition table; invalid transitions rejected | `lifecycle.ts`; `platform.spec.ts` |
+| FR-ELE-005 | Implemented | T1-T16 transition table; invalid transitions rejected | `lifecycle.ts`; `platform.spec.ts` |
 | FR-ELE-006 | Partial | Config frozen after freeze; no recorded exception procedure | `lifecycle.ts:assertConfigEditable` |
 | FR-ELE-007 | Partial | Manual audited open/close; no scheduler auto open/close; window enforced at submit | `platform.service.ts:transition/submitBallot` |
-| FR-ELE-008 | Gap | No voter/observer-readable published-rules view | — |
+| FR-ELE-008 | Gap | No voter/observer-readable published-rules view | - |
 | FR-CAN-001 | Partial | Add only; no edit or withdraw endpoint (`withdrawnAt` honoured at submit) | `platform.service.ts:addCandidate` |
 | FR-CAN-002 | Partial | Name + statement; `photo_url` column exists, not exposed in API/ballot | `db/schema.ts`; `ballotForSession` |
-| FR-CAN-003 | Gap | No candidate eligibility rule checks | — |
+| FR-CAN-003 | Gap | No candidate eligibility rule checks | - |
 | FR-CAN-004 | Partial | `ballotOrderPolicy` stored (default `fixed`); order never randomized | `platform.service.ts:createElection` |
 | FR-CAN-005 | Implemented | SoD-2 blocks candidate holding admin role | `auth.spec.ts` |
 | FR-VOT-001 | Implemented | CSV import with per-line error report | `csv-import.ts`; `platform.spec.ts` |
@@ -70,7 +70,7 @@
 | FR-AST-008 | Partial | Training pack ready; not delivered or rehearsed with named officers | `TRAINING_AND_ONBOARDING.md` |
 | FR-MON-001 | Implemented | Aggregate participation endpoint | `security.spec.ts` aggregates test |
 | FR-MON-002 | Implemented | No selections or voter identities in monitoring output | `security.spec.ts` |
-| FR-MON-003 | Gap | No station status (online/activity/alerts) endpoint or view | — |
+| FR-MON-003 | Gap | No station status (online/activity/alerts) endpoint or view | - |
 | FR-MON-004 | Gap | No alerting or monitoring dashboard; runbook loop is manual | `ELECTION_DAY_RUNBOOK.md` §4 |
 | FR-MON-005 | Partial | Observer/auditor roles with scoped read capabilities; no dedicated observer UI | `roles.ts` matrix |
 | FR-RES-001 | Implemented | Tally only after CLOSED, chair-authorized, executor separate, 2 approvers | `phase3.spec.ts` SoD test |
@@ -99,7 +99,7 @@
 | NFR-SEC-001 | Partial | Controls implemented per policy; DEC-006/007 keep the set incomplete |
 | NFR-SEC-002 | Implemented | Secrecy by construction, asserted in `phase3.spec.ts` + logger redaction spec |
 | NFR-SEC-003 | Partial | Encryption at rest in app layer (AES-256-GCM ballots); transit/storage encryption is a staging deployment property |
-| NFR-SEC-004 | Blocked | Standard constructions used, but protocol unreviewed — DEC-006 |
+| NFR-SEC-004 | Blocked | Standard constructions used, but protocol unreviewed - DEC-006 |
 | NFR-SEC-005 | Blocked | F-02 (Critical) open; DEC-007 assessment not done |
 | NFR-SEC-006 | Implemented | Claims register enforced; no certification claimed anywhere |
 | NFR-PERF-001 | Implemented | 10,000-record import + reconciliation test |
@@ -116,7 +116,7 @@
 | NFR-ACC-003 | Partial | Lightweight by design; slow-3G staging test outstanding (A-3) |
 | NFR-ACC-004 | Implemented | Assisted station path implemented; delivery of training is Phase 5 operations |
 | NFR-QUAL-001 | Implemented | 49 automated tests over eligibility, acceptance, tally, certification |
-| NFR-QUAL-002 | Implemented | Drizzle migrations 0000–0005 in version control |
+| NFR-QUAL-002 | Implemented | Drizzle migrations 0000-0005 in version control |
 | NFR-QUAL-003 | Implemented | Postgres-backed in production; in-memory store refused when `NODE_ENV=production` |
 | NFR-QUAL-004 | Partial | CI build+test on every push; no versioned production release or freeze record yet |
 | NFR-LEG-001 | Blocked | DEC-005 counsel not engaged |
@@ -133,7 +133,7 @@
 
 ## 4. G1 Conclusion
 
-G1 requires all MVP-priority requirements implemented with acceptance criteria passing (EMP-SCOPE-001 §5). On this matrix G1 is **Partial — cannot pass yet**: 4 gaps (FR-ELE-008, FR-CAN-003, FR-MON-003, FR-MON-004), the FR-SUP-001 block, and 40 partial remainders must be closed or formally accepted by the Product Owner with a dated plan. The largest partial clusters are election-rules publication and candidate administration (ELE/CAN), station/monitoring views (AST/MON), report formats (RES/AUD), and every staging-dependent NFR. Nothing in this matrix weakens the G2/G4 position: DEC-006/007 and F-02/F-04 block independently of G1.
+G1 requires all MVP-priority requirements implemented with acceptance criteria passing (EMP-SCOPE-001 §5). On this matrix G1 is **Partial - cannot pass yet**: 4 gaps (FR-ELE-008, FR-CAN-003, FR-MON-003, FR-MON-004), the FR-SUP-001 block, and 40 partial remainders must be closed or formally accepted by the Product Owner with a dated plan. The largest partial clusters are election-rules publication and candidate administration (ELE/CAN), station/monitoring views (AST/MON), report formats (RES/AUD), and every staging-dependent NFR. Nothing in this matrix weakens the G2/G4 position: DEC-006/007 and F-02/F-04 block independently of G1.
 
 ## 5. Out of This Matrix (by PRD release target)
 

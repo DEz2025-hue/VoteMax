@@ -21,7 +21,7 @@ export default function LoginPage() {
       setChecking(false);
       return;
     }
-    // Already signed in with a live session — go straight to the right portal.
+    // Already signed in with a live session - go straight to the right portal.
     void fetchPrincipal(t).then((principal) => {
       if (principal) {
         router.replace(isPlatformOnly(principal) ? '/platform' : '/admin');

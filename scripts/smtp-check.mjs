@@ -1,5 +1,5 @@
 /**
- * SMTP check — verifies the mail settings the API will use and optionally
+ * SMTP check - verifies the mail settings the API will use and optionally
  * sends a test email. Reads the same SMTP_* variables as the API, so what
  * passes here will work on Railway.
  *

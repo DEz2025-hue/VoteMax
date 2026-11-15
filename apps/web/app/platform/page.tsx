@@ -71,11 +71,11 @@ interface PlatformHealth {
 }
 
 function fmtDate(v: string | null | undefined) {
-  return v ? new Date(v).toLocaleString() : '—';
+  return v ? new Date(v).toLocaleString() : '-';
 }
 
 function fmtDay(v: string | null | undefined) {
-  return v ? new Date(v).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+  return v ? new Date(v).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
 }
 
 function fmtUptime(seconds: number) {
@@ -165,7 +165,7 @@ export default function PlatformPage() {
   useEffect(() => {
     const t = sessionStorage.getItem('votemax.session');
     if (!t) return;
-    // Validate the stored session before trusting it — expired or revoked
+    // Validate the stored session before trusting it - expired or revoked
     // tokens must return the visitor to sign-in, not the dashboard.
     void sessionIsValid(t).then((ok) => {
       if (ok) {
@@ -228,7 +228,7 @@ export default function PlatformPage() {
       const f = friendlyFromUnknown(err);
       setStatus(f.message);
       setStatusKind(f.severity === 'guidance' ? 'info' : 'error');
-      setToast(errorToast(err, `${label} — ${f.title}`));
+      setToast(errorToast(err, `${label} - ${f.title}`));
       if (isAuthzError(err)) setDenied(true);
     } finally {
       setLoading(false);
@@ -371,7 +371,7 @@ export default function PlatformPage() {
   ].filter(Boolean).join(', ') : '';
 
   const userLabel = (userId?: string) => {
-    if (!userId) return '—';
+    if (!userId) return '-';
     const u = detail?.users.find((x) => x.id === userId);
     return u ? u.email : userId.slice(0, 8);
   };
@@ -390,15 +390,15 @@ export default function PlatformPage() {
             </header>
             <div className="ps-drawer-body">
               {orgEnrollment && (
-                <Alert kind="success" title="Organization created — share the TOTP secret once">
-                  <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) — enroll this secret in their authenticator now; it is not shown again:</p>
+                <Alert kind="success" title="Organization created - share the TOTP secret once">
+                  <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) - enroll this secret in their authenticator now; it is not shown again:</p>
                   <code>{orgEnrollment.totpSecret}</code>
                   <p className="small" style={{ margin: '8px 0 0' }}>They sign in at <a href="/login">/login</a> with email, password and TOTP code.</p>
                 </Alert>
               )}
               <h3 className="ps-form-heading">Organization</h3>
               <Field label="Name" htmlFor="org-name"><Input id="org-name" value={newOrgName} onChange={(e) => { setNewOrgName(e.target.value); if (!slugTouched) setNewOrgSlug(slugify(e.target.value)); }} placeholder="Example Organization" /></Field>
-              <Field label="Slug" hint="Auto-generated from the name — used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => { setSlugTouched(true); setNewOrgSlug(slugify(e.target.value)); }} placeholder="example-org" /></Field>
+              <Field label="Slug" hint="Auto-generated from the name - used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => { setSlugTouched(true); setNewOrgSlug(slugify(e.target.value)); }} placeholder="example-org" /></Field>
 
               <h3 className="ps-form-heading">First administrator <span>optional</span></h3>
               <p className="muted small">Leave blank to create an unstaffed tenant. When set, an MFA-enrolled account is created with the selected role.</p>
@@ -407,8 +407,8 @@ export default function PlatformPage() {
               <Field label="Password" hint="Minimum 12 characters" htmlFor="org-admin-password"><Input id="org-admin-password" type="password" value={orgAdminPassword} onChange={(e) => setOrgAdminPassword(e.target.value)} autoComplete="new-password" /></Field>
               <Field label="Role" htmlFor="org-admin-role">
                 <Select id="org-admin-role" value={orgAdminRole} onChange={(e) => setOrgAdminRole(e.target.value)}>
-                  <option value="organization_owner">organization_owner — runs the tenant</option>
-                  <option value="auditor">auditor — read-only oversight</option>
+                  <option value="organization_owner">organization_owner - runs the tenant</option>
+                  <option value="auditor">auditor - read-only oversight</option>
                 </Select>
               </Field>
             </div>
@@ -467,7 +467,7 @@ export default function PlatformPage() {
                   <Kpi icon="building" label="Organizations" value={directory.length} note={`${directory.length - unstaffedTenants.length} staffed`} />
                   <Kpi icon="calendar" label="Elections" value={totalElections} note="across all tenants" tone="navy" />
                   <Kpi icon="alert" label="Unstaffed tenants" value={unstaffedTenants.length} note={unstaffedTenants.length ? 'Need an owner assigned' : 'All tenants staffed'} tone={unstaffedTenants.length ? 'amber' : 'green'} />
-                  <Kpi icon="shield" label="Audit outbox" value={health ? health.pendingAuditEntries : '—'} note="entries awaiting chain commit" tone="green" />
+                  <Kpi icon="shield" label="Audit outbox" value={health ? health.pendingAuditEntries : '-'} note="entries awaiting chain commit" tone="green" />
                 </div>
               )}
 
@@ -688,8 +688,8 @@ export default function PlatformPage() {
                 {detailTab === 'provision' && (
                   <Panel title="Provision staff account" subtitle="Creates an MFA-enrolled user and assigns the selected tenant role. Scope non-owner roles to one election for least privilege.">
                     {enrolled && (
-                      <Alert kind="success" title="Account provisioned — share the TOTP secret once">
-                        <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> — enroll this secret in their authenticator now; it is not shown again:</p>
+                      <Alert kind="success" title="Account provisioned - share the TOTP secret once">
+                        <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> - enroll this secret in their authenticator now; it is not shown again:</p>
                         <code>{enrolled.totpSecret}</code>
                         <p className="small" style={{ margin: '8px 0 0' }}>They sign in at <a href="/login">/login</a> with email, password and TOTP code.</p>
                       </Alert>
@@ -700,8 +700,8 @@ export default function PlatformPage() {
                       <Field label="Password" hint="Minimum 12 characters" htmlFor="prov-password"><Input id="prov-password" type="password" value={provPassword} onChange={(e) => setProvPassword(e.target.value)} autoComplete="new-password" /></Field>
                       <Field label="Role" htmlFor="prov-role">
                         <Select id="prov-role" value={provRole} onChange={(e) => setProvRole(e.target.value)}>
-                          <option value="organization_owner">organization_owner — runs the tenant</option>
-                          <option value="auditor">auditor — read-only oversight</option>
+                          <option value="organization_owner">organization_owner - runs the tenant</option>
+                          <option value="auditor">auditor - read-only oversight</option>
                         </Select>
                       </Field>
                       <Field label="Election scope" hint="Organization-wide applies to every election" htmlFor="prov-election">
@@ -733,7 +733,7 @@ export default function PlatformPage() {
             !health ? <Skeleton lines={5} /> : (
               <>
                 <div className="ps-kpis">
-                  <Kpi icon="pulse" label="Store backend" value={health.store} note={health.store === 'memory' ? 'NOT durable — dev/test only' : 'PostgreSQL'} tone={health.store === 'memory' ? 'amber' : 'green'} />
+                  <Kpi icon="pulse" label="Store backend" value={health.store} note={health.store === 'memory' ? 'NOT durable - dev/test only' : 'PostgreSQL'} tone={health.store === 'memory' ? 'amber' : 'green'} />
                   <Kpi icon="refresh" label="DB latency" value={`${health.dbLatencyMs} ms`} tone="navy" />
                   <Kpi icon="shield" label="Audit outbox" value={health.pendingAuditEntries} note="awaiting hash-chain commit" tone="green" />
                   <Kpi icon="calendar" label="Uptime" value={fmtUptime(health.uptimeSeconds)} note={`checked ${fmtDate(health.checkedAt)}`} />
@@ -748,7 +748,7 @@ export default function PlatformPage() {
                       <tr><td>Fallback</td><td className="muted">In-process dev outbox</td><td>{health.otpProviders.devAllowed ? <Badge tone="warning">enabled</Badge> : <Badge tone="success">disabled</Badge>}</td></tr>
                     </Table>
                     {health.otpProviders.devAllowed && (
-                      <div className="ps-panel-body"><Alert kind="warning" title="F-04 open">No production OTP provider is confirmed. Dev outbox is active — codes are captured in-process, not delivered.</Alert></div>
+                      <div className="ps-panel-body"><Alert kind="warning" title="F-04 open">No production OTP provider is confirmed. Dev outbox is active - codes are captured in-process, not delivered.</Alert></div>
                     )}
                   </Panel>
 
@@ -764,7 +764,7 @@ export default function PlatformPage() {
                       <div key={label} className="ps-status-row" style={{ alignItems: 'flex-start' }}>
                         <span className="ps-status-label"><i className={`ps-dot ${err ? 'bad' : 'ok'}`} />{label}</span>
                         <span className="ps-status-value" style={{ fontWeight: 500, maxWidth: '60%' }}>
-                          {!health.delivery ? 'Not reported — the API needs the latest deploy'
+                          {!health.delivery ? 'Not reported - the API needs the latest deploy'
                             : err ? (<>{err.channel} failed: {err.message}<div className="small muted">{fmtDate(err.at)}</div></>)
                             : 'No problems since start'}
                         </span>

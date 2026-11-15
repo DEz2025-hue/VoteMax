@@ -1,5 +1,5 @@
 /**
- * Brevo diagnostics — shows why a message was not delivered.
+ * Brevo diagnostics - shows why a message was not delivered.
  * Prints: your verified senders, domain authentication status, and the most
  * recent delivery events (including Brevo's own `reason` for any error/bounce).
  * Read-only; sends nothing.
@@ -27,12 +27,12 @@ if (acct.status !== 200) {
   if (/unrecogni[sz]ed IP/i.test(JSON.stringify(acct.data))) console.error('Hint: deactivate IP blocking at https://app.brevo.com/security/authorised_ips');
   process.exit(1);
 }
-console.log(`Account: ${acct.data.email ?? '?'} — plan: ${(acct.data.plan ?? []).map((p) => `${p.type}${p.credits !== undefined ? ` (${p.credits} credits)` : ''}`).join(', ') || '?'}`);
+console.log(`Account: ${acct.data.email ?? '?'} - plan: ${(acct.data.plan ?? []).map((p) => `${p.type}${p.credits !== undefined ? ` (${p.credits} credits)` : ''}`).join(', ') || '?'}`);
 
 console.log('\n== Senders (must be active to send from them) ==');
 const s = await get('/senders');
 for (const x of s.data.senders ?? []) console.log(`  ${x.active ? 'ACTIVE  ' : 'INACTIVE'} ${x.name ?? ''} <${x.email}>`);
-if (!(s.data.senders ?? []).length) console.log('  (none — add and verify a sender in Brevo)');
+if (!(s.data.senders ?? []).length) console.log('  (none - add and verify a sender in Brevo)');
 
 console.log('\n== Domains (authenticated = DKIM/DMARC set up) ==');
 const d = await get('/senders/domains');

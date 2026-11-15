@@ -49,7 +49,7 @@ function chunks<T>(arr: T[], size: number): T[][] {
  * Audit appends go through a transactional outbox: mutations write the
  * audit intent inside their own transaction (atomic, no lock), and a
  * background drainer chains queued entries into audit_records in batches
- * under a single advisory lock — preserving SEC-AUD atomicity without
+ * under a single advisory lock - preserving SEC-AUD atomicity without
  * serializing every mutation on ~3 round-trips.
  */
 export class PostgresStore implements PlatformStore {
@@ -742,7 +742,7 @@ export class PostgresStore implements PlatformStore {
    * Chain queued outbox rows into audit_records. Runs automatically on an
    * interval; also invoked directly by verifyAuditChain so callers always
    * observe a complete chain. Concurrent callers coalesce onto a single
-   * in-flight drain — without this, interval ticks pile up into a convoy
+   * in-flight drain - without this, interval ticks pile up into a convoy
    * of lock-waiting transactions that starves the connection pool.
    */
   flushAudit(): Promise<void> {

@@ -25,7 +25,7 @@ export interface FriendlyError {
   severity: Severity;
   /** Original API code, e.g. INVALID_STATE (for logic, not for display). */
   code: string;
-  /** Original technical text — for support and logs only. */
+  /** Original technical text - for support and logs only. */
   technical: string;
 }
 
@@ -133,7 +133,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
         current ? STATE_NEXT_STEP[current] : undefined);
     }
     case 'INVALID_TRANSITION':
-      return make(code, raw, 'guidance', 'Not available yet', "The election can't move to that stage from where it is now.", 'Use the guided steps in Election setup — they take you through each stage in order.');
+      return make(code, raw, 'guidance', 'Not available yet', "The election can't move to that stage from where it is now.", 'Use the guided steps in Election setup - they take you through each stage in order.');
     case 'CONFIG_FROZEN':
       return make(code, raw, 'guidance', 'Ballot is locked', "The ballot can't be changed any more because the voter register has been locked.");
     case 'REGISTER_FROZEN':
@@ -188,7 +188,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
     case 'OTP_INVALID':
       return make(code, raw, 'guidance', "That code doesn't match", "The code you entered isn't correct.", 'Check the latest message and try again.');
     case 'OTP_EXPIRED':
-      return make(code, raw, 'guidance', "That code can't be used", 'It has timed out (codes last 10 minutes) or was already used — each code works once.', 'Go back and ask for a new code.');
+      return make(code, raw, 'guidance', "That code can't be used", 'It has timed out (codes last 10 minutes) or was already used - each code works once.', 'Go back and ask for a new code.');
     case 'OTP_LOCKED':
       return make(code, raw, 'guidance', 'Too many attempts', 'That code can no longer be used.', 'Go back and ask for a new one.');
     case 'OTP_RATE_LIMITED':
@@ -196,7 +196,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
     case 'OTP_DELIVERY_UNAVAILABLE':
       return make(code, raw, 'error', "We couldn't send your code", "Something stopped your code from being delivered.", 'Please try again shortly, or contact your election officer.');
     case 'ELECTION_NOT_OPEN': {
-      if (/not opened/i.test(detail)) return make(code, raw, 'guidance', "Voting hasn't started", "Voting for this election hasn't opened yet.", 'Come back once voting opens — your invitation has the times.');
+      if (/not opened/i.test(detail)) return make(code, raw, 'guidance', "Voting hasn't started", "Voting for this election hasn't opened yet.", 'Come back once voting opens - your invitation has the times.');
       if (/closed/i.test(detail)) return make(code, raw, 'guidance', 'Voting has ended', 'The voting window for this election has closed.');
       return make(code, raw, 'guidance', 'Voting is not open', 'This election is not open for voting right now.');
     }
@@ -205,7 +205,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
     case 'ALREADY_VOTED':
       return make(code, raw, 'guidance', "You've already voted", 'Our records show a ballot has already been submitted for this member ID, so it can’t be used again.', "If you didn't vote, contact your election officer.");
     case 'SESSION_INVALID':
-      return make(code, raw, 'guidance', 'Your session timed out', 'For your security, voting sessions only last a short while.', 'Please start again — it only takes a minute.');
+      return make(code, raw, 'guidance', 'Your session timed out', 'For your security, voting sessions only last a short while.', 'Please start again - it only takes a minute.');
     case 'INVALID_BALLOT':
       return make(code, raw, 'guidance', 'Please check your choices', "Something in your selections isn't valid for this ballot.", 'Go back and review each position.');
     case 'RESULTS_RESTRICTED':
@@ -227,7 +227,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
   }
 }
 
-/** Offline / DNS / CORS failures — fetch() rejects with a TypeError. */
+/** Offline / DNS / CORS failures - fetch() rejects with a TypeError. */
 export function networkError(technical = 'network error'): FriendlyError {
   return make('NETWORK', technical, 'error', "Can't reach the server", "We couldn't connect. Nothing you entered has been lost.", 'Check your internet connection and try again.');
 }
@@ -239,7 +239,7 @@ export function friendlyFromUnknown(err: unknown): FriendlyError {
   const raw = err instanceof Error ? err.message : String(err ?? '');
   const { code } = splitCode(raw);
   // Plain-language errors thrown by the UI itself ("Pick a start time.") are
-  // already meant for people — show them as written.
+  // already meant for people - show them as written.
   if (!code && raw && /^[A-Z]/.test(raw) && !/^(HTTP \d+|Unauthorized|Forbidden|Internal)/.test(raw)) {
     return make('INVALID_INPUT', raw, 'guidance', 'Please check the details', raw);
   }

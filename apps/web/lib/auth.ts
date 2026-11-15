@@ -23,7 +23,7 @@ const SESSION_KEYS = [
   'votemax.assignments',
 ] as const;
 
-/** POST /auth/login — returns the session payload or throws with the API message. */
+/** POST /auth/login - returns the session payload or throws with the API message. */
 export async function signIn(email: string, password: string, totp?: string): Promise<SessionData> {
   const data = await apiRequest(`${API}/auth/login`, {
     method: 'POST',
@@ -57,7 +57,7 @@ export async function signOut(): Promise<void> {
         method: 'POST',
         headers: { authorization: `Bearer ${token}`, ...(await fraudHeaders()) },
       });
-    } catch { /* best effort — local session is cleared regardless */ }
+    } catch { /* best effort - local session is cleared regardless */ }
   }
   clearSession();
 }

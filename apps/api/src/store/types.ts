@@ -4,7 +4,7 @@ import type { AuditEntry, AuditEntryInput } from '../audit/audit-chain';
 import type { VoterRecord } from '../register/csv-import';
 
 // Domain types shared by the service layer and both store implementations
-// (in-memory for tests/dev, Postgres for production — F-01).
+// (in-memory for tests/dev, Postgres for production - F-01).
 
 export interface Organization { id: string; name: string; slug: string; createdAt: string }
 export interface User {
@@ -87,7 +87,7 @@ export interface AcceptBallotInput {
 export type AcceptBallotResult = { receiptId: string; alreadyRecorded: boolean };
 
 // ---- Anti-fraud (SEC-VOT-10) ----
-// All identifiers arriving here are already salted hashes — stores must
+// All identifiers arriving here are already salted hashes - stores must
 // never receive raw IPs, device fingerprints, or voter identifiers, and
 // fraud rows must never be joined to ballot records (SEC-BAL-02).
 export type FraudSignalKind = 'ip' | 'device' | 'actor';
@@ -206,7 +206,7 @@ export interface PlatformStore {
   setCandidatePhoto(candidateId: string, photo: { mime: string; data: string; url: string }): Promise<void>;
   getCandidatePhoto(candidateId: string): Promise<{ mime: string; data: string } | null>;
   clearCandidatePhoto(candidateId: string): Promise<void>;
-  /** Delete a candidate record (config editable states only — enforced by service). */
+  /** Delete a candidate record (config editable states only - enforced by service). */
   deleteCandidate(id: string): Promise<void>;
   /** Delete a position and all of its candidates atomically. */
   deletePositionCascade(positionId: string): Promise<void>;
@@ -216,7 +216,7 @@ export interface PlatformStore {
   findVoterByMemberId(electionId: string, memberId: string): Promise<VoterRecord | null>;
   getVoter(id: string): Promise<VoterRecord | null>;
   updateVoterStatus(voterId: string, status: VoterRecord['status'], reason: string): Promise<void>;
-  /** Update a voter's name/contact details only — never member ID or status. */
+  /** Update a voter's name/contact details only - never member ID or status. */
   updateVoterContact(voterId: string, patch: { fullName: string; email: string; phone: string }): Promise<void>;
   /** Resolve a duplicate and (for 'eligible') create its entitlement atomically. */
   resolveDuplicateVoter(voterId: string, status: 'eligible' | 'ineligible', reason: string, entitlement: Entitlement | null): Promise<void>;
@@ -248,7 +248,7 @@ export interface PlatformStore {
   // ---- ballots (append-only; SEC-BAL) ----
   /**
    * Atomic acceptance: lock entitlement, replay-check idempotency key,
-   * consume entitlement, insert ciphertext ballot, write receipt + audit —
+   * consume entitlement, insert ciphertext ballot, write receipt + audit -
    * one transaction (EMP-ARCH §8, SEC-VOT-02/04/05).
    */
   acceptBallot(input: AcceptBallotInput): Promise<AcceptBallotResult>;

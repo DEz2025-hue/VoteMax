@@ -1,6 +1,6 @@
 # System Architecture
 
-> **Model update (v0.2):** the role model is now four roles — `platform_admin`, `organization_owner`, `auditor`, `voter` — per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
+> **Model update (v0.2):** the role model is now four roles - `platform_admin`, `organization_owner`, `auditor`, `voter` - per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
 
 **Document ID:** EMP-ARCH-001\
 **Version:** 0.1\
@@ -299,15 +299,15 @@ Decisions are recorded as ADRs in the repository. Initial ADRs to write:
 
 | ADR | Topic | Depends on |
 |---|---|---|
-| ADR-001 | Modular monolith and module boundaries | – |
+| ADR-001 | Modular monolith and module boundaries | - |
 | ADR-002 | Backend framework and ORM | DEC-003 |
-| ADR-003 | Tenancy isolation (RLS) | – |
+| ADR-003 | Tenancy isolation (RLS) | - |
 | ADR-004 | Ballot secrecy and tally protocol | DEC-006 |
 | ADR-005 | Key management and custody | DEC-006 |
-| ADR-006 | Audit hash chain and external anchoring | – |
+| ADR-006 | Audit hash chain and external anchoring | - |
 | ADR-007 | Voter authentication method | DEC-004 |
 | ADR-008 | Hosting and region | DEC-002 |
-| ADR-009 | Observability privacy rules | – |
+| ADR-009 | Observability privacy rules | - |
 | ADR-010 | Offline voting reservation | DEC-008 |
 
 ## 20. Risks and Open Questions

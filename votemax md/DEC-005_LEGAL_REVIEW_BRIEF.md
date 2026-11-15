@@ -1,8 +1,8 @@
-# DEC-005 — Legal and Data-Protection Review Brief
+# DEC-005 - Legal and Data-Protection Review Brief
 
 **Document ID:** EMP-DEC005-001\
 **Version:** 0.1\
-**Status:** Brief ready — counsel not yet engaged\
+**Status:** Brief ready - counsel not yet engaged\
 **Document Type:** Legal Review Brief\
 **Last Updated:** 11 November 2026\
 **Parent Documents:** EMP-FOUND-001 §19, EMP-PRD-001 NFR-LEG-001…003, EMP-SEC-001 SEC-DAT-03, SEC-OI-3\
@@ -20,7 +20,7 @@ Instruct Liberian counsel for the DEC-005 review and record what is known today.
 |---|---|---|
 | Data Protection Act | Liberia enacted its **first Data Protection Act** (“Act for the Collection, Processing, Transmission, Storage, Protection, and Use of Personal Information”), signed August 2026; earlier sources confirm no comprehensive law existed before (Constitution Art. 16 privacy only; ECOWAS Supplementary Act signed, AU Malabo not signed) | Obtain the Act text; confirm regulator, registration, breach notification, data-subject rights, and **cross-border transfer rules** (DEC-002 depends on this) |
 | Cybercrime Act | Signed alongside (August 2026) | Confirm offences/duties touching platform operation and incident reporting |
-| Election authority | Membership organization elections governed by organization/union constitutions, not national electoral law (assumption) | Confirm no national approval is needed for an organizational election; confirm what the pilot committee's constitution requires (electronic voting, quorum, second approver — Q-LIFE-002) |
+| Election authority | Membership organization elections governed by organization/union constitutions, not national electoral law (assumption) | Confirm no national approval is needed for an organizational election; confirm what the pilot committee's constitution requires (electronic voting, quorum, second approver - Q-LIFE-002) |
 | Telecommunications / SMS | OTP and notifications ride Liberian carriers via aggregators | Confirm sender-ID/A2P registration duties for OTP SMS |
 
 Any conflict between this table and counsel's advice: counsel prevails and this document is corrected by new version.
@@ -29,7 +29,7 @@ Any conflict between this table and counsel's advice: counsel prevails and this 
 
 1. Data controller/processor roles: EMP vs organization; what agreement is required?
 2. Lawful basis and notices for processing the voter register (member ID, contact details); data minimization position (FR-VOT-008).
-3. Cross-border transfer: may voter personal data be stored/processed in EU (DEC-002 `eu-west`) — or is African residency required (→ `af-south-1`)?
+3. Cross-border transfer: may voter personal data be stored/processed in EU (DEC-002 `eu-west`) - or is African residency required (→ `af-south-1`)?
 4. Retention: what periods are lawful/required for register, audit records, encrypted ballots (Q-PRD-005 → retention schedule SEC-OI-6)?
 5. Breach notification duties and timelines (feeds SEC-INC plan).
 6. Electronic records/signatures: are electronic tally/certification records legally effective for an organizational election?
@@ -38,7 +38,7 @@ Any conflict between this table and counsel's advice: counsel prevails and this 
 
 ## 4. Deliverable and Gate Link
 
-Counsel delivers a short memo answering §3, mapped to requirement IDs (NFR-LEG-001…003, SEC-DAT-03). Memo is G6 evidence (`PRODUCT_SCOPE_AND_MVP.md` §5). Until the memo arrives, DEC-005 = **In progress** (EMP-ROAD-001 Phase 0 asks only that the review has begun — engagement letter is the Phase 0 evidence).
+Counsel delivers a short memo answering §3, mapped to requirement IDs (NFR-LEG-001…003, SEC-DAT-03). Memo is G6 evidence (`PRODUCT_SCOPE_AND_MVP.md` §5). Until the memo arrives, DEC-005 = **In progress** (EMP-ROAD-001 Phase 0 asks only that the review has begun - engagement letter is the Phase 0 evidence).
 
 ## 5. Engagement Checklist
 

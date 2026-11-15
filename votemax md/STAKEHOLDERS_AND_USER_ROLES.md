@@ -13,7 +13,7 @@
 > committee chair, election administrator, voter registrar, observer,
 > candidate, and station officer roles were removed; their responsibilities
 > were absorbed by the owner and auditor, candidates became election records
-> rather than user roles, and in-person/assisted voting was removed — all
+> rather than user roles, and in-person/assisted voting was removed - all
 > voting is online.
 
 ---
@@ -74,12 +74,12 @@ Two additional **function-level responsibilities** are required by EMP-FOUND-001
 
 **Removed roles (v0.1 → v0.2):**
 
-- `committee_chair` — responsibilities absorbed by `organization_owner`.
-- `election_admin` — responsibilities absorbed by `organization_owner`.
-- `voter_registrar` — responsibilities absorbed by `organization_owner`.
-- `observer` — responsibilities absorbed by `auditor`.
-- `candidate` — now an election record, not a user role.
-- `station_officer` — removed; there is no in-person voting.
+- `committee_chair` - responsibilities absorbed by `organization_owner`.
+- `election_admin` - responsibilities absorbed by `organization_owner`.
+- `voter_registrar` - responsibilities absorbed by `organization_owner`.
+- `observer` - responsibilities absorbed by `auditor`.
+- `candidate` - now an election record, not a user role.
+- `station_officer` - removed; there is no in-person voting.
 
 ## 4. Role Descriptions
 
@@ -97,7 +97,7 @@ Two additional **function-level responsibilities** are required by EMP-FOUND-001
 
 ### 4.3 Auditor
 - Read-only access to election progress, turnout statistics, audit records, results, and tally evidence.
-- Can act as a tally approver and certification second approver — the independent check on owner-run tallies.
+- Can act as a tally approver and certification second approver - the independent check on owner-run tallies.
 - Cannot modify any election data; cannot hold the owner role for the same election (SoD-8).
 
 ### 4.4 Voter
@@ -105,37 +105,37 @@ Two additional **function-level responsibilities** are required by EMP-FOUND-001
 - Ballots are cast online only; there is no assisted or in-person voting channel.
 
 ### 4.5 Candidate (election record)
-- A candidate is data attached to a position in an election — not a user account and not a role.
+- A candidate is data attached to a position in an election - not a user account and not a role.
 - Candidate records carry name and statement only; they confer no system access.
 
 ## 5. Permission Matrix
 
-Legend: **C** create, **R** read, **U** update, **A** approve, **X** execute, **–** none. "Own" means the user's own record only. "Agg" means aggregate-only, never identified selections.
+Legend: **C** create, **R** read, **U** update, **A** approve, **X** execute, **-** none. "Own" means the user's own record only. "Agg" means aggregate-only, never identified selections.
 
 | Capability | Platform admin | Org owner | Auditor | Voter |
 |---|---|---|---|---|
-| Create organization | CRU | – | – | – |
-| Provision initial owner account | X | – | – | – |
-| Assign org roles | – | CRU | – | – |
-| Create/configure election | – | CRU | R | – |
-| Manage candidates | – | CRU | R | – |
-| Import/manage voter register | – | CRU | R | R(own eligibility) |
-| Resolve duplicate/eligibility cases | – | CRU | R | – |
-| Freeze register | – | A | R | – |
-| Approve election readiness | – | A | R | – |
-| Open / close election | – | A | R | – |
-| Cast ballot (online) | – | – | – | X |
-| View participation (aggregate) | – | R(Agg) | R(Agg) | – |
-| View ballot selections linked to a voter | – | – | – | – |
-| Hold key custody | – | – | – | – (custodian responsibility) |
-| Authorize tally | – | A | R | – |
-| Execute tally | – | X (with approvers) | – | – |
-| Verify tally evidence | – | R | X | – |
-| Certify results | – | A | A (second approver) | – |
-| Publish results | – | X | R | R |
-| Read audit records | R(platform) | R(org) | R | – |
-| Read fraud signals | – | R | R | – |
-| Manage fraud blocks | – | X | – | – |
+| Create organization | CRU | - | - | - |
+| Provision initial owner account | X | - | - | - |
+| Assign org roles | - | CRU | - | - |
+| Create/configure election | - | CRU | R | - |
+| Manage candidates | - | CRU | R | - |
+| Import/manage voter register | - | CRU | R | R(own eligibility) |
+| Resolve duplicate/eligibility cases | - | CRU | R | - |
+| Freeze register | - | A | R | - |
+| Approve election readiness | - | A | R | - |
+| Open / close election | - | A | R | - |
+| Cast ballot (online) | - | - | - | X |
+| View participation (aggregate) | - | R(Agg) | R(Agg) | - |
+| View ballot selections linked to a voter | - | - | - | - |
+| Hold key custody | - | - | - | - (custodian responsibility) |
+| Authorize tally | - | A | R | - |
+| Execute tally | - | X (with approvers) | - | - |
+| Verify tally evidence | - | R | X | - |
+| Certify results | - | A | A (second approver) | - |
+| Publish results | - | X | R | R |
+| Read audit records | R(platform) | R(org) | R | - |
+| Read fraud signals | - | R | R | - |
+| Manage fraud blocks | - | X | - | - |
 
 **Notes**
 1. No role can see a ballot selection linked to an identified voter. This is an architectural property, not only a permission rule.
@@ -152,12 +152,12 @@ The following rules apply per election and are enforced by the system:
 | SoD-3 | The platform administrator cannot hold any election role in any organization. |
 | SoD-4 | Key custody requires multiple custodians; no single person can unseal tally material. |
 | SoD-5 | Tally authorization, tally execution, and certification require separate individuals: the tally authorizer (an owner) cannot execute the tally, and the tally executor cannot certify. |
-| SoD-8 | The auditor cannot hold the organization owner role for the same election — oversight must be independent of operation. |
+| SoD-8 | The auditor cannot hold the organization owner role for the same election - oversight must be independent of operation. |
 | SoD-9 | Role grants that would violate a rule above are rejected, and attempts are audited. |
 
 **Owner + auditor tally split.** Because the owner runs the whole tenant, tally and certification keep their independence through person-level separation rather than role separation:
 
-- **Tally:** an owner authorizes, a *different* user executes, and at least two approvers sign off — at least one of whom must be an auditor.
+- **Tally:** an owner authorizes, a *different* user executes, and at least two approvers sign off - at least one of whom must be an auditor.
 - **Certification:** an owner certifies with an auditor as the required second approver; the certifier cannot be the tally executor.
 
 ## 7. Role Assignment Rules

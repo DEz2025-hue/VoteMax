@@ -12,7 +12,7 @@ import type { NotificationKind } from '../store/types';
  * email, or the email fails, SMS through the same providers as one-time codes
  * (Africa's Talking, or the generic SMS webhook). In development with no
  * provider configured, messages go to an in-process outbox so the flow can be
- * exercised. In production an undeliverable message is a FAILURE — it is never
+ * exercised. In production an undeliverable message is a FAILURE - it is never
  * recorded as sent.
  */
 
@@ -48,7 +48,7 @@ export interface NotificationContext {
 
 /** Sent from a no-reply address, so say so and point voters to a real contact. */
 export const NO_REPLY_NOTE =
-  '\n\n—\nThis is an automated message from VoteMax. Please do not reply to it; if you need help, contact your election officer.';
+  '\n\n--\nThis is an automated message from VoteMax. Please do not reply to it; if you need help, contact your election officer.';
 
 export function renderVoterMessage(kind: NotificationKind, ctx: NotificationContext): { subject: string; text: string } {
   const window =
@@ -58,7 +58,7 @@ export function renderVoterMessage(kind: NotificationKind, ctx: NotificationCont
   switch (kind) {
     case 'invite':
       return {
-        subject: `You're eligible to vote — ${ctx.electionName}`,
+        subject: `You're eligible to vote - ${ctx.electionName}`,
         text:
           `Hello,\n\nYou are eligible to vote in "${ctx.electionName}" organized by ${ctx.organizationName}.\n\n` +
           `Your member ID: ${ctx.memberId}\n` +
@@ -68,17 +68,17 @@ export function renderVoterMessage(kind: NotificationKind, ctx: NotificationCont
       };
     case 'reminder_open':
       return {
-        subject: `Voting opens soon — ${ctx.electionName}`,
+        subject: `Voting opens soon - ${ctx.electionName}`,
         text:
           `Hello,\n\nVoting for "${ctx.electionName}" (${ctx.organizationName}) is about to begin.${window}\n\n` +
           `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nCast your ballot before it closes.` + NO_REPLY_NOTE,
       };
     case 'reminder_close':
       return {
-        subject: `Last chance to vote — ${ctx.electionName}`,
+        subject: `Last chance to vote - ${ctx.electionName}`,
         text:
           `Hello,\n\nVoting for "${ctx.electionName}" (${ctx.organizationName}) closes soon.${window}\n\n` +
-          `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nThis is your final reminder — ballots cannot be cast after closing.` + NO_REPLY_NOTE,
+          `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nThis is your final reminder - ballots cannot be cast after closing.` + NO_REPLY_NOTE,
       };
   }
 }

@@ -1,4 +1,4 @@
-# Phase 2 Execution Plan — Core Election Workflows
+# Phase 2 Execution Plan - Core Election Workflows
 
 **Document ID:** EMP-PHASE2-001\
 **Version:** 0.1\
@@ -15,7 +15,7 @@
 | Work item (EMP-ROAD-001 Phase 2) | Implementation | State |
 |---|---|---|
 | Organization and role management | `POST /organizations`, `POST /users`, `POST /roles` in `platform.controller.ts`; SoD checked in `platform.service.ts:assignRole` | Implemented |
-| Election, position, candidate configuration | `POST /elections`, `/positions`, `/candidates`, `/transition`; lifecycle in `elections/lifecycle.ts` (T1–T16 table) | Implemented |
+| Election, position, candidate configuration | `POST /elections`, `/positions`, `/candidates`, `/transition`; lifecycle in `elections/lifecycle.ts` (T1-T16 table) | Implemented |
 | Voter register import, validation, duplicates, statuses | `register/csv-import.ts` (parser, validation, duplicate detection); `POST /register/import`, `/register/resolve` | Implemented |
 | Entitlement creation | Created per eligible voter at import/resolution; reconciled at freeze | Implemented |
 | Register + configuration freeze | `freezeRegister` (hash, counts, unresolved-duplicate block); `assertConfigEditable` / `assertRegisterEditable` | Implemented |

@@ -93,7 +93,7 @@ describe('Phase 2 core workflows', () => {
     await svc.addCandidate(adminId, election.id, position.id, 'Ada Kamara');
     await svc.transition(adminId, election.id, 'CONFIGURED');
     await svc.transition(adminId, election.id, 'REGISTRATION');
-    // No memberId column at all — every voter gets a generated VM- ID.
+    // No memberId column at all - every voter gets a generated VM- ID.
     const csv = [
       'fullName,email,phone',
       'Alice Auto,alice.auto@example.org,',

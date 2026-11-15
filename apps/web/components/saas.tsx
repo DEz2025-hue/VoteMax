@@ -112,7 +112,7 @@ export function AuthLayout({ eyebrow, title, lede, children, footer }: {
           <span className="ps-logo ps-logo-lg">V</span>
           <h2>Elections your members can trust.</h2>
           <ul>
-            <li><Icon name="lock" size={18} /><span>Secret ballots — no record links a voter to a vote.</span></li>
+            <li><Icon name="lock" size={18} /><span>Secret ballots - no record links a voter to a vote.</span></li>
             <li><Icon name="shield" size={18} /><span>Tamper-evident audit trail for every action.</span></li>
             <li><Icon name="users" size={18} /><span>Separation of duties for tally and certification.</span></li>
           </ul>

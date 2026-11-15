@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'VoteMax by ClaMax Group',
     short_name: 'VoteMax',
-    description: 'Secure organizational elections — register, vote privately, verify results.',
+    description: 'Secure organizational elections - register, vote privately, verify results.',
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',

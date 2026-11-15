@@ -6,7 +6,7 @@ import SiteNav from '../components/site-nav';
 
 export const metadata = {
   title: 'VoteMax by ClaMax Group',
-  description: 'Secure organizational elections — register, vote privately, verify results.',
+  description: 'Secure organizational elections - register, vote privately, verify results.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

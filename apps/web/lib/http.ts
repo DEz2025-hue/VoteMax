@@ -1,8 +1,8 @@
 import { AppError, networkError, toFriendly } from './errors';
 
 /**
- * One place that talks to the API and turns every failure — HTTP errors,
- * server crashes, dropped connections — into an AppError carrying a friendly
+ * One place that talks to the API and turns every failure - HTTP errors,
+ * server crashes, dropped connections - into an AppError carrying a friendly
  * message. Pages catch it and show `err.friendly`; they never see raw codes.
  */
 export async function apiRequest(url: string, init: RequestInit): Promise<Record<string, unknown>> {

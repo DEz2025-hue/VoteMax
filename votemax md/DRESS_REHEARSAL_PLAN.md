@@ -1,20 +1,20 @@
 # Dress Rehearsal Plan and Report
 
-> **Model update (v0.2):** the role model is now four roles — `platform_admin`, `organization_owner`, `auditor`, `voter` — per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
+> **Model update (v0.2):** the role model is now four roles - `platform_admin`, `organization_owner`, `auditor`, `voter` - per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
 
 **Document ID:** EMP-REH-001\
 **Version:** 0.1\
-**Status:** Plan ready — production-like rehearsal NOT run; local mock pre-rehearsal recorded in §5\
+**Status:** Plan ready - production-like rehearsal NOT run; local mock pre-rehearsal recorded in §5\
 **Document Type:** Rehearsal Plan (Gate G7 evidence when run as specified)\
 **Last Updated:** 11 November 2026\
-**Parent Documents:** EMP-SCOPE-001 (G7), EMP-LIFE-001 §§6–7, EMP-RUN-001, EMP-SCALE-001 §7\
+**Parent Documents:** EMP-SCOPE-001 (G7), EMP-LIFE-001 §§6-7, EMP-RUN-001, EMP-SCALE-001 §7\
 **Owner:** Election Operations Lead (with Technical Lead)
 
 ---
 
 ## 1. Purpose
 
-Prove — with the real procedures, real roles, and production-like infrastructure — that the pilot election can be run, recovered, tallied, and certified before anyone asks voters to trust it (G7). A rehearsal on the developer mock is a *pre-rehearsal* and is never G7 evidence.
+Prove - with the real procedures, real roles, and production-like infrastructure - that the pilot election can be run, recovered, tallied, and certified before anyone asks voters to trust it (G7). A rehearsal on the developer mock is a *pre-rehearsal* and is never G7 evidence.
 
 ## 2. Entry Criteria (all required before scheduling)
 
@@ -43,9 +43,9 @@ While DEC-006/F-02 stands, the rehearsal tallies with mock custody and the repor
 
 Rehearsal date/environment/version: ______ · Participants (name/role): ______ · Scenario results (pass/fail per §3 row): ______ · Defects (ID, severity, owner, due): ______ · Timings (recovery, tally, verification): ______ · Recommendation (ready / not ready, signed Ops + Technical Leads): ______
 
-## 5. Pre-Rehearsal Record (local mock — preparation only, 11 Nov 2026)
+## 5. Pre-Rehearsal Record (local mock - preparation only, 11 Nov 2026)
 
-What has actually been exercised so far, all on the development mock with synthetic voters: full lifecycle to PUBLISHED over HTTP; 600 voters at 200 concurrent sessions (600/600 accepted, no duplicates); duplicate-burst, idempotency, assisted-station, tally/verification/recount, and certification-blocker behaviours in the automated suite (45 tests). Known rehearsal failures already on record: API kill loses accepted ballots (F-01) and single-key custody (F-02) — both are scheduled injects above precisely because they must pass before G8.
+What has actually been exercised so far, all on the development mock with synthetic voters: full lifecycle to PUBLISHED over HTTP; 600 voters at 200 concurrent sessions (600/600 accepted, no duplicates); duplicate-burst, idempotency, assisted-station, tally/verification/recount, and certification-blocker behaviours in the automated suite (45 tests). Known rehearsal failures already on record: API kill loses accepted ballots (F-01) and single-key custody (F-02) - both are scheduled injects above precisely because they must pass before G8.
 
 ## Document Control
 

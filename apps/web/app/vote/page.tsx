@@ -163,7 +163,7 @@ function VoteFlow() {
       {step === 'identify' && (
         <Card title="Find your election">
           <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await findElections(); }); }}>
-            <Field label="Organization code" htmlFor="org-slug" hint="The code your election officer gave you — it is not a secret.">
+            <Field label="Organization code" htmlFor="org-slug" hint="The code your election officer gave you - it is not a secret.">
               <Input id="org-slug" value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} required autoComplete="organization" placeholder="e.g. acme" />
             </Field>
             <Button type="submit" variant="secondary" block disabled={busy || !orgSlug.trim()}>
@@ -191,7 +191,7 @@ function VoteFlow() {
           {searched && elections.length === 0 && !busy && (
             <Alert kind="warning" title="Voting isn't open yet">
               We found this organization, but no election is open for voting right now. If you were invited to vote,
-              voting may not have started — check the dates in your invitation, or ask your election officer.
+              voting may not have started - check the dates in your invitation, or ask your election officer.
             </Alert>
           )}
 
@@ -280,7 +280,7 @@ function VoteFlow() {
 
       {step === 'review' && ballot && (
         <Card title="Review before you submit">
-          <Alert kind="warning" title="This cannot be undone">Check carefully — after submitting, your ballot cannot be changed.</Alert>
+          <Alert kind="warning" title="This cannot be undone">Check carefully - after submitting, your ballot cannot be changed.</Alert>
           {ballot.positions.map((pos) => {
             const chosen = (selections[pos.id] ?? [])
               .map((id) => pos.candidates.find((c) => c.id === id))

@@ -107,7 +107,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
 
 export interface ToastData { message: string; kind: 'info' | 'error' | 'warning'; title?: string; hint?: string; technical?: string }
 
-/** Build a toast from anything thrown — friendly text, never raw codes. */
+/** Build a toast from anything thrown - friendly text, never raw codes. */
 export function errorToast(err: unknown, title?: string): ToastData {
   const f = friendlyFromUnknown(err);
   return {

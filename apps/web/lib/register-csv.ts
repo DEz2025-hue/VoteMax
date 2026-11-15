@@ -1,7 +1,7 @@
 // Client-side preview for the voter-register CSV import. Mirrors the
 // server's parsing rules (apps/api/src/register/csv-import.ts) closely
 // enough to show row counts, detected columns, and likely issues before
-// the file is submitted — the API remains the authoritative validator.
+// the file is submitted - the API remains the authoritative validator.
 
 export interface RegisterPreview {
   headers: string[];
@@ -75,7 +75,7 @@ export function previewRegisterCsv(text: string): RegisterPreview | null {
     const email = get(emailIdx);
     const phone = get(phoneIdx);
     if (email && !EMAIL_RE.test(email)) issues.push({ line: i + 1, message: 'Invalid email' });
-    else if (!email && !phone) issues.push({ line: i + 1, message: 'No email or phone — voter cannot receive an OTP' });
+    else if (!email && !phone) issues.push({ line: i + 1, message: 'No email or phone - voter cannot receive an OTP' });
   }
   return {
     ...base,

@@ -4,7 +4,7 @@ import { HttpEmailSender, type EmailProvider } from '../mail/email-api';
 
 /**
  * OTP delivery (DEC-004 §3, finding F-04). Codes are sent through
- * env-configured providers — never returned to the caller outside the
+ * env-configured providers - never returned to the caller outside the
  * explicit dev outbox. Message content carries only the code and expiry
  * (FR-SUP-002); no election content beyond that.
  */
@@ -30,7 +30,7 @@ export interface OtpSender {
 
 function otpText(msg: OtpMessage): string {
   return `Your Votemax verification code is ${msg.code}. It expires in 10 minutes. Do not share it with anyone.` +
-    (msg.email ? '\n\nThis is an automated message — please do not reply to it.' : '');
+    (msg.email ? '\n\nThis is an automated message - please do not reply to it.' : '');
 }
 
 /** SMTP email sender (nodemailer). Configured via SMTP_* env vars. */
@@ -216,7 +216,7 @@ export class OtpDelivery {
     this.devAllowed = env.NODE_ENV !== 'production';
   }
 
-  /** Configuration posture for ops dashboards — never exposes secrets. */
+  /** Configuration posture for ops dashboards - never exposes secrets. */
   describe(): OtpProviderStatus {
     return {
       email: this.httpEmail.configured || this.smtp.configured,

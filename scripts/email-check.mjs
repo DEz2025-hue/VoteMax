@@ -1,5 +1,5 @@
 /**
- * Email API check — sends one test email through Brevo, Resend or SendGrid
+ * Email API check - sends one test email through Brevo, Resend or SendGrid
  * using the same EMAIL_* variables as the API, and prints the provider's real
  * answer. What works here will work on Railway.
  *

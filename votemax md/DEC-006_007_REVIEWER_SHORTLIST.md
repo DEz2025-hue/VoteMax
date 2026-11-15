@@ -1,10 +1,10 @@
-# DEC-006 / DEC-007 — Specialist Reviewer and Independent Assessor Pack
+# DEC-006 / DEC-007 - Specialist Reviewer and Independent Assessor Pack
 
-> **Model update (v0.2):** the role model is now four roles — `platform_admin`, `organization_owner`, `auditor`, `voter` — per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
+> **Model update (v0.2):** the role model is now four roles - `platform_admin`, `organization_owner`, `auditor`, `voter` - per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
 
 **Document ID:** EMP-DEC0067-001\
 **Version:** 0.1\
-**Status:** Criteria ready — no firms named or contacted yet\
+**Status:** Criteria ready - no firms named or contacted yet\
 **Document Type:** Shortlisting Pack\
 **Last Updated:** 11 November 2026\
 **Parent Documents:** EMP-FOUND-001 §19, EMP-SEC-001 SEC-ASR-01…07 / SEC-OI-1…2, EMP-ARCH-001 §7\
@@ -16,22 +16,22 @@
 
 | Engagement | Decision | Scope | Needed by |
 |---|---|---|---|
-| **Cryptographic specialist reviewer** | DEC-006 | Review ballot secrecy + tally protocol options (EMP-ARCH §7.2), threshold key custody model, unlinkability/timing analysis (ARCH-R1, ARCH-R3) | **Phase 1 exit** — design cannot be built before review (SEC-CRY-02) |
-| **Independent security assessor** | DEC-007 | Independent assessment of secrecy, eligibility, integrity, availability; penetration test (external, authenticated, cross-tenant, station — SEC-ASR-03); G2 gate evidence | Engaged **during design** (SEC-ASR-02), assessment complete in Phase 4 |
+| **Cryptographic specialist reviewer** | DEC-006 | Review ballot secrecy + tally protocol options (EMP-ARCH §7.2), threshold key custody model, unlinkability/timing analysis (ARCH-R1, ARCH-R3) | **Phase 1 exit** - design cannot be built before review (SEC-CRY-02) |
+| **Independent security assessor** | DEC-007 | Independent assessment of secrecy, eligibility, integrity, availability; penetration test (external, authenticated, cross-tenant, station - SEC-ASR-03); G2 gate evidence | Engaged **during design** (SEC-ASR-02), assessment complete in Phase 4 |
 
-They may be different firms. One firm may do both only if the crypto review and the assessment remain separately staffed and reported — record the arrangement.
+They may be different firms. One firm may do both only if the crypto review and the assessment remain separately staffed and reported - record the arrangement.
 
-## 2. Selection Criteria (score each candidate 0–2 per row)
+## 2. Selection Criteria (score each candidate 0-2 per row)
 
 | Criterion | Crypto reviewer (DEC-006) | Assessor (DEC-007) |
 |---|---|---|
 | Demonstrated election-system or applied-cryptography review experience | Required | Strongly preferred |
 | Published protocol review / verifiable-tally expertise (mix-nets or homomorphic tallying) | Required | Preferred |
 | Independence: no stake in EMP build, no reselling of build services to EMP | Required | Required |
-| Penetration testing across web, authenticated, tenant-isolation, and station/device contexts | — | Required |
+| Penetration testing across web, authenticated, tenant-isolation, and station/device contexts | - | Required |
 | Familiarity with OWASP ASVS and election-system guidance (SEC-SDL-12) | Preferred | Required |
 | Availability to start at Phase 1 design, not only after build | Required | Required |
-| Clear deliverable: written findings with severity, remediation, re-test | Required | Required (no critical/high open at G2 — SEC-ASR-04) |
+| Clear deliverable: written findings with severity, remediation, re-test | Required | Required (no critical/high open at G2 - SEC-ASR-04) |
 | References from comparable engagements | Required | Required |
 
 **No firm is named in this document.** Naming candidates requires outreach and availability checks; inventing a shortlist of firm names without contact would be a fabricated claim (SEC-ASR-06 claims discipline applies to our own documents too). The Security Lead populates §3 from real responses.
@@ -40,7 +40,7 @@ They may be different firms. One firm may do both only if the crypto review and 
 
 | Candidate | Type (DEC-006/007) | Contacted | Responded | Score (§2) | Decision |
 |---|---|---|---|---|---|
-| — | — | ☐ | ☐ | — | — |
+| - | - | ☐ | ☐ | - | - |
 
 ## 4. Outreach / RFP Outline (send to each candidate)
 
@@ -51,7 +51,7 @@ They may be different firms. One firm may do both only if the crypto review and 
 
 ## 5. Phase 0 Exit Link
 
-Phase 0 requires **reviewers identified** (EMP-ROAD-001). “Identified” = at least one candidate per engagement in §3 with contact made and response received — not merely criteria written. This pack satisfies the preparation half; outreach is the remaining Phase 0 task (owner: Security Lead, by W0 + 4 per `PHASE_0_EXECUTION_PLAN.md` §5).
+Phase 0 requires **reviewers identified** (EMP-ROAD-001). “Identified” = at least one candidate per engagement in §3 with contact made and response received - not merely criteria written. This pack satisfies the preparation half; outreach is the remaining Phase 0 task (owner: Security Lead, by W0 + 4 per `PHASE_0_EXECUTION_PLAN.md` §5).
 
 ## Document Control
 

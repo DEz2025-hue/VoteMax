@@ -27,7 +27,7 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqual(actual, expected);
 }
 
-// RFC 6238 TOTP (HMAC-SHA1, 30s step, 6 digits) — standard construction,
+// RFC 6238 TOTP (HMAC-SHA1, 30s step, 6 digits) - standard construction,
 // implemented with node:crypto HMAC. Secrets are base32.
 const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 

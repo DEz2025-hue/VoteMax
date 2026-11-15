@@ -1,4 +1,4 @@
-# Phase 1 Execution Plan — Architecture and Secure Foundations
+# Phase 1 Execution Plan - Architecture and Secure Foundations
 
 **Document ID:** EMP-PHASE1-001\
 **Version:** 0.1\
@@ -27,9 +27,9 @@
 
 Phase 1 builds **foundations only**: tenancy, authorization/SoD policy, audit chain, health, typed tenant context, migrations pipeline, web shell. It does **not** build elections, registers, or voting (Phase 2/3). No ballot code exists; EMP-PROTO-001 is behind the DEC-006 hold point.
 
-Authentication note: privileged-user MFA login (FR-IAM-001) needs an identity approach. Phase 1 implements the **authorization layer** (roles, scopes, SoD, tenant guard) against authenticated-principal objects, with a development-only principal header for local work clearly marked non-production. Choosing/building the MFA login itself (provider vs built-in TOTP) is the first Phase 2 task and must not be improvised here — recorded as open item P1-OI-1.
+Authentication note: privileged-user MFA login (FR-IAM-001) needs an identity approach. Phase 1 implements the **authorization layer** (roles, scopes, SoD, tenant guard) against authenticated-principal objects, with a development-only principal header for local work clearly marked non-production. Choosing/building the MFA login itself (provider vs built-in TOTP) is the first Phase 2 task and must not be improvised here - recorded as open item P1-OI-1.
 
-## 3. Exit Criteria — Status
+## 3. Exit Criteria - Status
 
 | Criterion | Status |
 |---|---|

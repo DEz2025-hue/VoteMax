@@ -1,11 +1,11 @@
-# Ballot Secrecy and Tally Protocol — Specification Draft
+# Ballot Secrecy and Tally Protocol - Specification Draft
 
 **Document ID:** EMP-PROTO-001\
 **Version:** 0.1\
-**Status:** DRAFT — NOT APPROVED FOR IMPLEMENTATION. Requires DEC-006 specialist review.\
+**Status:** DRAFT - NOT APPROVED FOR IMPLEMENTATION. Requires DEC-006 specialist review.\
 **Document Type:** Protocol Specification (for review)\
 **Last Updated:** 11 November 2026\
-**Parent Documents:** EMP-ARCH-001 §7/§8, EMP-SEC-001 §§6–7, EMP-PRD-001 FR-VTG/FR-RES\
+**Parent Documents:** EMP-ARCH-001 §7/§8, EMP-SEC-001 §§6-7, EMP-PRD-001 FR-VTG/FR-RES\
 **Owner:** Security Lead
 
 > **Hold point.** Per SEC-CRY-02, no code implementing this protocol's cryptography may be merged until a specialist reviewer has reviewed this specification and findings are addressed or tracked. This document states the design to be reviewed; it is not an approved protocol. Phase 3 ballot code must not start from an unreviewed version of this document.
@@ -30,7 +30,7 @@ Non-goals (stated limitations, SEC §6): protection against a compromised voter 
 
 ## 3. Design Constraints (any option must satisfy)
 
-1. **Separation.** Participation record (D2: voter, election, entitlement consumed) and ballot record (D3) share no stored identifier — no voter ID, session ID, OTP ID, IP, or user-agent on the ballot record (EMP-ARCH §7.1.1–3).
+1. **Separation.** Participation record (D2: voter, election, entitlement consumed) and ballot record (D3) share no stored identifier - no voter ID, session ID, OTP ID, IP, or user-agent on the ballot record (EMP-ARCH §7.1.1-3).
 2. **Encryption at acceptance.** Ballot plaintext exists only in the voter's client and transiently in the acceptance request; stored form is ciphertext under an election-specific key (SEC-CRY-04).
 3. **Sealed until close.** No decryption capability is reachable by application roles before CLOSED + tally authorization (T9, EMP-LIFE-001).
 4. **Threshold decryption.** Decryption requires *t-of-n* key custodians (SEC-CRY-05); parameters proposed in `KEY_LIFECYCLE_AND_CUSTODY.md`, fixed only by reviewer + committee.
@@ -50,7 +50,7 @@ Authenticate (DEC-004) → eligibility + window check → short-lived ballot ses
 1. Chosen option + written rationale + publishable claims and limitations.
 2. Custodian threshold parameters (feeds Q-STK-002).
 3. Metadata/timing analysis for the pilot's turnout profile.
-4. Receipt/individual-verification position (Q-PRD-002, FR-VTG-011) — default: **out of pilot** unless reviewer advises otherwise.
+4. Receipt/individual-verification position (Q-PRD-002, FR-VTG-011) - default: **out of pilot** unless reviewer advises otherwise.
 5. Key ceremony script review (with `KEY_LIFECYCLE_AND_CUSTODY.md`).
 
 ## Document Control
@@ -60,7 +60,7 @@ Authenticate (DEC-004) → eligibility + window check → short-lived ballot ses
 | Document | Ballot Secrecy and Tally Protocol Specification |
 | ID | EMP-PROTO-001 |
 | Version | 0.1 |
-| Status | Draft for DEC-006 specialist review — not approved |
+| Status | Draft for DEC-006 specialist review - not approved |
 | Owner | Security Lead |
 | Change control | Reviewer findings tracked to closure; new version on approval |
 

@@ -58,7 +58,7 @@ describe('FraudService (SEC-VOT-10)', () => {
     const svc = new FraudService(store);
     const electionId = randomUUID();
     const ip = '197.215.9.9'; // shared-network NAT
-    // 25 distinct voters behind one IP, each on their own device — under the
+    // 25 distinct voters behind one IP, each on their own device - under the
     // 20-distinct-IP sweep threshold? No: 25 >= 20 → throttle, never block.
     for (let i = 1; i <= 25; i++) {
       const d = await svc.evaluate(ctx({ electionId, ip, deviceFp: `dev-${i}`, ref: `voter-${i}` }));
@@ -94,7 +94,7 @@ describe('FraudService (SEC-VOT-10)', () => {
     expect(d.action).toBe('block');
     const block = store.fraudBlocks.find((b) => b.rule === 'login_stuffing_device');
     expect(block?.electionId).toBeNull(); // global scope
-    // Global block now rejects even without device fp? No — blocks are per-signal.
+    // Global block now rejects even without device fp? No - blocks are per-signal.
     const other = await svc.evaluate(ctx({ surface: 'login', electionId: null, deviceFp: 'clean-fp', ref: 'acct-7@x.edu', ip: '1.1.1.1' }));
     expect(other.action).not.toBe('block');
   });

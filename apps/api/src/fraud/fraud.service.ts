@@ -22,7 +22,7 @@ import { logEvent } from '../common/logger';
  *   is the primary harvesting signal.
  * - Hard blocks require corroborated high-confidence patterns (e.g. one
  *   device fingerprint requesting OTPs for many distinct voters), never a
- *   single weak signal — legitimate low-end devices must not be excluded.
+ *   single weak signal - legitimate low-end devices must not be excluded.
  * - Fail-open: fraud persistence/rule errors are logged and the request is
  *   allowed; an active block already in the store still rejects.
  */
@@ -34,7 +34,7 @@ export interface FraudRequestContext {
   userAgent?: string;
   uaClass?: string;
   behavior?: { dwellMs?: number; interactions?: number };
-  /** Raw actor identifier — hashed with the fraud salt before any storage. */
+  /** Raw actor identifier - hashed with the fraud salt before any storage. */
   ref?: string;
   electionId?: string | null;
   surface: FraudSurface;
@@ -104,7 +104,7 @@ export class FraudService {
 
   /**
    * Evaluate one request. Returns the worst action across all fired rules.
-   * Never throws for store/rule failures — fraud must not take voting down.
+   * Never throws for store/rule failures - fraud must not take voting down.
    */
   async evaluate(ctx: FraudRequestContext): Promise<FraudDecision> {
     try {
@@ -145,12 +145,12 @@ export class FraudService {
       }
     }
 
-    // 2. Rule evaluation — counts cover PRIOR requests (current not yet stored).
+    // 2. Rule evaluation - counts cover PRIOR requests (current not yet stored).
     const hits = await this.runRules(ctx, { ipHash, deviceHash, refHash, electionId, ipPrivate, now });
 
     // 3. Persist new blocks for block-rules (deduped against active blocks).
     // A rule whose block was lifted within the cooldown is downgraded to a
-    // throttle — lifting must give real relief, not an instant re-block.
+    // throttle - lifting must give real relief, not an instant re-block.
     const blocksToAdd: NewFraudBlock[] = [];
     for (const hit of hits) {
       if (hit.action !== 'block' || !hit.block || !hit.signalHash) continue;
@@ -227,7 +227,7 @@ export class FraudService {
         });
       }
       // Cross-election sweep: same device burning OTP requests across many
-      // elections (electionId omitted = any election). High threshold — a
+      // elections (electionId omitted = any election). High threshold - a
       // shared family/dorm device legitimately votes in a handful.
       const sweep = await this.count({ kind: 'device', signalHash: deviceHash, surface: s }, now, 60 * MIN);
       if (sweep >= 15) {

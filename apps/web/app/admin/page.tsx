@@ -138,7 +138,7 @@ function initialsOf(name: string) {
 }
 
 function fmtDate(v: string | null | undefined) {
-  return v ? new Date(v).toLocaleString() : '—';
+  return v ? new Date(v).toLocaleString() : '-';
 }
 
 function toLocalInput(v: string | null | undefined) {
@@ -194,7 +194,7 @@ export default function AdminPage() {
       setSessionChecked(true);
       return;
     }
-    // Resolve the stored session before trusting it — expired or revoked
+    // Resolve the stored session before trusting it - expired or revoked
     // tokens go to sign-in, and platform-only accounts belong to /platform.
     void fetchPrincipal(t).then((principal) => {
       if (!principal) {
@@ -226,7 +226,7 @@ export default function AdminPage() {
           sessionStorage.setItem('votemax.election', w.electionId);
           if (w.step && w.step >= 1 && w.step <= 4) setWizardStep(w.step);
         }
-      } catch { /* corrupted wizard state — start fresh */ }
+      } catch { /* corrupted wizard state - start fresh */ }
       setSessionChecked(true);
     });
   }, [router]);
@@ -248,7 +248,7 @@ export default function AdminPage() {
   }, [signedIn, section, electionId]);
 
   // Resumed wizard sessions may land on step 3 while the election is still
-  // DRAFT/CONFIGURED — walk it forward to REGISTRATION so imports work.
+  // DRAFT/CONFIGURED - walk it forward to REGISTRATION so imports work.
   useEffect(() => {
     if (wizardStep === 3 && electionId && election && ['DRAFT', 'CONFIGURED'].includes(election.state)) {
       void act('Open voter registration', async () => { await advanceToRegistration(); });
@@ -278,7 +278,7 @@ export default function AdminPage() {
       setStatus(f.message);
       // Expected situations (not ready yet, no permission) are guidance, not alarms.
       setStatusKind(f.severity === 'guidance' ? 'info' : 'error');
-      setToast(errorToast(err, `${label} — ${f.title}`));
+      setToast(errorToast(err, `${label} - ${f.title}`));
     } finally {
       setLoading(false);
     }
@@ -500,7 +500,7 @@ export default function AdminPage() {
   const capAny = (capabilities: string[]) => capabilities.some((c) => cap(c));
 
   // When the org context is unknown (legacy session, org-less account) show
-  // everything — the API still enforces per-request.
+  // everything - the API still enforces per-request.
   const sectionAllowed = (caps: string[]) =>
     caps.length === 0 || !orgId || caps.some((c) => capOrg(c));
 
@@ -509,13 +509,13 @@ export default function AdminPage() {
   const voterEditable = !!election && ['REGISTRATION', 'REGISTER_FROZEN', 'READY', 'OPEN', 'SUSPENDED'].includes(election.state);
   const configEditable = !!election && ['DRAFT', 'CONFIGURED', 'REGISTRATION'].includes(election.state);
 
-  // Shared bulk-upload block — used by the setup wizard (step 3) and the
+  // Shared bulk-upload block - used by the setup wizard (step 3) and the
   // Voter register management section.
   const registerImportBox = (
     <div className="import-box">
       <div className="import-bar">
         <Button variant="secondary" size="sm" onClick={downloadRegisterTemplate}>Download template</Button>
-        <span className="muted small">CSV · memberId optional — voters without one are given a unique ID automatically · email or phone required</span>
+        <span className="muted small">CSV · memberId optional - voters without one are given a unique ID automatically · email or phone required</span>
       </div>
       <div
         className={`dropzone ${dragOver ? 'drag-over' : ''}`}
@@ -535,7 +535,7 @@ export default function AdminPage() {
           onChange={(e) => { const f = e.target.files?.[0]; if (f) loadCsvFile(f); e.target.value = ''; }}
         />
         <strong>{csvName || 'Drop your voter CSV here'}</strong>
-        <span className="muted small">or click to browse — you can also paste rows below</span>
+        <span className="muted small">or click to browse - you can also paste rows below</span>
       </div>
       <Field label="Or paste CSV" htmlFor="register-csv" hint="fullName is required. Blank memberId cells get a unique VM- ID, which is sent to the voter with their voting link. Voters need an email or phone to receive it.">
         <Textarea
@@ -587,7 +587,7 @@ export default function AdminPage() {
         <Button
           variant="primary"
           disabled={!electionId || !csvText.trim() || !cap('register.manage')}
-          title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') ? undefined : 'Requires register.manage — assigned to organization_owner'}
+          title={!csvText.trim() ? 'Load a CSV file or paste rows below first' : cap('register.manage') ? undefined : 'Requires register.manage - assigned to organization_owner'}
           onClick={() => setConfirm({
             title: 'Import register',
             message: `Import ${registerPreview?.rowCount ?? '?'} rows into the voter register?`,
@@ -682,7 +682,7 @@ export default function AdminPage() {
                 }); }}>
                 <div className="form-grid">
                   <Field label="Organization name" htmlFor="org-name"><Input id="org-name" name="name" required placeholder="Example Organization" /></Field>
-                  <Field label="Slug — voter access code" htmlFor="org-slug-input"><Input id="org-slug-input" name="slug" required placeholder="example-org" /></Field>
+                  <Field label="Slug - voter access code" htmlFor="org-slug-input"><Input id="org-slug-input" name="slug" required placeholder="example-org" /></Field>
                 </div>
                 <Button type="submit" variant="primary" disabled={!capOrg('organization.create')} title={capOrg('organization.create') ? undefined : 'Requires the platform administrator role'}>Create organization</Button>
               </form>
@@ -700,7 +700,7 @@ export default function AdminPage() {
                 </div>
                 <Button type="submit" variant="secondary">Set organization context</Button>
               </form>
-              {(orgId || orgSlug) && <p className="small muted" style={{ marginTop: 14 }}>Organization ID: <code>{orgId || '—'}</code> · voter code: <code>{orgSlug || '—'}</code></p>}
+              {(orgId || orgSlug) && <p className="small muted" style={{ marginTop: 14 }}>Organization ID: <code>{orgId || '-'}</code> · voter code: <code>{orgSlug || '-'}</code></p>}
             </Card>
           )}
 
@@ -710,7 +710,7 @@ export default function AdminPage() {
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 void act('Create user', async () => {
                   const u = await call('/users', { organizationId: orgId, email: f.get('email'), displayName: f.get('name'), password: f.get('password') }) as { id: string; totpSecret?: string };
-                  setStatus(`Create user: done. TOTP secret for ${f.get('email')}: ${u.totpSecret ?? '(none)'} — shown once, store it now.`);
+                  setStatus(`Create user: done. TOTP secret for ${f.get('email')}: ${u.totpSecret ?? '(none)'} - shown once, store it now.`);
                   await refreshUsers();
                 }); }}>
                 <div className="form-grid">
@@ -749,7 +749,7 @@ export default function AdminPage() {
 
           {activeSection === 'setup' && (
             <Card title="Election setup">
-              <p className="muted small" style={{ marginTop: 0 }}>Guided setup — details, ballot, voter register, then review and launch. Progress saves automatically; exit anytime and resume where you left off.</p>
+              <p className="muted small" style={{ marginTop: 0 }}>Guided setup - details, ballot, voter register, then review and launch. Progress saves automatically; exit anytime and resume where you left off.</p>
               <div className="inline-form" style={{ marginBottom: 16 }}>
                 <Field label="Election" htmlFor="wizard-election" hint="Pick an existing election or start a new one">
                   <Select id="wizard-election" value={electionId} onChange={(e) => {
@@ -760,7 +760,7 @@ export default function AdminPage() {
                     void refreshElection();
                   }}>
                     <option value="">New election…</option>
-                    {elections.map((el) => <option key={el.id} value={el.id}>{el.name} — {el.state}</option>)}
+                    {elections.map((el) => <option key={el.id} value={el.id}>{el.name} - {el.state}</option>)}
                   </Select>
                 </Field>
                 <Button type="button" variant="secondary" onClick={() => void act('Refresh elections', refreshElections)}>Refresh</Button>
@@ -790,26 +790,26 @@ export default function AdminPage() {
                   <p className="muted small">Name the vote, set the voting window, choose how results are released, and add an optional announcement shown with published results.</p>
                   <div className="form-grid">
                     <Field label="Vote title" htmlFor="wiz-name"><Input id="wiz-name" name="name" required defaultValue={election?.name ?? ''} placeholder="Board Election 2026" disabled={!!election && election.state !== 'DRAFT'} /></Field>
-                    <Field label="Vote type" htmlFor="wiz-vote-type" hint="Online secret ballot — the only voting channel"><Select id="wiz-vote-type" name="voteType" defaultValue={election?.voteType ?? 'online'} disabled={!!election && election.state !== 'DRAFT'}><option value="online">Online — secret ballot</option></Select></Field>
+                    <Field label="Vote type" htmlFor="wiz-vote-type" hint="Online secret ballot - the only voting channel"><Select id="wiz-vote-type" name="voteType" defaultValue={election?.voteType ?? 'online'} disabled={!!election && election.state !== 'DRAFT'}><option value="online">Online - secret ballot</option></Select></Field>
                     <Field label="Voting opens" htmlFor="wiz-opens"><Input id="wiz-opens" name="opens" type="datetime-local" required defaultValue={toLocalInput(election?.votingOpensAt)} disabled={!!election && election.state !== 'DRAFT'} /></Field>
                     <Field label="Voting closes" htmlFor="wiz-closes"><Input id="wiz-closes" name="closes" type="datetime-local" required defaultValue={toLocalInput(election?.votingClosesAt)} disabled={!!election && election.state !== 'DRAFT'} /></Field>
-                    <Field label="Results visibility" htmlFor="wiz-results-mode" hint="Applies to staff dashboards — the API enforces it"><Select id="wiz-results-mode" name="resultsMode" defaultValue={election?.resultsMode ?? 'live'} disabled={!!election && election.state !== 'DRAFT'}>
-                      <option value="live">Live counts — turnout visible while voting is open</option>
-                      <option value="final">Final results only — counts hidden until results are published</option>
+                    <Field label="Results visibility" htmlFor="wiz-results-mode" hint="Applies to staff dashboards - the API enforces it"><Select id="wiz-results-mode" name="resultsMode" defaultValue={election?.resultsMode ?? 'live'} disabled={!!election && election.state !== 'DRAFT'}>
+                      <option value="live">Live counts - turnout visible while voting is open</option>
+                      <option value="final">Final results only - counts hidden until results are published</option>
                     </Select></Field>
                     <Field label="Results announcement (optional)" htmlFor="wiz-announcement" hint="Message shown with the published report"><Textarea id="wiz-announcement" name="announcement" rows={2} defaultValue={election?.announcement ?? ''} disabled={!!election && election.state !== 'DRAFT'} placeholder="e.g. Results certified by the election committee on …" /></Field>
                   </div>
                   <div className="schedule-switches">
                     <label className="check-row">
                       <input type="checkbox" name="autoOpen" defaultChecked={election?.autoOpen ?? true} disabled={!!election && election.state !== 'DRAFT'} />
-                      <span><strong>Start voting automatically</strong><span className="muted small"> — a ready election opens by itself at the opening time.</span></span>
+                      <span><strong>Start voting automatically</strong><span className="muted small"> - a ready election opens by itself at the opening time.</span></span>
                     </label>
                     <label className="check-row">
                       <input type="checkbox" name="autoClose" defaultChecked={election?.autoClose ?? true} disabled={!!election && election.state !== 'DRAFT'} />
-                      <span><strong>Close voting automatically</strong><span className="muted small"> — an open election closes by itself at the closing time.</span></span>
+                      <span><strong>Close voting automatically</strong><span className="muted small"> - an open election closes by itself at the closing time.</span></span>
                     </label>
                   </div>
-                  {election && election.state !== 'DRAFT' && <Alert kind="info" title="Details locked">This election is {election.state} — details can only change while it is a draft.</Alert>}
+                  {election && election.state !== 'DRAFT' && <Alert kind="info" title="Details locked">This election is {election.state} - details can only change while it is a draft.</Alert>}
                   <div className="form-actions">
                     <Button type="submit" name="intent" value="continue" variant="primary" disabled={!orgId || !capOrg('election.configure')}>Save &amp; continue →</Button>
                     <Button type="submit" name="intent" value="exit" variant="secondary" disabled={!orgId || !capOrg('election.configure')}>Save &amp; exit</Button>
@@ -819,7 +819,7 @@ export default function AdminPage() {
 
               {wizardStep === 2 && (
                 <>
-                  <p className="muted small">Build the ballot: positions (what voters choose between) and candidates (the names on the ballot). Candidates are election records — they don&apos;t need accounts.</p>
+                  <p className="muted small">Build the ballot: positions (what voters choose between) and candidates (the names on the ballot). Candidates are election records - they don&apos;t need accounts.</p>
                   {!electionId && <Alert kind="info" title="Details first">Save the election details in step 1 before adding positions and candidates.</Alert>}
                   <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                     void act('Add position', async () => {
@@ -880,7 +880,7 @@ export default function AdminPage() {
                             <td>{p.title}</td>
                             <td>{p.seats}</td>
                             <td>
-                              {(p.candidates ?? []).length === 0 ? '—' : (p.candidates ?? []).map((c) => (
+                              {(p.candidates ?? []).length === 0 ? '-' : (p.candidates ?? []).map((c) => (
                                 <span key={c.id} className="candidate-chip">
                                   <button
                                     type="button" className="cand-avatar-btn"
@@ -931,7 +931,7 @@ export default function AdminPage() {
                 <>
                   {!electionId && <Alert kind="info" title="Details first">Save the election details in step 1 before importing voters.</Alert>}
                   {election && !['DRAFT', 'CONFIGURED', 'REGISTRATION'].includes(election.state) && (
-                    <Alert kind="info" title="Register sealed">This election is {election.state} — the voter register can no longer be changed.</Alert>
+                    <Alert kind="info" title="Register sealed">This election is {election.state} - the voter register can no longer be changed.</Alert>
                   )}
                   {election?.register && (
                     <div className="stat-grid" style={{ marginBottom: 16 }}>
@@ -1016,8 +1016,8 @@ export default function AdminPage() {
                     ))}
                     <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
                     <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.freeze')}
-                      title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze — assigned to organization_owner'}
-                      onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting — imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
+                      title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze - assigned to organization_owner'}
+                      onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting - imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
                   </div>
 
                   <div className="import-box" style={{ marginBottom: 16 }}>
@@ -1028,10 +1028,10 @@ export default function AdminPage() {
                         <Button variant="secondary" size="sm" onClick={() => void copyVoterLink()}>{copiedLink ? 'Copied!' : 'Copy link'}</Button>
                       </div>
                     )}
-                    <p className="muted small">Share this link with voters — they&apos;ll enter their member ID and receive a one-time code. Or send every eligible voter their own member ID and a personal link by email, or by text message when they have no email.</p>
+                    <p className="muted small">Share this link with voters - they&apos;ll enter their member ID and receive a one-time code. Or send every eligible voter their own member ID and a personal link by email, or by text message when they have no email.</p>
                     <div className="form-actions">
                       <Button variant="primary" size="sm" disabled={!electionId || !cap('register.manage')}
-                        title={cap('register.manage') ? 'Send every eligible voter their member ID and personal voting link' : 'Requires register.manage — assigned to organization_owner'}
+                        title={cap('register.manage') ? 'Send every eligible voter their member ID and personal voting link' : 'Requires register.manage - assigned to organization_owner'}
                         onClick={() => setConfirm({
                           title: 'Send invitations',
                           message: `Send each eligible voter in ${election?.name} their member ID and voting link? They are sent by email, or by text message to voters without an email.`,
@@ -1058,7 +1058,7 @@ export default function AdminPage() {
 
                   <div className="form-actions">
                     <Button type="button" variant="ghost" onClick={() => goWizardStep(3)}>← Back</Button>
-                    <Button type="button" variant="secondary" onClick={() => { sessionStorage.removeItem('votemax.wizard'); setSection('overview'); }}>Done — back to overview</Button>
+                    <Button type="button" variant="secondary" onClick={() => { sessionStorage.removeItem('votemax.wizard'); setSection('overview'); }}>Done - back to overview</Button>
                   </div>
                 </>
               )}
@@ -1089,8 +1089,8 @@ export default function AdminPage() {
                   </Button>
                 ))}
                 <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.freeze')}
-                  title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze — assigned to organization_owner'}
-                  onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting — imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
+                  title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze - assigned to organization_owner'}
+                  onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting - imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
                 <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
               </div>
               {registerImportBox}
@@ -1100,7 +1100,7 @@ export default function AdminPage() {
                     {voters.map((v) => (
                       <tr key={v.id}>
                         <td><code>{v.memberId}</code></td><td>{v.fullName}<div className="small muted">{[v.email, v.phone].filter(Boolean).join(' · ') || 'no contact'}</div></td>
-                        <td><Badge tone={statusPill(v.status)}>{v.status}</Badge>{v.statusReason ? <span className="small muted"> — {v.statusReason}</span> : null}</td>
+                        <td><Badge tone={statusPill(v.status)}>{v.status}</Badge>{v.statusReason ? <span className="small muted"> - {v.statusReason}</span> : null}</td>
                         <td><span style={{ display: 'inline-flex', gap: 6 }}>
                           {voterEditable && cap('register.manage') && <Button size="sm" variant="ghost" onClick={() => setEditVoter(v)}>Edit</Button>}
                           {v.status === 'duplicate_unresolved' && (<>
@@ -1120,10 +1120,10 @@ export default function AdminPage() {
             <Card title="Results and reports">
               <p className="muted small" style={{ marginTop: 0 }}>Tally requires an owner authorization and two approvers (at least one auditor). Certification requires the session user and an auditor as second approver. All identifiers must be real organization members.</p>
               <div className="stat-grid" style={{ marginBottom: 16 }}>
-                <Stat label="Eligible voters" value={participation?.eligible ?? '—'} />
-                <Stat label="Ballots cast" value={participation?.ballotsCast ?? '—'} />
-                <Stat label="Turnout" value={participation ? `${participation.turnoutPercent}%` : '—'} />
-                <Stat label="State" value={election ? <Badge tone={electionPill(election.state)}>{election.state}</Badge> : '—'} />
+                <Stat label="Eligible voters" value={participation?.eligible ?? '-'} />
+                <Stat label="Ballots cast" value={participation?.ballotsCast ?? '-'} />
+                <Stat label="Turnout" value={participation ? `${participation.turnoutPercent}%` : '-'} />
+                <Stat label="State" value={election ? <Badge tone={electionPill(election.state)}>{election.state}</Badge> : '-'} />
               </div>
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 void act('Run tally', async () => {
@@ -1184,7 +1184,7 @@ export default function AdminPage() {
                         <div style={{ marginTop: 8 }}>{p.results.map((r, j) => <div key={j} className="small">{r.candidate}: {r.votes}</div>)}</div>
                       </div>
                     ))}
-                    <div className="result-row"><span>Tally hash</span><code>{report.tallyHash ?? '—'}</code></div>
+                    <div className="result-row"><span>Tally hash</span><code>{report.tallyHash ?? '-'}</code></div>
                     <div className="result-row"><span>Evidence root</span>{report.evidenceRoot ? <code>{report.evidenceRoot}</code> : <span className="muted small">available after tally</span>}</div>
                   </div>
                 </div>
@@ -1205,7 +1205,7 @@ export default function AdminPage() {
                   {audit.records.length ? (
                     <Table head={['Time', 'Actor', 'Action', 'Target', 'Outcome']}>
                       {audit.records.slice(0, 200).map((r) => (
-                        <tr key={r.hash}><td>{fmtDate(r.createdAt)}</td><td><code>{r.actorId ?? '—'}</code></td><td>{r.action}</td><td><code>{r.scope}</code></td><td><Badge tone={r.outcome.startsWith('success') ? 'success' : r.outcome.startsWith('denied') || r.outcome.includes('fail') ? 'error' : 'warning'}>{r.outcome}</Badge></td></tr>
+                        <tr key={r.hash}><td>{fmtDate(r.createdAt)}</td><td><code>{r.actorId ?? '-'}</code></td><td>{r.action}</td><td><code>{r.scope}</code></td><td><Badge tone={r.outcome.startsWith('success') ? 'success' : r.outcome.startsWith('denied') || r.outcome.includes('fail') ? 'error' : 'warning'}>{r.outcome}</Badge></td></tr>
                       ))}
                     </Table>
                   ) : <EmptyState title="No audit records">Audit events appear here after administrative actions.</EmptyState>}
@@ -1217,7 +1217,7 @@ export default function AdminPage() {
           {activeSection === 'fraud' && (
             <Card title="Fraud signals" actions={<Button variant="secondary" size="sm" onClick={() => void act('Refresh fraud', refreshFraud)}>Refresh</Button>}>
               <p className="muted small" style={{ marginTop: 0 }}>
-                Abuse-detection events and active blocks (SEC-VOT-10). Only salted hashes and rule names are stored — never raw IPs, device fingerprints, or voter identifiers.
+                Abuse-detection events and active blocks (SEC-VOT-10). Only salted hashes and rule names are stored - never raw IPs, device fingerprints, or voter identifiers.
               </p>
               <h3>Active blocks</h3>
               {fraudBlocks === null ? <Skeleton lines={2} /> : fraudBlocks.length === 0 ? (
@@ -1232,7 +1232,7 @@ export default function AdminPage() {
                       <td className="small">{b.reason}</td>
                       <td>{b.score}</td>
                       <td className="small muted">{fmtDate(b.expiresAt)}</td>
-                      <td className="small muted">{b.liftedAt ? fmtDate(b.liftedAt) : '—'}</td>
+                      <td className="small muted">{b.liftedAt ? fmtDate(b.liftedAt) : '-'}</td>
                       <td>{!b.liftedAt && capOrg('fraud.manage') && (
                         <Button size="sm" variant="secondary" onClick={() => setConfirm({
                           title: 'Lift fraud block',
@@ -1244,7 +1244,7 @@ export default function AdminPage() {
                   ))}
                 </Table>
               )}
-              <h3>Recent events{electionId ? '' : ' — select an election'}</h3>
+              <h3>Recent events{electionId ? '' : ' - select an election'}</h3>
               {!electionId ? (
                 <p className="muted small">Select an election in the Elections section to view its fraud events.</p>
               ) : fraudEvents === null ? <Skeleton lines={3} /> : fraudEvents.length === 0 ? (
@@ -1257,8 +1257,8 @@ export default function AdminPage() {
                       <td>{ev.rule}</td>
                       <td>{ev.score}</td>
                       <td><Badge tone={ev.action === 'block' ? 'error' : ev.action === 'throttle' ? 'warning' : 'success'}>{ev.action}</Badge></td>
-                      <td className="small">{ev.reasons.join(', ') || '—'}</td>
-                      <td className="small muted"><code>{ev.signalHash ? `${ev.signalHash.slice(0, 10)}…` : '—'}</code></td>
+                      <td className="small">{ev.reasons.join(', ') || '-'}</td>
+                      <td className="small muted"><code>{ev.signalHash ? `${ev.signalHash.slice(0, 10)}…` : '-'}</code></td>
                     </tr>
                   ))}
                 </Table>
@@ -1271,8 +1271,8 @@ export default function AdminPage() {
               <div className="ps-kpis">
                 <Kpi icon="building" label="Organization" value={orgId ? 'Connected' : 'Not set'} note={orgSlug ? `voter code: ${orgSlug}` : undefined} />
                 <Kpi icon="calendar" label="Election" value={election ? election.name : 'None'} note={election ? election.state : 'select or create'} tone="navy" />
-                <Kpi icon="users" label="Eligible voters" value={election?.register.eligible ?? '—'} note={election ? `${election.register.total} on register` : undefined} />
-                <Kpi icon="ballot" label="Ballots cast" value={participation?.ballotsCast ?? '—'} note={participation ? `${participation.turnoutPercent}% turnout` : undefined} tone="green" />
+                <Kpi icon="users" label="Eligible voters" value={election?.register.eligible ?? '-'} note={election ? `${election.register.total} on register` : undefined} />
+                <Kpi icon="ballot" label="Ballots cast" value={participation?.ballotsCast ?? '-'} note={participation ? `${participation.turnoutPercent}% turnout` : undefined} tone="green" />
               </div>
               <div className="ps-split">
                 <Panel

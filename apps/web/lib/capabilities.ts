@@ -1,6 +1,6 @@
 /**
  * Client-side mirror of the API's role → capability matrix (apps/api/src/auth/roles.ts).
- * Used only to hide/disable UI the server would reject anyway — the API remains
+ * Used only to hide/disable UI the server would reject anyway - the API remains
  * the enforcement point. Keep in sync with ROLE_CAPABILITIES.
  */
 

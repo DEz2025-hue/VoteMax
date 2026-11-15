@@ -2,7 +2,7 @@
  * Failure drill: kill the API mid-election, restart, and check whether
  * accepted ballots survive. Builds the API first if dist is stale.
  *
- * With DATABASE_URL set (Postgres store), committed ballots MUST survive —
+ * With DATABASE_URL set (Postgres store), committed ballots MUST survive -
  * that is the F-01 acceptance check. Without DATABASE_URL the in-memory
  * store loses them by design; the drill reports that honestly.
  */
@@ -66,7 +66,7 @@ console.log(JSON.stringify({
   result: survived
     ? 'PASS: committed ballot survived restart (NFR-AVL-004)'
     : durable
-      ? 'FAIL: accepted ballot lost on restart despite Postgres store — F-01 NOT fixed'
-      : 'EXPECTED-LOSS on in-memory store: accepted ballot lost on restart — set DATABASE_URL and re-run for the F-01 check',
+      ? 'FAIL: accepted ballot lost on restart despite Postgres store - F-01 NOT fixed'
+      : 'EXPECTED-LOSS on in-memory store: accepted ballot lost on restart - set DATABASE_URL and re-run for the F-01 check',
 }, null, 2));
 process.exit(durable ? (survived ? 0 : 2) : (survived ? 0 : 3));

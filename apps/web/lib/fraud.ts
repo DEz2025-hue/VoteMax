@@ -3,7 +3,7 @@
 /**
  * Client-side anti-fraud signals (SEC-VOT-10). Collects a coarse device
  * fingerprint and lightweight behavioral counters, sent as request headers
- * (x-device-fp / x-fraud-behavior). The server stores only salted hashes —
+ * (x-device-fp / x-fraud-behavior). The server stores only salted hashes -
  * these values are never persisted raw and never touch ballot records
  * (SEC-BAL-02). Everything here is best-effort: any failure yields no
  * header, never a broken request.

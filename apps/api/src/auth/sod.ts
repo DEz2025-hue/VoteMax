@@ -34,7 +34,7 @@ export function checkSeparationOfDuties(
   if (candidate.role === 'platform_admin' && existing.length > 0)
     add('SoD-3', 'A user holding election roles cannot become platform administrator.');
 
-  // SoD-8: the auditor is read-only oversight — it cannot be combined with
+  // SoD-8: the auditor is read-only oversight - it cannot be combined with
   // the data-modifying organization_owner role in the same election scope.
   if (candidate.role === 'auditor' && held.has('organization_owner'))
     add('SoD-8', 'An auditor cannot also be organization owner for the same election.');

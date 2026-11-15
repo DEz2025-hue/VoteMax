@@ -1,4 +1,4 @@
-/* VoteMax design system — institutional blue/white, accessible, low-bandwidth friendly. */
+/* VoteMax design system - institutional blue/white, accessible, low-bandwidth friendly. */
 :root {
   --navy-900: #0f2547;
   --navy-800: #173b70;
@@ -358,7 +358,7 @@ pre.detail { overflow-x: auto; background: #0f172a; color: #e2e8f0; padding: 14p
 .chip-remove:hover { color: var(--danger, #dc2626); }
 
 /* ======================================================================
-   Platform console (SaaS shell) — navy sidebar, panels, KPI cards, drawer.
+   Platform console (SaaS shell) - navy sidebar, panels, KPI cards, drawer.
    Same palette as the rest of the app; scoped under .ps-* so /admin and the
    public pages are unaffected.
    ====================================================================== */
@@ -526,7 +526,7 @@ pre.detail { overflow-x: auto; background: #0f172a; color: #e2e8f0; padding: 14p
 }
 
 /* ======================================================================
-   Global SaaS refresh — softer surfaces, rounder controls, focus rings.
+   Global SaaS refresh - softer surfaces, rounder controls, focus rings.
    Loaded last so it refines the base primitives used across every page.
    ====================================================================== */
 body { background: var(--bg); letter-spacing: -0.003em; }
@@ -564,7 +564,7 @@ table.data td { padding: 12px 16px; }
 .site-footer-inner a { color: var(--text-secondary); text-decoration: none; font-weight: 600; }
 .site-footer-inner a:hover { color: var(--blue-600); }
 
-/* consoles are full-height app shells — no marketing footer */
+/* consoles are full-height app shells - no marketing footer */
 body:has(.ps-shell) .site-footer, body:has(.auth-split) .site-footer { display: none; }
 
 /* split-screen auth */
@@ -689,7 +689,7 @@ body:has(.ps-shell) .site-footer, body:has(.auth-split) .site-footer { display: 
 .faq summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; font-weight: 700; color: var(--navy-900); }
 .faq summary::-webkit-details-marker { display: none; }
 .faq summary::after { content: "+"; font-size: 20px; font-weight: 400; color: var(--text-muted); transition: transform .15s ease; }
-.faq[open] summary::after { content: "–"; }
+.faq[open] summary::after { content: "-"; }
 .faq summary:hover { background: var(--blue-50); }
 .faq-body { padding: 4px 20px 18px; color: var(--text-secondary); line-height: 1.75; font-size: 15px; }
 .faq-body ul, .faq-body ol { margin: 0; padding-left: 20px; }

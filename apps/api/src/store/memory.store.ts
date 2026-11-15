@@ -31,7 +31,7 @@ import {
 
 /**
  * In-memory store for unit tests and local development without Postgres.
- * NOT durable — F-01. Production must run PostgresStore.
+ * NOT durable - F-01. Production must run PostgresStore.
  */
 export class InMemoryStore implements PlatformStore {
   readonly storeKind = 'memory' as const;

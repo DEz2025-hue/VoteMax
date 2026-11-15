@@ -167,7 +167,7 @@ describe('Phase 3 voting and results (mock election)', () => {
       .rejects.toThrow(/SOD_VIOLATION/);
     await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1] }))
       .rejects.toThrow(/PRECONDITION/);
-    // Two owner approvers are not enough — at least one must be an auditor.
+    // Two owner approvers are not enough - at least one must be an auditor.
     await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [owner2Id, owner3Id] }))
       .rejects.toThrow(/auditor/);
     const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });

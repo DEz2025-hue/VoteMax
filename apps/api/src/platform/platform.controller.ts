@@ -368,7 +368,7 @@ export class PlatformController {
   }
 
   // ---- anti-fraud review (SEC-VOT-10) ----
-  // Events/blocks expose salted hashes and rule names only — no raw IPs,
+  // Events/blocks expose salted hashes and rule names only - no raw IPs,
   // device fingerprints, or voter identifiers.
 
   @Get('elections/:id/fraud/events')
@@ -400,7 +400,7 @@ export class AuthController {
     return guard(() => this.platform.login(body.email, body.password, body.totp));
   }
 
-  /** Resolve the caller's session to a principal — lets clients validate a stored token. */
+  /** Resolve the caller's session to a principal - lets clients validate a stored token. */
   @Get('me')
   @UseGuards(SessionGuard)
   me(@Req() req: { principal?: Principal }) {

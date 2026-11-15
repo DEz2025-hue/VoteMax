@@ -2,7 +2,7 @@
   "name": "votemax",
   "version": "0.1.0",
   "private": true,
-  "description": "Election Management Platform (EMP) — modular monolith, Phase 1 foundations",
+  "description": "Election Management Platform (EMP) - modular monolith, Phase 1 foundations",
   "workspaces": [
     "apps/*"
   ],

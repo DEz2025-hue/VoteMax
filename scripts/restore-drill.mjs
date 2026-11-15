@@ -2,13 +2,13 @@
  * Restore drill (READINESS_CHECKLIST item 12 evidence): take a logical
  * snapshot of every table, wipe the database, restore from the snapshot,
  * and verify row counts + the audit hash chain. Run against a dev/staging
- * database only — this is a procedure rehearsal, not a production backup
+ * database only - this is a procedure rehearsal, not a production backup
  * mechanism (Neon PITR/snapshots remain the production answer).
  *
  *   node --env-file=.env scripts/restore-drill.mjs
  *
  * Requires DATABASE_URL. Snapshot is written to the OS temp dir and
- * contains voter data — never commit it.
+ * contains voter data - never commit it.
  */
 import { Client } from 'pg';
 import { mkdirSync, writeFileSync } from 'node:fs';

@@ -1,5 +1,5 @@
 /**
- * Mock pre-rehearsal (DRESS_REHEARSAL_PLAN.md s.3, automated subset) —
+ * Mock pre-rehearsal (DRESS_REHEARSAL_PLAN.md s.3, automated subset) -
  * PREPARATION ONLY, never G7 evidence. Exercises the rehearsal script's
  * automatable scenarios over HTTP against a running API: setup/freeze,
  * online + assisted voting, duplicate burst, suspension/resumption,
@@ -16,7 +16,7 @@ const API = process.env.API_URL ?? 'http://localhost:4101';
 const results = [];
 function record(id, name, pass, detail) {
   results.push({ id, name, pass: Boolean(pass), detail });
-  console.log(`${pass ? 'PASS' : 'FAIL'} ${id} ${name} — ${detail}`);
+  console.log(`${pass ? 'PASS' : 'FAIL'} ${id} ${name} - ${detail}`);
 }
 const mustOk = (label, r) => {
   if (r.status >= 400) throw new Error(`${label} failed: ${r.status} ${JSON.stringify(r.data)}`);

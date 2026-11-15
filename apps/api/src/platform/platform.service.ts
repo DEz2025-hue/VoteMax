@@ -82,7 +82,7 @@ const OTP_TTL_MS = 10 * 60_000;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
 
 /**
- * Platform workflows. All persistence goes through PlatformStore —
+ * Platform workflows. All persistence goes through PlatformStore -
  * PostgresStore in production (durable, transactional), InMemoryStore for
  * tests/dev. Every mutating operation writes a hash-chained audit record;
  * ballot acceptance is atomic inside the store (SEC-VOT-02/04/05).
@@ -119,7 +119,7 @@ export class PlatformService {
     if (!admin) return org;
     // Optionally staff the tenant in the same call: same rules as
     // provisionTenantAdmin (provisionable roles only, MFA-enrolled, secret
-    // returned once). A failure here leaves the org created but unstaffed —
+    // returned once). A failure here leaves the org created but unstaffed -
     // identical to the two-step flow, recoverable via /platform provision.
     const role = admin.role ?? 'organization_owner';
     if (!PlatformService.PROVISIONABLE_ROLES.has(role)) {
@@ -134,7 +134,7 @@ export class PlatformService {
   async createUser(organizationId: string | null, email: string, displayName: string, password: string): Promise<Omit<User, 'passwordHash' | 'totpSecret'> & { totpSecret: string }> {
     if (password.length < 12) throw new Error('WEAK_PASSWORD: password must be at least 12 characters');
     if (organizationId && !(await this.store.getOrganization(organizationId))) throw new Error('NOT_FOUND: organization');
-    // Email is the login identifier — duplicates make findUserByEmail ambiguous.
+    // Email is the login identifier - duplicates make findUserByEmail ambiguous.
     if (await this.store.findUserByEmail(email)) throw new Error('EMAIL_EXISTS: a user with this email already exists');
     const totpSecret = generateTotpSecret();
     const user = await this.store.createUser({
@@ -208,7 +208,7 @@ export class PlatformService {
   }
 
   /**
-   * True while no role has been assigned yet — the first-run bootstrap
+   * True while no role has been assigned yet - the first-run bootstrap
    * window. Organization/user creation and the first role assignments are
    * allowed anonymously during this window only; it closes as soon as the
    * first role exists (F-03).
@@ -217,7 +217,7 @@ export class PlatformService {
     return (await this.store.listAssignments()).length === 0;
   }
 
-  /** Org-scoped user list for administration — never returns secrets. */
+  /** Org-scoped user list for administration - never returns secrets. */
   async listUsers(organizationId: string): Promise<
     { id: string; email: string; displayName: string; mfaEnrolled: boolean }[]
   > {
@@ -227,7 +227,7 @@ export class PlatformService {
     }));
   }
 
-  /** Voter register rows for an election (admin review; PII — register.manage only). */
+  /** Voter register rows for an election (admin review; PII - register.manage only). */
   async listVoters(electionId: string): Promise<
     { id: string; memberId: string; fullName: string; email: string; phone: string; status: string; statusReason: string | null }[]
   > {
@@ -280,7 +280,7 @@ export class PlatformService {
         await this.store.deleteOtpChallenge(`${electionId}:${voterId}`);
       }
     }
-    // Audit records the fact and the field names — never the values (PII).
+    // Audit records the fact and the field names - never the values (PII).
     await this.log(election.organizationId, actorId, 'register.updateVoter', `election:${electionId}`,
       `success:voter=${voterId.slice(0, 8)},fields=${changed.join('+') || 'none'}`);
     return { id: voter.id, memberId: voter.memberId, ...next, status: voter.status };
@@ -296,7 +296,7 @@ export class PlatformService {
   ): Promise<RoleAssignment> {
     const user = await this.store.findUser(userId);
     if (!user) throw new Error('NOT_FOUND: user');
-    // Scope references must point inside the target organization — a scoped
+    // Scope references must point inside the target organization - a scoped
     // assignment to another tenant's election would leak capabilities.
     if (electionId) {
       const election = await this.store.getElection(electionId);
@@ -306,7 +306,7 @@ export class PlatformService {
       }
     }
     // platform_admin holds platform-scoped capabilities (organization.create,
-    // audit.read) — granting it is itself a privileged act. Only an existing
+    // audit.read) - granting it is itself a privileged act. Only an existing
     // platform_admin may delegate it; during first-run bootstrap (zero
     // assignments) it may be seeded anonymously.
     if (role === 'platform_admin' && !(await this.isBootstrap())) {
@@ -454,8 +454,8 @@ export class PlatformService {
 
   // ---- Candidate photos ----
   // Photos are resized in the browser to a small square, so the server limit is
-  // generous but bounded. Only raster formats are accepted — never SVG, which
-  // can carry script — and the type is decided from the bytes, not the client.
+  // generous but bounded. Only raster formats are accepted - never SVG, which
+  // can carry script - and the type is decided from the bytes, not the client.
 
   private static readonly PHOTO_MAX_BYTES = 400_000;
 
@@ -611,7 +611,7 @@ export class PlatformService {
   /**
    * Voting link. With a member ID it is personal: the ID arrives pre-filled so
    * the voter only has to ask for their one-time code. The ID is an identifier,
-   * not a secret — the one-time code is what proves it is the voter.
+   * not a secret - the one-time code is what proves it is the voter.
    */
   private voterLink(orgSlug: string, electionId: string, memberId?: string): string {
     const base = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').replace(/\/$/, '');
@@ -621,7 +621,7 @@ export class PlatformService {
 
   /**
    * Who a batch goes to. Invitations reach every eligible voter; reminders
-   * skip voters who have already voted (consumed entitlement) — nobody wants
+   * skip voters who have already voted (consumed entitlement) - nobody wants
    * a "last chance to vote" email after voting. This reads participation
    * from the identity domain only and never touches ballots (SEC-BAL-02).
    */
@@ -701,7 +701,7 @@ export class PlatformService {
     const opens = new Date(election.votingOpensAt).getTime();
     const closes = new Date(election.votingClosesAt).getTime();
     const WINDOW = 5 * 60_000;
-    // Send once, inside a ±5-minute catch-up window around each boundary —
+    // Send once, inside a ±5-minute catch-up window around each boundary -
     // and only when voters can actually act on it: the opening reminder needs
     // a ready/open election (never one still being configured or registered),
     // the closing reminder needs voting still running.
@@ -763,7 +763,7 @@ export class PlatformService {
   // mock election. NOT production-approved: threshold custody and the
   // reviewed protocol remain DEC-006 hold points (see PHASE_3 plan §3).
 
-  /** Org-scoped election list for admin consoles — all lifecycle states. */
+  /** Org-scoped election list for admin consoles - all lifecycle states. */
   async listOrgElections(organizationId: string): Promise<{
     id: string; name: string; state: ElectionState;
     votingOpensAt: string | null; votingClosesAt: string | null;
@@ -822,7 +822,7 @@ export class PlatformService {
     }
     // One ballot per voter: once this ID has voted, say so straight away and send
     // no code. (Unknown IDs still get the uniform "sent" reply above, so this does
-    // reveal that a valid ID has voted — an accepted trade-off for a clear message.)
+    // reveal that a valid ID has voted - an accepted trade-off for a clear message.)
     const entitlement = await this.store.findEntitlement(electionId, voter.id);
     if (entitlement?.consumedAt) {
       await this.log(election.organizationId, null, 'voting.otpRequest', `election:${electionId}`, 'denied:already_voted');
@@ -848,8 +848,8 @@ export class PlatformService {
       codeHash: createHash('sha256').update(code).digest('hex'),
       expiresAt: Date.now() + OTP_TTL_MS, attempts: 0,
     });
-    // Delivered via env-configured providers (DEC-004 §3); the dev outbox —
-    // and the returned devCode — exist only outside production (F-04).
+    // Delivered via env-configured providers (DEC-004 §3); the dev outbox -
+    // and the returned devCode - exist only outside production (F-04).
     const channel = await this.otpDelivery.deliver({
       electionId, memberId, code, email: voter.email || undefined, phone: voter.phone || undefined,
     });
@@ -878,7 +878,7 @@ export class PlatformService {
     }
     const voter = await this.store.findVoterByMemberId(electionId, memberId);
     if (!voter || voter.status !== 'eligible') {
-      // Same error as a wrong code — no register enumeration via verify.
+      // Same error as a wrong code - no register enumeration via verify.
       failures.push(now);
       otpVerifyFailures.set(verifyKey, failures);
       throw new Error('OTP_INVALID: code does not match');
@@ -1047,7 +1047,7 @@ export class PlatformService {
   /**
    * Adjust the schedule: switch automatic start/close on or off, or move the
    * closing time. Once an election is READY the closing time can only be
-   * extended, never shortened — cutting voting short could shut out voters.
+   * extended, never shortened - cutting voting short could shut out voters.
    */
   async updateSchedule(
     actorId: string, electionId: string,
@@ -1092,7 +1092,7 @@ export class PlatformService {
    * Called by the scheduler every minute: open a READY election whose time has
    * come, and close an OPEN one whose time is up. Each move is a compare-and-set,
    * so with several API instances (or a restart mid-tick) it happens exactly once.
-   * Deliberately NOT automatic: SUSPENDED elections (a person paused it — a
+   * Deliberately NOT automatic: SUSPENDED elections (a person paused it - a
    * person decides), and a READY election whose whole window already passed
    * (opening it would be meaningless; extend the schedule instead).
    */
@@ -1141,7 +1141,7 @@ export class PlatformService {
     return JSON.parse(plain.toString('utf8')) as Record<string, string[]>;
   }
 
-  /** Pure tally computation — decrypts and counts without persisting a run. */
+  /** Pure tally computation - decrypts and counts without persisting a run. */
   private async computeTally(election: Election): Promise<Omit<TallyRun, 'id' | 'authorizedBy' | 'executedBy' | 'approvers' | 'createdAt'>> {
     const key = await this.store.getOrCreateElectionKey(election.id);
     const ballots = await this.store.listBallots(election.id);
@@ -1410,7 +1410,7 @@ export class PlatformService {
   /**
    * Provision a staff account for an organization. Platform admins staff
    * tenants directly: the account is MFA-enrolled (secret returned once) and
-   * the selected role is assigned — organization_owner by default, or any
+   * the selected role is assigned - organization_owner by default, or any
    * tenant staff role optionally scoped to one election. platform_admin and
    * voter are deliberately not provisionable here (delegation and
    * non-staff respectively).
@@ -1459,7 +1459,7 @@ export class PlatformService {
       pendingAuditEntries: pendingAudit,
       uptimeSeconds: Math.round(process.uptime()),
       otpProviders: this.otpDelivery.describe(),
-      // Most recent email/SMS delivery problems since this process started —
+      // Most recent email/SMS delivery problems since this process started -
       // so a wrong mail password shows up here instead of only in server logs.
       delivery: {
         invitations: this.voterNotifier.lastError,
@@ -1481,7 +1481,7 @@ export class PlatformService {
   }
 
   // ---- anti-fraud review (SEC-VOT-10) ----
-  // All fraud rows contain salted hashes only — safe to expose to auditors.
+  // All fraud rows contain salted hashes only - safe to expose to auditors.
 
   async listFraudEvents(electionId: string) {
     await this.electionOrThrow(electionId);
@@ -1490,7 +1490,7 @@ export class PlatformService {
 
   /**
    * Platform admins see every block. Tenant principals see only blocks
-   * scoped to their own organization's elections — global blocks and other
+   * scoped to their own organization's elections - global blocks and other
    * tenants' blocks are invisible (SEC-TEN).
    */
   async listFraudBlocks(scope: { platform: boolean; organizationId: string | null }) {
@@ -1529,7 +1529,7 @@ export class PlatformService {
 // Ephemeral, per-process rate-limit state. These are deliberately NOT
 // persisted: login lockout and OTP request throttling are short-window
 // abuse controls, and losing them on restart only widens the window
-// slightly — never correctness (unlike ballots, F-01).
+// slightly - never correctness (unlike ballots, F-01).
 const loginFailures = new Map<string, { count: number; lockedUntil: number }>();
 const otpRequestLog = new Map<string, number[]>();
 const otpVerifyFailures = new Map<string, number[]>();

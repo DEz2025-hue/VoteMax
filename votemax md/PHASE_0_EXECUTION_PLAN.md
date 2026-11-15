@@ -1,6 +1,6 @@
-# Phase 0 Execution Plan — Foundation and Decisions
+# Phase 0 Execution Plan - Foundation and Decisions
 
-> **Model update (v0.2):** the role model is now four roles — `platform_admin`, `organization_owner`, `auditor`, `voter` — per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
+> **Model update (v0.2):** the role model is now four roles - `platform_admin`, `organization_owner`, `auditor`, `voter` - per EMP-STAKE-001 v0.2. References below to committee chair, election administrator, voter registrar, observer, station officer, candidate-as-role, polling stations, or assisted voting are superseded; all voting is online.
 
 **Document ID:** EMP-PHASE0-001\
 **Version:** 0.1\
@@ -14,7 +14,7 @@
 
 ## 1. Purpose
 
-This plan turns Phase 0 of `PRODUCT_ROADMAP.md` into trackable work. Phase 0 ends only when its exit criteria are met — gates, not deadlines, decide readiness (EMP-ROAD-001 section 2).
+This plan turns Phase 0 of `PRODUCT_ROADMAP.md` into trackable work. Phase 0 ends only when its exit criteria are met - gates, not deadlines, decide readiness (EMP-ROAD-001 section 2).
 
 ## 2. Inputs Confirmed (11 November 2026)
 
@@ -32,7 +32,7 @@ All documents were read in full on 11 November 2026.
 |---|---|---|---|
 | Project Overview | EMP-FOUND-001 v1.0 | Initial baseline | Baseline; DEC-001…DEC-010 all open as recorded |
 | Product Requirements Document | EMP-PRD-001 v0.1 | Draft for review | Ready for review; 5 open questions (Q-PRD-001…005) |
-| Product Scope and MVP | EMP-SCOPE-001 v0.1 | Draft for review | Ready; gates G1–G8 approvers unnamed |
+| Product Scope and MVP | EMP-SCOPE-001 v0.1 | Draft for review | Ready; gates G1-G8 approvers unnamed |
 | Stakeholders and User Roles | EMP-STAKE-001 v0.1 | Draft for review | Ready; named individuals missing (Q-STK-001) |
 | Product Roadmap | EMP-ROAD-001 v0.1 | Draft for review | Ready; fix “eight documents” (9 files exist) |
 | System Architecture | EMP-ARCH-001 v0.1 | Draft for review | Ready; DEC-002/003/004/006 block exit |
@@ -42,9 +42,9 @@ All documents were read in full on 11 November 2026.
 
 **Audit findings (no contradictions found in scope, roles, or gates):**
 
-1. Version control: only EMP-FOUND-001 is above draft. Phase 0 exit needs the set signed by Product Owner, Technical Lead, Security Lead (`GOVERNANCE_ROLES_ASSIGNMENT.md` sign-off sheet). Those people are not yet named — this blocks formal approval.
+1. Version control: only EMP-FOUND-001 is above draft. Phase 0 exit needs the set signed by Product Owner, Technical Lead, Security Lead (`GOVERNANCE_ROLES_ASSIGNMENT.md` sign-off sheet). Those people are not yet named - this blocks formal approval.
 2. Count discrepancy: EMP-ROAD-001 says “eight foundation documents”; nine files exist. Correct at next version bump.
-3. Unconfirmed planning values that must not harden into claims: 4-hour window (EMP-SCALE-001 §3.1), 10–20% assisted share, 15% opening surge. All pending pilot committee confirmation.
+3. Unconfirmed planning values that must not harden into claims: 4-hour window (EMP-SCALE-001 §3.1), 10-20% assisted share, 15% opening surge. All pending pilot committee confirmation.
 4. Cross-cutting opens to consolidate at Phase 0 exit: ballot-order policy (Q-PRD-003), certification quorum (Q-PRD-004), retention period (Q-PRD-005), recount triggers (Q-LIFE-001), window-extension rules (Q-LIFE-004), custodian threshold (Q-STK-002, needs DEC-006).
 
 ## 4. Work Tracker
@@ -65,7 +65,7 @@ No pilot election date (E) is confirmed, so Phase 0 uses relative weeks from Pha
 
 | By | Milestone | DEC |
 |---|---|---|
-| W0 + 1 | Foundation doc set signed (or exceptions recorded) | — |
+| W0 + 1 | Foundation doc set signed (or exceptions recorded) | - |
 | W0 + 2 | Governance roles named; sign-off authority live | Q-STK-001 |
 | W0 + 2 | Hosting recommendation ratified; latency test from Liberian networks scheduled | DEC-002 |
 | W0 + 3 | Voter verification method approved by pilot committee (or interim approval by Product + Security Lead pending committee) | DEC-004 |
@@ -75,7 +75,7 @@ No pilot election date (E) is confirmed, so Phase 0 uses relative weeks from Pha
 
 DEC-010 has no hard close date possible while “in discussion”; the W0 + 6 escalation is the dated decision plan required by the Phase 0 exit criteria.
 
-## 6. Phase 0 Exit Criteria — Status
+## 6. Phase 0 Exit Criteria - Status
 
 | Criterion (EMP-ROAD-001 Phase 0) | Status |
 |---|---|
@@ -83,7 +83,7 @@ DEC-010 has no hard close date possible while “in discussion”; the W0 + 6 es
 | DEC-002 closed or dated plan | Dated plan ✓; close pending ratification + latency measurement |
 | DEC-004 method chosen or dated plan | Method recommended (Member ID + OTP); close pending committee approval |
 | DEC-010 closed or dated plan | Dated plan ✓ (above); written confirmation pending |
-| Reviewers identified | **Blocked:** shortlist criteria ready, no firms named yet (see DEC-006/007 pack — names require outreach, not assumption) |
+| Reviewers identified | **Blocked:** shortlist criteria ready, no firms named yet (see DEC-006/007 pack - names require outreach, not assumption) |
 
 **Honest status:** Phase 0 cannot exit until named people sign, the pilot confirms in writing, and at least one reviewer/assessor is identified. The packs in this folder make each of those a single meeting or email away; they do not substitute for them.
 

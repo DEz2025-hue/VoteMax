@@ -89,7 +89,7 @@ describe('Phase 4 internal security assessment', () => {
     const second = await open();
     await svc.submitBallot(first, { [posId]: [adaId] }, 'first-attempt');
     await expect(svc.submitBallot(second, { [posId]: [adaId] }, 'second-attempt')).rejects.toThrow(/ALREADY_VOTED/);
-    // After voting, asking for a code is refused outright with a clear message — and no code is issued.
+    // After voting, asking for a code is refused outright with a clear message - and no code is issued.
     const outbox = (svc as unknown as { otpDelivery: { devOutbox: unknown[] } }).otpDelivery.devOutbox;
     const before = outbox.length;
     await expect(svc.requestOtp(electionId, 'M001')).rejects.toThrow(/ALREADY_VOTED/);

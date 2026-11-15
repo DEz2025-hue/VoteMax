@@ -5,7 +5,7 @@ import { Icon } from '../components/icons';
 const FEATURES = [
   { icon: 'users', title: 'Voter eligibility verification', text: 'Only voters on the approved register can request a ballot, confirmed with a one-time code.' },
   { icon: 'lock', title: 'Ballot secrecy', text: 'Ballots are encrypted and stored with no link back to the voter who cast them.' },
-  { icon: 'check', title: 'Duplicate-vote prevention', text: 'Each eligible voter can cast exactly one ballot per election — enforced atomically.' },
+  { icon: 'check', title: 'Duplicate-vote prevention', text: 'Each eligible voter can cast exactly one ballot per election - enforced atomically.' },
   { icon: 'sliders', title: 'Controlled lifecycle', text: 'Tally, verification, certification and publication follow dedicated multi-party workflows.' },
   { icon: 'filetext', title: 'Auditable processes', text: 'Every administrative and election event lands in a tamper-evident, hash-chained audit log.' },
   { icon: 'shield', title: 'Independent verification', text: 'Tally evidence and certified reports can be reviewed by authorized auditors.' },
@@ -69,7 +69,7 @@ export default function HomePage() {
           <div className="section-head">
             <p className="eyebrow">How it works</p>
             <h2>From register to certified result</h2>
-            <p>One guided workflow for election officers — and a two-minute experience for voters.</p>
+            <p>One guided workflow for election officers - and a two-minute experience for voters.</p>
           </div>
           <div className="steps">
             {STEPS.map((s, i) => (
