@@ -176,7 +176,10 @@ function VoteFlow() {
             </fieldset>
           )}
           {searched && elections.length === 0 && !busy && (
-            <Alert kind="warning" title="No elections found">Check the organization code spelling or ask your election officer.</Alert>
+            <Alert kind="warning" title="Voting isn't open yet">
+              We found this organization, but no election is open for voting right now. If you were invited to vote,
+              voting may not have started — check the dates in your invitation, or ask your election officer.
+            </Alert>
           )}
 
           <hr className="divider" />
