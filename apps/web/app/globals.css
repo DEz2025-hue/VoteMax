@@ -736,3 +736,20 @@ body:has(.vote-shell) .site-footer { display: none; }
   .vote-shell .field { margin-bottom: 12px; }
   .vote-shell .divider { margin: 12px 0; }
 }
+
+/* candidate photos */
+.cand-photo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--blue-100); box-shadow: 0 0 0 1px var(--border); }
+.cand-photo-empty { display: inline-grid; place-items: center; color: var(--blue-700); font-weight: 800; font-size: 18px; }
+.choice .cand-photo { align-self: center; }
+.choice:has(.cand-photo) { align-items: center; }
+.review-picks { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; }
+.review-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text); }
+.review-pick .cand-photo { width: 36px; height: 36px; font-size: 13px; }
+.cand-thumb { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; vertical-align: middle; }
+.cand-thumb-empty { display: inline-grid; place-items: center; background: var(--blue-100); color: var(--blue-700); font-size: 11px; font-weight: 800; }
+.cand-avatar-btn { border: 0; padding: 0; background: transparent; border-radius: 50%; cursor: pointer; line-height: 0; margin-right: 6px; }
+.cand-avatar-btn:disabled { cursor: default; }
+.cand-avatar-btn:not(:disabled):hover .cand-thumb { outline: 2px solid var(--blue-600); outline-offset: 1px; }
+.chip-link { border: 0; background: transparent; color: var(--text-muted); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0 4px; }
+.chip-link:hover { color: var(--danger); }
+.candidate-chip { align-items: center; }

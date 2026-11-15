@@ -23,6 +23,8 @@ export interface Position {
 }
 export interface Candidate {
   id: string; positionId: string; fullName: string; statement: string | null; withdrawnAt: string | null;
+  /** Versioned path to the candidate's photo, or null when none has been added. */
+  photoUrl: string | null;
 }
 export interface Entitlement { id: string; electionId: string; voterRecordId: string; consumedAt: string | null; receiptId: string | null }
 export interface Session { userId: string; tokenHash: string; expiresAt: number; revokedAt?: number | null }
@@ -190,6 +192,10 @@ export interface PlatformStore {
   listCandidates(): Promise<Candidate[]>;
   /** Candidates of one election's positions (avoids whole-table reads). */
   listCandidatesByElection(electionId: string): Promise<Candidate[]>;
+  /** Store (or replace) a candidate's photo and record its versioned URL on the candidate. */
+  setCandidatePhoto(candidateId: string, photo: { mime: string; data: string; url: string }): Promise<void>;
+  getCandidatePhoto(candidateId: string): Promise<{ mime: string; data: string } | null>;
+  clearCandidatePhoto(candidateId: string): Promise<void>;
   /** Delete a candidate record (config editable states only — enforced by service). */
   deleteCandidate(id: string): Promise<void>;
   /** Delete a position and all of its candidates atomically. */

@@ -9,8 +9,11 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import type { Role } from '../auth/roles';
@@ -143,6 +146,32 @@ export class PlatformController {
   @RequireCapability('candidates.manage')
   removeCandidate(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('candidateId') candidateId: string) {
     return guard(() => this.platform.removeCandidate(actor(req), id, candidateId));
+  }
+
+  @Put('elections/:id/candidates/:candidateId/photo')
+  @RequireCapability('candidates.manage')
+  setCandidatePhoto(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('candidateId') candidateId: string, @Body() body: { image: string }) {
+    return guard(() => this.platform.setCandidatePhoto(actor(req), id, candidateId, body?.image));
+  }
+
+  @Delete('elections/:id/candidates/:candidateId/photo')
+  @RequireCapability('candidates.manage')
+  removeCandidatePhoto(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('candidateId') candidateId: string) {
+    return guard(() => this.platform.removeCandidatePhoto(actor(req), id, candidateId));
+  }
+
+  // Public image for the ballot. The URL carries a content hash (?v=), so it can be cached
+  // forever; a new photo gets a new URL.
+  @Get('candidates/:candidateId/photo')
+  @Public()
+  candidatePhoto(@Param('candidateId') candidateId: string, @Res({ passthrough: true }) res: { setHeader: (k: string, v: string) => void }) {
+    return guard(async () => {
+      const { mime, bytes } = await this.platform.candidatePhoto(candidateId);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Content-Disposition', 'inline');
+      return new StreamableFile(bytes, { type: mime });
+    });
   }
 
   @Post('elections/:id/transition')

@@ -127,6 +127,16 @@ describe('Phase 3 voting and results (mock election)', () => {
     expect(store.ballots.length).toBe(1);
   });
 
+  it('the ballot a voter receives carries each candidate\'s photo URL (or null)', async () => {
+    await store.setCandidatePhoto(adaId, { mime: 'image/jpeg', data: 'AAAA', url: `/candidates/${adaId}/photo?v=abc123abc123` });
+    const { devCode } = await svc.requestOtp(electionId, 'S001');
+    const { ballotSession } = await svc.verifyOtp(electionId, 'S001', devCode!);
+    const ballot = await svc.ballotForSession(ballotSession);
+    const byId = Object.fromEntries(ballot.positions[0].candidates.map((c) => [c.id, c.photoUrl]));
+    expect(byId[adaId]).toBe(`/candidates/${adaId}/photo?v=abc123abc123`);
+    expect(byId[benId]).toBeNull();
+  });
+
   it('ballot records contain no voter linkage and audit contains no selections (SEC-BAL)', async () => {
     await vote('S001', adaId);
     const ballot = store.ballots[0];

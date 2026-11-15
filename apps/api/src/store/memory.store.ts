@@ -41,6 +41,7 @@ export class InMemoryStore implements PlatformStore {
   readonly elections = new Map<string, Election>();
   readonly positions = new Map<string, Position>();
   readonly candidates = new Map<string, Candidate>();
+  readonly candidatePhotos = new Map<string, { mime: string; data: string }>();
   readonly voters: VoterRecord[] = [];
   readonly entitlements: Entitlement[] = [];
   readonly audit: AuditEntry[] = [];
@@ -172,13 +173,30 @@ export class InMemoryStore implements PlatformStore {
     return [...this.candidates.values()].filter((c) => positionIds.has(c.positionId));
   }
 
+  async setCandidatePhoto(candidateId: string, photo: { mime: string; data: string; url: string }): Promise<void> {
+    this.candidatePhotos.set(candidateId, { mime: photo.mime, data: photo.data });
+    const c = this.candidates.get(candidateId);
+    if (c) c.photoUrl = photo.url;
+  }
+
+  async getCandidatePhoto(candidateId: string): Promise<{ mime: string; data: string } | null> {
+    return this.candidatePhotos.get(candidateId) ?? null;
+  }
+
+  async clearCandidatePhoto(candidateId: string): Promise<void> {
+    this.candidatePhotos.delete(candidateId);
+    const c = this.candidates.get(candidateId);
+    if (c) c.photoUrl = null;
+  }
+
   async deleteCandidate(id: string): Promise<void> {
+    this.candidatePhotos.delete(id);
     this.candidates.delete(id);
   }
 
   async deletePositionCascade(positionId: string): Promise<void> {
     for (const [id, c] of this.candidates) {
-      if (c.positionId === positionId) this.candidates.delete(id);
+      if (c.positionId === positionId) { this.candidates.delete(id); this.candidatePhotos.delete(id); }
     }
     this.positions.delete(positionId);
   }

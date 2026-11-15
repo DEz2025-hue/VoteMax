@@ -7,6 +7,7 @@ import {
   Select, Skeleton, Stat, Table, Textarea, Toast, errorToast, type ToastData,
 } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
+import { prepareCandidatePhoto } from '../../lib/image';
 import { apiRequest } from '../../lib/http';
 import { friendlyFromUnknown } from '../../lib/errors';
 import { Icon } from '../../components/icons';
@@ -93,7 +94,7 @@ const SECTION_CAPS: Record<Section, string[]> = {
 
 interface AdminUser { id: string; email: string; displayName: string; mfaEnrolled: boolean }
 interface VoterRow { id: string; memberId: string; fullName: string; email?: string; phone?: string; status: string; statusReason: string | null }
-interface PositionRow { id: string; title: string; seats: number; maxChoices: number; candidates?: { id: string; fullName: string; statement: string | null }[] }
+interface PositionRow { id: string; title: string; seats: number; maxChoices: number; candidates?: { id: string; fullName: string; statement: string | null; photoUrl?: string | null }[] }
 interface ElectionDetail {
   id: string; name: string; state: string; organizationId: string;
   description: string | null; voteType: string; resultsMode: string; announcement: string | null;
@@ -129,6 +130,10 @@ function electionPill(state: string): 'success' | 'warning' | 'error' | 'accent'
   if (state === 'SUSPENDED' || state === 'RECOUNT') return 'warning';
   if (state === 'CANCELLED' || state === 'ARCHIVED') return 'neutral';
   return 'accent';
+}
+
+function initialsOf(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
 }
 
 function fmtDate(v: string | null | undefined) {
@@ -177,6 +182,8 @@ export default function AdminPage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [editVoter, setEditVoter] = useState<VoterRow | null>(null);
   const csvFileRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoTargetRef = useRef('');
 
   const registerPreview = useMemo(() => (csvText.trim() ? previewRegisterCsv(csvText) : null), [csvText]);
 
@@ -817,16 +824,41 @@ export default function AdminPage() {
                   <hr className="divider" />
                   <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                     void act('Add candidate', async () => {
-                      await call(`/elections/${electionId}/candidates`, { positionId, fullName: f.get('candidate'), statement: f.get('statement') || undefined });
+                      const created = await call(`/elections/${electionId}/candidates`, { positionId, fullName: f.get('candidate'), statement: f.get('statement') || undefined }) as { id: string };
+                      const file = f.get('photo');
+                      if (file instanceof File && file.size > 0) {
+                        try {
+                          const image = await prepareCandidatePhoto(file);
+                          await call(`/elections/${electionId}/candidates/${created.id}/photo`, { image }, 'PUT');
+                        } catch (err) {
+                          await refreshElection();
+                          throw new Error(`Candidate added, but the photo wasn't saved. ${friendlyFromUnknown(err).message}`);
+                        }
+                      }
                       await refreshElection();
                     }); }}>
                     <div className="form-grid">
                       <Field label="Position" htmlFor="candidate-position"><Select id="candidate-position" name="positionId" required disabled={!positionOptions.length} onChange={(e) => setPositionId(e.target.value)} defaultValue={positionId}><option value="">Select…</option>{positionOptions}</Select></Field>
                       <Field label="Candidate name" htmlFor="candidate-name"><Input id="candidate-name" name="candidate" required placeholder="Full name" /></Field>
                       <Field label="Statement (optional)" htmlFor="candidate-statement"><Input id="candidate-statement" name="statement" /></Field>
+                      <Field label="Photo (optional)" htmlFor="candidate-photo" hint="Helps voters recognise who they are voting for. It is cropped square and shrunk automatically."><Input id="candidate-photo" name="photo" type="file" accept="image/*" /></Field>
                     </div>
                     <Button type="submit" variant="primary" disabled={!electionId || !positionId || !cap('candidates.manage')}>Add candidate</Button>
                   </form>
+                  <input
+                    ref={photoInputRef} type="file" accept="image/*" hidden
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      const target = photoTargetRef.current;
+                      e.target.value = '';
+                      if (!file || !target) return;
+                      void act('Save photo', async () => {
+                        const image = await prepareCandidatePhoto(file);
+                        await call(`/elections/${electionId}/candidates/${target}/photo`, { image }, 'PUT');
+                        await refreshElection();
+                      });
+                    }}
+                  />
                   {election?.positions?.length ? (
                     <div style={{ marginTop: 16 }}>
                       <Table head={['Position', 'Seats', 'Candidates', '']}>
@@ -837,7 +869,22 @@ export default function AdminPage() {
                             <td>
                               {(p.candidates ?? []).length === 0 ? '—' : (p.candidates ?? []).map((c) => (
                                 <span key={c.id} className="candidate-chip">
+                                  <button
+                                    type="button" className="cand-avatar-btn"
+                                    disabled={!configEditable || !cap('candidates.manage')}
+                                    title={configEditable ? (c.photoUrl ? 'Change photo' : 'Add photo') : undefined}
+                                    aria-label={`${c.photoUrl ? 'Change' : 'Add'} photo for ${c.fullName}`}
+                                    onClick={() => { photoTargetRef.current = c.id; photoInputRef.current?.click(); }}
+                                  >
+                                    {c.photoUrl
+                                      ? <img className="cand-thumb" src={`${API}${c.photoUrl}`} alt="" />
+                                      : <span className="cand-thumb cand-thumb-empty">{initialsOf(c.fullName)}</span>}
+                                  </button>
                                   {c.fullName}
+                                  {configEditable && c.photoUrl && (
+                                    <button type="button" className="chip-link" title="Remove photo"
+                                      onClick={() => void act('Remove photo', async () => { await call(`/elections/${electionId}/candidates/${c.id}/photo`, {}, 'DELETE'); await refreshElection(); })}>Remove photo</button>
+                                  )}
                                   {configEditable && (
                                     <button type="button" className="chip-remove" title={`Remove ${c.fullName}`}
                                       onClick={() => setConfirm({ title: 'Remove candidate', message: `Remove ${c.fullName} from ${p.title}?`, action: () => void act('Remove candidate', async () => { await call(`/elections/${electionId}/candidates/${c.id}`, {}, 'DELETE'); await refreshElection(); }) })}>×</button>

@@ -106,6 +106,11 @@ export class FraudInterceptor implements NestInterceptor {
 
   async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
     const req = context.switchToHttp().getRequest<FraudRequest>();
+    // Candidate photos are static, cacheable GETs: no rule applies to them and
+    // each ballot view loads several, so skip the (write-heavy) evaluation.
+    if (req.method === 'GET' && /\/candidates\/[^/]+\/photo$/.test((req.path ?? req.originalUrl ?? '').split('?')[0])) {
+      return next.handle();
+    }
     const surface = surfaceFor(req.method, req.path ?? req.originalUrl ?? '');
     const deviceFp = header(req, 'x-device-fp');
     const decision = await this.fraud.evaluate({

@@ -14,7 +14,7 @@ interface BallotData {
   election: { id: string; name: string };
   positions: {
     id: string; title: string; maxChoices: number; allowAbstain: boolean;
-    candidates: { id: string; fullName: string; statement: string | null }[];
+    candidates: { id: string; fullName: string; statement: string | null; photoUrl: string | null }[];
   }[];
 }
 
@@ -54,6 +54,19 @@ function statePill(state: string): 'success' | 'warning' | 'error' | 'accent' | 
   if (state === 'CLOSED' || state === 'ARCHIVED') return 'neutral';
   if (state === 'SUSPENDED' || state === 'RECOUNT') return 'warning';
   return 'accent';
+}
+
+function initialsOf(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
+}
+
+/** Round candidate photo, or their initials when there is no photo (or it fails to load). */
+function CandidatePhoto({ name, url }: { name: string; url: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (url && !failed) {
+    return <img className="cand-photo" src={`${API}${url}`} alt={`Photo of ${name}`} loading="lazy" decoding="async" onError={() => setFailed(true)} />;
+  }
+  return <span className="cand-photo cand-photo-empty" aria-hidden="true">{initialsOf(name)}</span>;
 }
 
 function VoteFlow() {
@@ -245,6 +258,7 @@ function VoteFlow() {
                     <input type={pos.maxChoices > 1 ? 'checkbox' : 'radio'} name={pos.id}
                       checked={(selections[pos.id] ?? []).includes(cand.id)}
                       onChange={(e) => choose(cand.id, pos, e.target.checked)} />
+                    <CandidatePhoto name={cand.fullName} url={cand.photoUrl} />
                     <span className="choice-body">
                       <span className="choice-name">{cand.fullName}</span>
                       {cand.statement ? <span className="choice-note" style={{ display: 'block' }}>{cand.statement}</span> : null}
@@ -269,11 +283,18 @@ function VoteFlow() {
           <Alert kind="warning" title="This cannot be undone">Check carefully — after submitting, your ballot cannot be changed.</Alert>
           {ballot.positions.map((pos) => {
             const chosen = (selections[pos.id] ?? [])
-              .map((id) => pos.candidates.find((c) => c.id === id)?.fullName)
-              .filter(Boolean);
+              .map((id) => pos.candidates.find((c) => c.id === id))
+              .filter((c): c is BallotData['positions'][number]['candidates'][number] => Boolean(c));
             return (
               <div key={pos.id} className="result-row">
-                <div><strong>{pos.title}</strong><div className="small muted">{chosen.length ? chosen.join(', ') : 'Abstain'}</div></div>
+                <div>
+                  <strong>{pos.title}</strong>
+                  <div className="review-picks">
+                    {chosen.length
+                      ? chosen.map((c) => <span key={c.id} className="review-pick"><CandidatePhoto name={c.fullName} url={c.photoUrl} />{c.fullName}</span>)
+                      : <span className="small muted">Abstain</span>}
+                  </div>
+                </div>
                 <Button variant="ghost" size="sm" onClick={() => setStep('ballot')}>Edit</Button>
               </div>
             );

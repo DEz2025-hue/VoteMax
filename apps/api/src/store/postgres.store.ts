@@ -255,6 +255,7 @@ export class PostgresStore implements PlatformStore {
     await this.database.insert(schema.candidates).values({
       id: candidate.id, positionId: candidate.positionId, fullName: candidate.fullName,
       statement: candidate.statement, withdrawnAt: date(candidate.withdrawnAt),
+      photoUrl: candidate.photoUrl,
     });
   }
 
@@ -267,7 +268,30 @@ export class PostgresStore implements PlatformStore {
     return {
       id: row.id, positionId: row.positionId, fullName: row.fullName,
       statement: row.statement, withdrawnAt: iso(row.withdrawnAt),
+      photoUrl: row.photoUrl,
     };
+  }
+
+  async setCandidatePhoto(candidateId: string, photo: { mime: string; data: string; url: string }): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await tx.insert(schema.candidatePhotos)
+        .values({ candidateId, mime: photo.mime, data: photo.data })
+        .onConflictDoUpdate({ target: schema.candidatePhotos.candidateId, set: { mime: photo.mime, data: photo.data } });
+      await tx.update(schema.candidates).set({ photoUrl: photo.url }).where(eq(schema.candidates.id, candidateId));
+    });
+  }
+
+  async getCandidatePhoto(candidateId: string): Promise<{ mime: string; data: string } | null> {
+    const [row] = await this.database.select({ mime: schema.candidatePhotos.mime, data: schema.candidatePhotos.data })
+      .from(schema.candidatePhotos).where(eq(schema.candidatePhotos.candidateId, candidateId));
+    return row ?? null;
+  }
+
+  async clearCandidatePhoto(candidateId: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await tx.delete(schema.candidatePhotos).where(eq(schema.candidatePhotos.candidateId, candidateId));
+      await tx.update(schema.candidates).set({ photoUrl: null }).where(eq(schema.candidates.id, candidateId));
+    });
   }
 
   async listCandidates(): Promise<Candidate[]> {

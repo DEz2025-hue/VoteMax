@@ -124,6 +124,18 @@ export const candidates = adminSchema.table('candidates', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Candidate photos live in their own table so candidate lists never load image
+// bytes. Stored base64; the public image endpoint serves them. candidates.photo_url
+// holds the versioned URL (set on upload) so lists know a photo exists.
+export const candidatePhotos = adminSchema.table('candidate_photos', {
+  candidateId: uuid('candidate_id')
+    .primaryKey()
+    .references(() => candidates.id, { onDelete: 'cascade' }),
+  mime: text('mime').notNull(),
+  data: text('data').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const voterStatusEnum = pgEnum('voter_status', [
   'pending',
   'eligible',

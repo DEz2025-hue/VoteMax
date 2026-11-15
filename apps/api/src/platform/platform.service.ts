@@ -423,7 +423,7 @@ export class PlatformService {
     assertConfigEditable(election.state);
     const position = await this.store.getPosition(positionId);
     if (!position || position.electionId !== electionId) throw new Error('NOT_FOUND: position');
-    const candidate: Candidate = { id: randomUUID(), positionId, fullName, statement: statement ?? null, withdrawnAt: null };
+    const candidate: Candidate = { id: randomUUID(), positionId, fullName, statement: statement ?? null, withdrawnAt: null, photoUrl: null };
     await this.store.addCandidate(candidate);
     await this.log(election.organizationId, actorId, 'candidate.create', `election:${electionId}`, 'success');
     return candidate;
@@ -447,6 +447,60 @@ export class PlatformService {
     if (!position || position.electionId !== electionId) throw new Error('NOT_FOUND: candidate');
     await this.store.deleteCandidate(candidateId);
     await this.log(election.organizationId, actorId, 'candidate.delete', `election:${electionId}`, `success:${candidate.fullName}`);
+  }
+
+  // ---- Candidate photos ----
+  // Photos are resized in the browser to a small square, so the server limit is
+  // generous but bounded. Only raster formats are accepted — never SVG, which
+  // can carry script — and the type is decided from the bytes, not the client.
+
+  private static readonly PHOTO_MAX_BYTES = 400_000;
+
+  private static sniffImage(buf: Buffer): 'image/jpeg' | 'image/png' | 'image/webp' | null {
+    if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+    if (buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+    if (buf.length > 12 && buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+    return null;
+  }
+
+  private async candidateInElection(electionId: string, candidateId: string): Promise<Candidate> {
+    const candidate = await this.store.getCandidate(candidateId);
+    const position = candidate ? await this.store.getPosition(candidate.positionId) : null;
+    if (!candidate || !position || position.electionId !== electionId) throw new Error('NOT_FOUND: candidate');
+    return candidate;
+  }
+
+  /** Add or replace a candidate's photo. `image` is base64, optionally a data: URL. */
+  async setCandidatePhoto(actorId: string, electionId: string, candidateId: string, image: string): Promise<{ photoUrl: string }> {
+    const election = await this.electionOrThrow(electionId);
+    assertConfigEditable(election.state);
+    await this.candidateInElection(electionId, candidateId);
+    const b64 = String(image ?? '').replace(/^data:[^;,]*;base64,/, '').replace(/\s+/g, '');
+    if (!b64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) throw new Error('INVALID_INPUT: the photo could not be read');
+    const bytes = Buffer.from(b64, 'base64');
+    if (bytes.length > PlatformService.PHOTO_MAX_BYTES) throw new Error('INVALID_INPUT: the photo is too large (maximum 400 KB)');
+    const mime = PlatformService.sniffImage(bytes);
+    if (!mime) throw new Error('INVALID_INPUT: the photo must be a JPEG, PNG or WebP image');
+    const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+    const url = `/candidates/${candidateId}/photo?v=${hash}`;
+    await this.store.setCandidatePhoto(candidateId, { mime, data: bytes.toString('base64'), url });
+    await this.log(election.organizationId, actorId, 'candidate.photo', `election:${electionId}`, 'success:set');
+    return { photoUrl: url };
+  }
+
+  async removeCandidatePhoto(actorId: string, electionId: string, candidateId: string): Promise<void> {
+    const election = await this.electionOrThrow(electionId);
+    assertConfigEditable(election.state);
+    await this.candidateInElection(electionId, candidateId);
+    await this.store.clearCandidatePhoto(candidateId);
+    await this.log(election.organizationId, actorId, 'candidate.photo', `election:${electionId}`, 'success:removed');
+  }
+
+  /** Public: photo bytes for the ballot. Candidates are public information once on a ballot. */
+  async candidatePhoto(candidateId: string): Promise<{ mime: string; bytes: Buffer }> {
+    const photo = await this.store.getCandidatePhoto(candidateId);
+    if (!photo) throw new Error('NOT_FOUND: photo');
+    return { mime: photo.mime, bytes: Buffer.from(photo.data, 'base64') };
   }
 
   async transition(actorId: string, electionId: string, to: ElectionState): Promise<Election> {
@@ -853,7 +907,7 @@ export class PlatformService {
       id: p.id, title: p.title, seats: p.seats, maxChoices: p.maxChoices, allowAbstain: p.allowAbstain,
       candidates: allCandidates
         .filter((c) => c.positionId === p.id && !c.withdrawnAt)
-        .map((c) => ({ id: c.id, fullName: c.fullName, statement: c.statement })),
+        .map((c) => ({ id: c.id, fullName: c.fullName, statement: c.statement, photoUrl: c.photoUrl })),
     }));
     return { election: { id: election.id, name: election.name }, positions };
   }
