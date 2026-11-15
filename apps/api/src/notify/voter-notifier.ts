@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { logEvent } from '../common/logger';
 import { AfricaTalkingSmsSender, WebhookSmsSender } from '../otp/otp-delivery';
+import { HttpEmailSender } from '../mail/email-api';
 import type { NotificationKind } from '../store/types';
 
 /**
@@ -95,6 +96,7 @@ export class VoterNotifier {
   /** Most recent delivery problem since this process started (for ops visibility). */
   lastError: { at: string; channel: 'email' | 'sms'; message: string } | null = null;
   private transporter: nodemailer.Transporter | null = null;
+  private readonly httpEmail: HttpEmailSender;
   private readonly from: string;
   private readonly smsSenders: SmsSender[];
   private readonly devAllowed: boolean;
@@ -102,6 +104,7 @@ export class VoterNotifier {
   constructor(env: NodeJS.ProcessEnv = process.env) {
     this.from = env.SMTP_FROM ?? env.SMTP_USER ?? 'VoteMax <no-reply@votemax.local>';
     this.devAllowed = env.NODE_ENV !== 'production';
+    this.httpEmail = new HttpEmailSender(env);
     if (env.SMTP_HOST) {
       this.transporter = nodemailer.createTransport({
         host: env.SMTP_HOST,
@@ -116,7 +119,7 @@ export class VoterNotifier {
       });
     }
     this.smsSenders = [new AfricaTalkingSmsSender(env), new WebhookSmsSender(env)].filter((s) => s.configured);
-    this.configured = this.transporter !== null || this.smsSenders.length > 0;
+    this.configured = this.transporter !== null || this.httpEmail.configured || this.smsSenders.length > 0;
   }
 
   private noteError(channel: 'email' | 'sms', err: unknown): void {
@@ -127,6 +130,17 @@ export class VoterNotifier {
   }
 
   async send(msg: VoterMessage): Promise<DeliveryChannel> {
+    // Email: the HTTPS provider API first (works where SMTP ports are blocked),
+    // then SMTP; either failing falls through to SMS when the voter has a phone.
+    if (msg.email && this.httpEmail.configured) {
+      try {
+        await this.httpEmail.send({ to: msg.email, subject: msg.subject, text: msg.text });
+        return 'email';
+      } catch (err) {
+        this.noteError('email', err);
+        logEvent('warn', 'notify.email_failed', { via: this.httpEmail.provider, error: err instanceof Error ? err.message : 'unknown' });
+      }
+    }
     if (msg.email && this.transporter) {
       try {
         await this.transporter.sendMail({ from: this.from, to: msg.email, subject: msg.subject, text: msg.text });

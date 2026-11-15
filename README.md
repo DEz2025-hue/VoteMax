@@ -54,9 +54,12 @@ Configured via environment variables on the API:
 
 | Provider | Variables |
 |---|---|
-| SMTP email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
+| Email API (Brevo, Resend or SendGrid) — **preferred** | `EMAIL_PROVIDER` (`brevo`\|`resend`\|`sendgrid`), `EMAIL_API_KEY`, `EMAIL_FROM` (a verified sender, e.g. `VoteMax <elections@your-domain>`) |
+| SMTP email (fallback) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
 | Africa's Talking SMS | `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID` |
 | SMS webhook | `SMS_WEBHOOK_URL`, `SMS_WEBHOOK_AUTH` |
+
+The email API sends over HTTPS, so it works on hosts that block SMTP ports (e.g. Railway's Hobby plan) and handles volume and deliverability better than a mailbox. When configured it is tried first; SMTP is the fallback, then SMS. Verify settings from your own shell with `node scripts/email-check.mjs you@example.com` (API) or `node scripts/smtp-check.mjs you@example.com` (SMTP). Platform health shows which path is active and the latest delivery error.
 
 Without a provider, OTP delivery fails closed in production; a dev-only outbox captures codes for local testing (flagged on the health dashboard).
 

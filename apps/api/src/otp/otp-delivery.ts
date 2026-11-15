@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { logEvent } from '../common/logger';
+import { HttpEmailSender, type EmailProvider } from '../mail/email-api';
 
 /**
  * OTP delivery (DEC-004 §3, finding F-04). Codes are sent through
@@ -67,6 +68,28 @@ export class SmtpOtpSender implements OtpSender {
       subject: 'Your Votemax verification code',
       text: otpText(msg),
     });
+  }
+}
+
+/** HTTPS email sender (Brevo / Resend / SendGrid). Configured via EMAIL_* env vars. */
+export class HttpEmailOtpSender implements OtpSender {
+  readonly channel = 'email' as const;
+  private readonly api: HttpEmailSender;
+
+  constructor(env: NodeJS.ProcessEnv = process.env) {
+    this.api = new HttpEmailSender(env);
+  }
+
+  get configured(): boolean { return this.api.configured; }
+  get provider(): EmailProvider | null { return this.api.provider; }
+
+  canDeliver(msg: OtpMessage): boolean {
+    return this.api.configured && Boolean(msg.email);
+  }
+
+  async send(msg: OtpMessage): Promise<void> {
+    if (!msg.email) throw new Error('No email address for delivery');
+    await this.api.send({ to: msg.email, subject: 'Your Votemax verification code', text: otpText(msg) });
   }
 }
 
@@ -165,6 +188,8 @@ export interface DevOutboxEntry { electionId: string; memberId: string; code: st
  */
 export interface OtpProviderStatus {
   email: boolean;
+  /** Which email path is active: an HTTPS provider, SMTP, or none. */
+  emailVia: EmailProvider | 'smtp' | null;
   smsAfricaTalking: boolean;
   smsWebhook: boolean;
   devAllowed: boolean;
@@ -175,6 +200,7 @@ export class OtpDelivery {
   /** Most recent one-time-code delivery problem since this process started. */
   lastError: { at: string; channel: 'email' | 'sms'; message: string } | null = null;
   private readonly smtp: SmtpOtpSender;
+  private readonly httpEmail: HttpEmailOtpSender;
   private readonly africasTalking: AfricaTalkingSmsSender;
   private readonly webhook: WebhookSmsSender;
   private readonly senders: OtpSender[];
@@ -182,16 +208,18 @@ export class OtpDelivery {
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
     this.smtp = new SmtpOtpSender(env);
+    this.httpEmail = new HttpEmailOtpSender(env);
     this.africasTalking = new AfricaTalkingSmsSender(env);
     this.webhook = new WebhookSmsSender(env);
-    this.senders = [this.smtp, this.africasTalking, this.webhook];
+    this.senders = [this.httpEmail, this.smtp, this.africasTalking, this.webhook];
     this.devAllowed = env.NODE_ENV !== 'production';
   }
 
   /** Configuration posture for ops dashboards — never exposes secrets. */
   describe(): OtpProviderStatus {
     return {
-      email: this.smtp.configured,
+      email: this.httpEmail.configured || this.smtp.configured,
+      emailVia: this.httpEmail.configured ? this.httpEmail.provider : this.smtp.configured ? 'smtp' : null,
       smsAfricaTalking: this.africasTalking.configured,
       smsWebhook: this.webhook.configured,
       devAllowed: this.devAllowed,

@@ -59,7 +59,7 @@ interface TenantDetail extends Omit<TenantRow, 'staffed' | 'electionsByState' | 
 interface PlatformHealth {
   store: string; dbLatencyMs: number; pendingAuditEntries: number;
   uptimeSeconds: number; checkedAt: string;
-  otpProviders: { email: boolean; smsAfricaTalking: boolean; smsWebhook: boolean; devAllowed: boolean };
+  otpProviders: { email: boolean; emailVia?: string | null; smsAfricaTalking: boolean; smsWebhook: boolean; devAllowed: boolean };
   delivery?: {
     invitations: { at: string; channel: string; message: string } | null;
     codes: { at: string; channel: string; message: string } | null;
@@ -742,7 +742,7 @@ export default function PlatformPage() {
                 <div className="ps-split ps-split-even">
                   <Panel title="OTP delivery providers" flush>
                     <Table head={['Channel', 'Provider', 'Configured']}>
-                      <tr><td>Email</td><td className="muted">SMTP_HOST</td><td>{health.otpProviders.email ? <Badge tone="success">yes</Badge> : <Badge tone="error">no</Badge>}</td></tr>
+                      <tr><td>Email</td><td className="muted">{health.otpProviders.emailVia ? (health.otpProviders.emailVia === 'smtp' ? 'SMTP (SMTP_HOST)' : `${health.otpProviders.emailVia} API (EMAIL_API_KEY)`) : 'EMAIL_API_KEY or SMTP_HOST'}</td><td>{health.otpProviders.email ? <Badge tone="success">yes</Badge> : <Badge tone="error">no</Badge>}</td></tr>
                       <tr><td>SMS</td><td className="muted">Africa&apos;s Talking</td><td>{health.otpProviders.smsAfricaTalking ? <Badge tone="success">yes</Badge> : <Badge tone="neutral">no</Badge>}</td></tr>
                       <tr><td>SMS</td><td className="muted">Generic webhook</td><td>{health.otpProviders.smsWebhook ? <Badge tone="success">yes</Badge> : <Badge tone="neutral">no</Badge>}</td></tr>
                       <tr><td>Fallback</td><td className="muted">In-process dev outbox</td><td>{health.otpProviders.devAllowed ? <Badge tone="warning">enabled</Badge> : <Badge tone="success">disabled</Badge>}</td></tr>
@@ -764,7 +764,9 @@ export default function PlatformPage() {
                       <div key={label} className="ps-status-row" style={{ alignItems: 'flex-start' }}>
                         <span className="ps-status-label"><i className={`ps-dot ${err ? 'bad' : 'ok'}`} />{label}</span>
                         <span className="ps-status-value" style={{ fontWeight: 500, maxWidth: '60%' }}>
-                          {err ? (<>{err.channel} failed: {err.message}<div className="small muted">{fmtDate(err.at)}</div></>) : 'No problems since start'}
+                          {!health.delivery ? 'Not reported — the API needs the latest deploy'
+                            : err ? (<>{err.channel} failed: {err.message}<div className="small muted">{fmtDate(err.at)}</div></>)
+                            : 'No problems since start'}
                         </span>
                       </div>
                     ))}
