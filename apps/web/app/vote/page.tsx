@@ -49,6 +49,17 @@ type Step = 'identify' | 'code' | 'ballot' | 'review' | 'done';
 const STEP_ORDER: Step[] = ['identify', 'code', 'ballot', 'review', 'done'];
 const STEP_LABELS = ['Find election', 'Verify', 'Ballot', 'Review', 'Done'];
 
+/** Elections a voter can still act on. Everything after voting closes is hidden from this list. */
+const VOTABLE = new Set(['READY', 'OPEN', 'SUSPENDED']);
+
+function pillLabel(state: string): string {
+  return state === 'OPEN' ? 'Voting open' : state === 'READY' ? 'Opens soon' : state === 'SUSPENDED' ? 'Paused' : state.toLowerCase();
+}
+
+function fmtWhen(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 function statePill(state: string): 'success' | 'warning' | 'error' | 'accent' | 'neutral' {
   if (state === 'OPEN') return 'success';
   if (state === 'CLOSED' || state === 'ARCHIVED') return 'neutral';
@@ -86,6 +97,8 @@ function VoteFlow() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [endedCount, setEndedCount] = useState(0);
+  const [endedName, setEndedName] = useState('');
 
   useEffect(() => {
     const org = params.get('org');
@@ -113,8 +126,15 @@ function VoteFlow() {
     if (!clean) return;
     setSearched(true);
     const list = (await getJson(`/organizations/${encodeURIComponent(clean)}/elections`)) as PublicElection[];
-    const arr = Array.isArray(list) ? list : [];
+    const all = Array.isArray(list) ? list : [];
+    // Voters only need elections they can act on. Finished ones (closed, being counted,
+    // published, archived) are hidden so the list is not cluttered with past elections.
+    const arr = all.filter((el) => VOTABLE.has(el.state));
+    const ended = all.filter((el) => !VOTABLE.has(el.state));
     setElections(arr);
+    setEndedCount(ended.length);
+    // If this person opened a link to an election that has since ended, say so by name.
+    setEndedName(electionParam ? (ended.find((el) => el.id === electionParam)?.name ?? '') : '');
     const preselect = electionParam && arr.find((el) => el.id === electionParam);
     if (preselect) setElectionId(preselect.id);
     else if (arr.length === 1) setElectionId(arr[0].id);
@@ -180,15 +200,23 @@ function VoteFlow() {
                   <span className="choice-body">
                     <span className="choice-name">{el.name}</span>
                     <span className="choice-note" style={{ display: 'block' }}>
-                      <Badge tone={statePill(el.state)}>{el.state === 'OPEN' ? 'Voting open' : el.state.toLowerCase()}</Badge>{' '}
-                      {el.votingClosesAt ? `closes ${new Date(el.votingClosesAt).toLocaleString()}` : ''}
+                      <Badge tone={statePill(el.state)}>{pillLabel(el.state)}</Badge>{' '}
+                      {el.state === 'READY' && el.votingOpensAt
+                        ? `opens ${fmtWhen(el.votingOpensAt)}`
+                        : el.votingClosesAt ? `closes ${fmtWhen(el.votingClosesAt)}` : ''}
                     </span>
                   </span>
                 </label>
               ))}
             </fieldset>
           )}
-          {searched && elections.length === 0 && !busy && (
+          {searched && elections.length === 0 && endedCount > 0 && !busy && (
+            <Alert kind="info" title="Voting has ended">
+              {endedName ? `Voting for "${endedName}" has ended.` : 'Voting for this organization\'s elections has ended.'}{' '}
+              Nothing more is needed from you. If you think this is a mistake, ask your election officer.
+            </Alert>
+          )}
+          {searched && elections.length === 0 && endedCount === 0 && !busy && (
             <Alert kind="warning" title="Voting isn't open yet">
               We found this organization, but no election is open for voting right now. If you were invited to vote,
               voting may not have started - check the dates in your invitation, or ask your election officer.
