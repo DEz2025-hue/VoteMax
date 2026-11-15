@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Alert, Button, Card, Field, Input, Skeleton } from '../../components/ui';
+import { Alert, Button, Field, Input, Skeleton } from '../../components/ui';
+import { AuthLayout } from '../../components/saas';
 import { clearSession, fetchPrincipal, isPlatformOnly, signIn, storeSession } from '../../lib/auth';
 
 export default function LoginPage() {
@@ -66,25 +67,19 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="auth-page">
-      <div className="auth-card">
-        <p className="eyebrow">Election administration</p>
-        <h1>Sign in</h1>
-        <p className="lede">Access the election console for your organization.</p>
-        {status && <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>}
-        <Card title="Organization sign in">
-          <form onSubmit={submit} className="inline-form">
-            <Field label="Email" htmlFor="login-email"><Input id="login-email" name="email" type="email" required autoComplete="username" /></Field>
-            <Field label="Password" htmlFor="login-password"><Input id="login-password" name="password" type="password" required autoComplete="current-password" /></Field>
-            <Field label="TOTP code" hint="Required for privileged accounts" htmlFor="login-totp"><Input id="login-totp" name="totp" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" /></Field>
-            <Button type="submit" variant="primary" block disabled={loading}>Sign in</Button>
-          </form>
-        </Card>
-        <p className="small muted" style={{ margin: '16px 2px 0', textAlign: 'center' }}>
-          Don't have an account? Organizations and staff accounts are provisioned through the <Link href="/platform">platform administration portal</Link>.
-          Platform administrators sign in there directly.
-        </p>
-      </div>
-    </main>
+    <AuthLayout
+      eyebrow="Election administration"
+      title="Welcome back"
+      lede="Sign in to the election console for your organization."
+      footer={<>Don&apos;t have an account? Organizations and staff accounts are provisioned through the <Link href="/platform">platform administration portal</Link>. Platform administrators sign in there directly.</>}
+    >
+      {status && <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>}
+      <form onSubmit={submit} className="inline-form">
+        <Field label="Email" htmlFor="login-email"><Input id="login-email" name="email" type="email" required autoComplete="username" /></Field>
+        <Field label="Password" htmlFor="login-password"><Input id="login-password" name="password" type="password" required autoComplete="current-password" /></Field>
+        <Field label="TOTP code" hint="Required for privileged accounts" htmlFor="login-totp"><Input id="login-totp" name="totp" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" /></Field>
+        <Button type="submit" variant="primary" size="lg" block disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</Button>
+      </form>
+    </AuthLayout>
   );
 }

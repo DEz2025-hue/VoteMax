@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Field, Input, Skeleton } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
+import { Icon } from '../../components/icons';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -108,20 +109,24 @@ function VoteFlow() {
   const stepIndex = STEP_ORDER.indexOf(step);
 
   return (
-    <main className="page">
-      <p className="eyebrow">Secure voting</p>
-      <h1>Cast your ballot</h1>
-      <p className="lede">
-        Your selections are private. No record links you to how you voted, and your
-        confirmation will not show your choices.
-      </p>
+    <main className="vote-shell">
+      <div className="vote-head">
+        <p className="eyebrow">Secure voting</p>
+        <h1>Cast your ballot</h1>
+        <p className="lede">
+          Your selections are private. No record links you to how you voted, and your
+          confirmation will not show your choices.
+        </p>
+      </div>
 
-      <ol className="progress" aria-hidden="true">
-        {STEP_LABELS.map((label, i) => <li key={label} className={i <= stepIndex ? 'done' : ''} title={label} />)}
+      <ol className="stepper" aria-label="Voting progress">
+        {STEP_LABELS.map((label, i) => (
+          <li key={label} className={i < stepIndex ? 'done' : i === stepIndex ? 'current' : ''} aria-current={i === stepIndex ? 'step' : undefined}>
+            <span className="dot">{i < stepIndex ? <Icon name="check" size={16} /> : i + 1}</span>
+            {label}
+          </li>
+        ))}
       </ol>
-      <p className="small muted" style={{ marginTop: -14, marginBottom: 22 }}>
-        Step {stepIndex + 1} of {STEP_LABELS.length} — {STEP_LABELS[stepIndex]}
-      </p>
 
       {error && <Alert kind="error" title="Something needs attention">{error}</Alert>}
       {notice && <Alert kind="success">{notice}</Alert>}
@@ -269,15 +274,22 @@ function VoteFlow() {
       )}
 
       {step === 'done' && (
-        <Card title="Ballot accepted">
-          <Alert kind="success" title="Your ballot was recorded">Your ballot has been recorded. Confirmation reference:</Alert>
-          <p><code className="mono-code" style={{ fontSize: 18, padding: '8px 12px' }}>{receipt}</code></p>
-          <p className="muted" style={{ lineHeight: 1.6 }}>
+        <Card>
+          <div style={{ textAlign: 'center' }}>
+            <div className="success-mark"><Icon name="check" size={30} /></div>
+            <h2 style={{ fontSize: 22 }}>Your ballot was recorded</h2>
+            <p className="muted" style={{ lineHeight: 1.6 }}>Thank you for voting. Your confirmation reference:</p>
+          </div>
+          <div className="receipt">
+            <code>{receipt}</code>
+            <Button variant="secondary" size="sm" onClick={() => void navigator.clipboard?.writeText(receipt)}>Copy</Button>
+          </div>
+          <p className="muted small" style={{ lineHeight: 1.6 }}>
             This reference confirms acceptance only. It does not show your selections,
             and no one can use it to see how you voted. Save it if you want proof
             your vote was counted.
           </p>
-          <Button variant="secondary" onClick={() => window.location.href = '/'}>Return home</Button>
+          <Button variant="secondary" block onClick={() => window.location.href = '/'}>Return home</Button>
         </Card>
       )}
     </main>

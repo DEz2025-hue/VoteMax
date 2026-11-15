@@ -20,6 +20,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
         {children}
+        <footer className="site-footer">
+          <div className="container site-footer-inner">
+            <span>© {new Date().getFullYear()} VoteMax by ClaMax Group</span>
+            <nav aria-label="Footer">
+              <Link href="/vote">Vote</Link>
+              <Link href="/help">How to vote</Link>
+              <Link href="/login">Sign in</Link>
+            </nav>
+          </div>
+        </footer>
         <SwRegister />
       </body>
     </html>

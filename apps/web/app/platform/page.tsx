@@ -6,6 +6,7 @@ import {
   Select, Skeleton, Table, Toast,
 } from '../../components/ui';
 import { Icon } from '../../components/icons';
+import { AuthLayout, ConsoleShell, Kpi, Panel, StatusRow } from '../../components/saas';
 import { fraudHeaders } from '../../lib/fraud';
 import { API, sessionIsValid, signIn as apiSignIn, signOut as apiSignOut, storeSession } from '../../lib/auth';
 
@@ -111,45 +112,8 @@ function slugify(name: string) {
     .replace(/^-+|-+$/g, '');
 }
 
-function Kpi({ icon, label, value, note, tone = 'blue' }: { icon: string; label: string; value: ReactNode; note?: string; tone?: 'blue' | 'navy' | 'amber' | 'green' }) {
-  return (
-    <div className="ps-kpi">
-      <span className={`ps-kpi-icon ${tone}`}><Icon name={icon} size={20} /></span>
-      <div>
-        <div className="ps-kpi-label">{label}</div>
-        <div className="ps-kpi-value">{value}</div>
-        {note && <div className="ps-kpi-note">{note}</div>}
-      </div>
-    </div>
-  );
-}
-
-function Panel({ title, subtitle, actions, children, flush }: { title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean }) {
-  return (
-    <section className="ps-panel">
-      {(title || actions) && (
-        <header className="ps-panel-head">
-          <div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>
-          {actions && <div className="ps-panel-actions">{actions}</div>}
-        </header>
-      )}
-      <div className={flush ? 'ps-panel-flush' : 'ps-panel-body'}>{children}</div>
-    </section>
-  );
-}
-
-function StatusRow({ label, value, tone }: { label: string; value: ReactNode; tone: 'ok' | 'warn' | 'bad' | 'off' }) {
-  return (
-    <div className="ps-status-row">
-      <span className="ps-status-label"><i className={`ps-dot ${tone}`} />{label}</span>
-      <span className="ps-status-value">{value}</span>
-    </div>
-  );
-}
-
 export default function PlatformPage() {
   const [section, setSection] = useState<Section>('overview');
-  const [mobileNav, setMobileNav] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [denied, setDenied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -371,35 +335,26 @@ export default function PlatformPage() {
   }
 
   if (!signedIn) {
+    if (denied) {
+      return (
+        <AuthLayout eyebrow="Platform administration" title="Access denied">
+          <Alert kind="error" title="Insufficient privileges">
+            This account does not hold platform administration privileges. Tenant administrators should use the Administration page.
+          </Alert>
+          <div className="form-actions"><Button variant="secondary" onClick={signOut}>Sign out</Button></div>
+        </AuthLayout>
+      );
+    }
     return (
-      <main className="auth-page">
-        <div className="auth-card">
-          {denied ? (
-            <>
-              <p className="eyebrow">Platform administration</p>
-              <h1>Access denied</h1>
-              <Alert kind="error" title="Insufficient privileges">
-                This account does not hold platform administration privileges. Tenant administrators should use the Administration page.
-              </Alert>
-              <div className="form-actions"><Button variant="secondary" onClick={signOut}>Sign out</Button></div>
-            </>
-          ) : (
-            <div className="ps-auth">
-              <span className="ps-logo ps-logo-lg">V</span>
-              <p className="eyebrow">Platform administration</p>
-              <h1>Sign in to the console</h1>
-              <p className="lede">Control-plane access for platform administrators. Tenant election operations stay in Administration.</p>
-              {status && <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>}
-              <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void signIn(); }}>
-                <Field label="Email" htmlFor="p-email"><Input id="p-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required /></Field>
-                <Field label="Password" htmlFor="p-password"><Input id="p-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></Field>
-                <Field label="TOTP code" hint="Required for privileged accounts" htmlFor="p-totp"><Input id="p-totp" inputMode="numeric" autoComplete="one-time-code" value={totp} onChange={(e) => setTotp(e.target.value)} /></Field>
-                <Button type="submit" variant="primary" size="lg" block disabled={loading || !email || !password}>Sign in</Button>
-              </form>
-            </div>
-          )}
-        </div>
-      </main>
+      <AuthLayout eyebrow="Platform administration" title="Sign in to the console" lede="Control-plane access for platform administrators. Tenant election operations stay in Administration.">
+        {status && <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>}
+        <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void signIn(); }}>
+          <Field label="Email" htmlFor="p-email"><Input id="p-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required /></Field>
+          <Field label="Password" htmlFor="p-password"><Input id="p-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></Field>
+          <Field label="TOTP code" hint="Required for privileged accounts" htmlFor="p-totp"><Input id="p-totp" inputMode="numeric" autoComplete="one-time-code" value={totp} onChange={(e) => setTotp(e.target.value)} /></Field>
+          <Button type="submit" variant="primary" size="lg" block disabled={loading || !email || !password}>Sign in</Button>
+        </form>
+      </AuthLayout>
     );
   }
 
@@ -418,54 +373,90 @@ export default function PlatformPage() {
     return u ? u.email : userId.slice(0, 8);
   };
 
+  const navItems = SECTIONS.map((x) => ({ id: x.id, label: x.label, icon: x.icon, badge: x.id === 'organizations' && directory ? directory.length : undefined }));
+
+  const overlays = (
+    <>
+      {showNewOrg && (
+        <>
+          <div className="ps-drawer-backdrop" onClick={closeNewOrg} />
+          <aside className="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="new-org-title">
+            <header className="ps-drawer-head">
+              <div><h2 id="new-org-title">New organization</h2><p>Creates a tenant. Optionally staff it with its first administrator.</p></div>
+              <button type="button" className="ps-icon-btn" aria-label="Close" onClick={closeNewOrg}><Icon name="close" /></button>
+            </header>
+            <div className="ps-drawer-body">
+              {orgEnrollment && (
+                <Alert kind="success" title="Organization created — share the TOTP secret once">
+                  <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) — enroll this secret in their authenticator now; it is not shown again:</p>
+                  <code>{orgEnrollment.totpSecret}</code>
+                  <p className="small" style={{ margin: '8px 0 0' }}>They sign in at <a href="/login">/login</a> with email, password and TOTP code.</p>
+                </Alert>
+              )}
+              <h3 className="ps-form-heading">Organization</h3>
+              <Field label="Name" htmlFor="org-name"><Input id="org-name" value={newOrgName} onChange={(e) => { setNewOrgName(e.target.value); if (!slugTouched) setNewOrgSlug(slugify(e.target.value)); }} placeholder="Example Organization" /></Field>
+              <Field label="Slug" hint="Auto-generated from the name — used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => { setSlugTouched(true); setNewOrgSlug(slugify(e.target.value)); }} placeholder="example-org" /></Field>
+
+              <h3 className="ps-form-heading">First administrator <span>optional</span></h3>
+              <p className="muted small">Leave blank to create an unstaffed tenant. When set, an MFA-enrolled account is created with the selected role.</p>
+              <Field label="Admin email" htmlFor="org-admin-email"><Input id="org-admin-email" type="email" value={orgAdminEmail} onChange={(e) => setOrgAdminEmail(e.target.value)} placeholder="admin@org.org" /></Field>
+              <Field label="Display name" htmlFor="org-admin-name"><Input id="org-admin-name" value={orgAdminName} onChange={(e) => setOrgAdminName(e.target.value)} /></Field>
+              <Field label="Password" hint="Minimum 12 characters" htmlFor="org-admin-password"><Input id="org-admin-password" type="password" value={orgAdminPassword} onChange={(e) => setOrgAdminPassword(e.target.value)} autoComplete="new-password" /></Field>
+              <Field label="Role" htmlFor="org-admin-role">
+                <Select id="org-admin-role" value={orgAdminRole} onChange={(e) => setOrgAdminRole(e.target.value)}>
+                  <option value="organization_owner">organization_owner — runs the tenant</option>
+                  <option value="auditor">auditor — read-only oversight</option>
+                </Select>
+              </Field>
+            </div>
+            <footer className="ps-drawer-foot">
+              <Button variant="secondary" onClick={closeNewOrg}>{orgEnrollment ? 'Done' : 'Cancel'}</Button>
+              <Button onClick={() => void createOrg()} disabled={loading || !newOrgName || !newOrgSlug || (Boolean(orgAdminEmail) && orgAdminPassword.length < 12)}>Create organization</Button>
+            </footer>
+          </aside>
+        </>
+      )}
+
+      <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title ?? ''}
+        message={confirm?.message}
+        confirmLabel="Confirm"
+        onConfirm={() => { const c = confirm; setConfirm(null); c?.action(); }}
+        onCancel={() => setConfirm(null)}
+      />
+    </>
+  );
+
   return (
-    <div className="ps-shell">
-      <aside className={`ps-sidebar ${mobileNav ? 'open' : ''}`}>
-        <div className="ps-side-head">
-          <span className="ps-logo">V</span>
-          <div><strong>VoteMax</strong><span>Platform console</span></div>
-        </div>
-        <div className="ps-nav-label">Control plane</div>
-        <nav className="ps-nav" aria-label="Platform sections">
-          {SECTIONS.map((s) => (
-            <button
-              key={s.id} type="button"
-              className={section === s.id ? 'active' : ''}
-              aria-current={section === s.id ? 'page' : undefined}
-              onClick={() => { setSection(s.id); if (s.id === 'organizations') { setDetail(null); setDetailLoading(false); } setMobileNav(false); }}
-            >
-              <Icon name={s.icon} />
-              <span>{s.label}</span>
-              {s.id === 'organizations' && directory && <em>{directory.length}</em>}
-            </button>
-          ))}
-        </nav>
-        <div className="ps-side-foot">
+    <ConsoleShell
+      subtitle="Platform console"
+      navLabel="Control plane"
+      nav={navItems}
+      active={section}
+      onSelect={(id) => { setSection(id as Section); if (id === 'organizations') { setDetail(null); setDetailLoading(false); } }}
+      footer={
+        <>
           <div className="ps-env">
             <i className={`ps-dot ${health ? (health.store === 'memory' ? 'warn' : 'ok') : 'off'}`} />
             <span>{health ? (health.store === 'memory' ? 'In-memory store' : 'PostgreSQL connected') : 'Connecting…'}</span>
           </div>
           <button type="button" className="ps-signout" onClick={signOut}><Icon name="logout" /><span>Sign out</span></button>
-        </div>
-      </aside>
-      {mobileNav && <div className="drawer-backdrop" onClick={() => setMobileNav(false)} />}
-
-      <main className="ps-main">
-        <header className="ps-topbar">
-          <button type="button" className="ps-icon-btn ps-menu-btn" aria-label="Open navigation" onClick={() => setMobileNav((v) => !v)}><Icon name="menu" /></button>
-          <div className="ps-topbar-title">
-            <h1>{showingDetail ? 'Organization' : current.title}</h1>
-            <p>{showingDetail ? 'Staffing, elections and access for this tenant.' : current.blurb}</p>
-          </div>
-          <div className="ps-topbar-actions">
-            <button type="button" className="ps-icon-btn" aria-label="Refresh data" title="Refresh" onClick={() => void refreshAll().catch(() => undefined)} disabled={loading}><Icon name="refresh" /></button>
-            <Button size="sm" onClick={() => { setSection('organizations'); setDetail(null); setDetailLoading(false); setShowNewOrg(true); }}><Icon name="plus" size={16} />New organization</Button>
-          </div>
-        </header>
-
+        </>
+      }
+      title={showingDetail ? 'Organization' : current.title}
+      description={showingDetail ? 'Staffing, elections and access for this tenant.' : current.blurb}
+      actions={
+        <>
+          <button type="button" className="ps-icon-btn" aria-label="Refresh data" title="Refresh" onClick={() => void refreshAll().catch(() => undefined)} disabled={loading}><Icon name="refresh" /></button>
+          <Button size="sm" onClick={() => { setSection('organizations'); setDetail(null); setDetailLoading(false); setShowNewOrg(true); }}><Icon name="plus" size={16} />New organization</Button>
+        </>
+      }
+      after={overlays}
+    >
+      <>
         {statusKind === 'error' && status && <Alert kind="error">{status}</Alert>}
-
-        <div className="ps-content">
           {section === 'overview' && (
             <>
               {directory === null ? <Skeleton lines={4} /> : (
@@ -768,58 +759,7 @@ export default function PlatformPage() {
               </>
             )
           )}
-        </div>
-
-        {showNewOrg && (
-          <>
-            <div className="ps-drawer-backdrop" onClick={closeNewOrg} />
-            <aside className="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="new-org-title">
-              <header className="ps-drawer-head">
-                <div><h2 id="new-org-title">New organization</h2><p>Creates a tenant. Optionally staff it with its first administrator.</p></div>
-                <button type="button" className="ps-icon-btn" aria-label="Close" onClick={closeNewOrg}><Icon name="close" /></button>
-              </header>
-              <div className="ps-drawer-body">
-                {orgEnrollment && (
-                  <Alert kind="success" title="Organization created — share the TOTP secret once">
-                    <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) — enroll this secret in their authenticator now; it is not shown again:</p>
-                    <code>{orgEnrollment.totpSecret}</code>
-                    <p className="small" style={{ margin: '8px 0 0' }}>They sign in at <a href="/login">/login</a> with email, password and TOTP code.</p>
-                  </Alert>
-                )}
-                <h3 className="ps-form-heading">Organization</h3>
-                <Field label="Name" htmlFor="org-name"><Input id="org-name" value={newOrgName} onChange={(e) => { setNewOrgName(e.target.value); if (!slugTouched) setNewOrgSlug(slugify(e.target.value)); }} placeholder="Example Organization" /></Field>
-                <Field label="Slug" hint="Auto-generated from the name — used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => { setSlugTouched(true); setNewOrgSlug(slugify(e.target.value)); }} placeholder="example-org" /></Field>
-
-                <h3 className="ps-form-heading">First administrator <span>optional</span></h3>
-                <p className="muted small">Leave blank to create an unstaffed tenant. When set, an MFA-enrolled account is created with the selected role.</p>
-                <Field label="Admin email" htmlFor="org-admin-email"><Input id="org-admin-email" type="email" value={orgAdminEmail} onChange={(e) => setOrgAdminEmail(e.target.value)} placeholder="admin@org.org" /></Field>
-                <Field label="Display name" htmlFor="org-admin-name"><Input id="org-admin-name" value={orgAdminName} onChange={(e) => setOrgAdminName(e.target.value)} /></Field>
-                <Field label="Password" hint="Minimum 12 characters" htmlFor="org-admin-password"><Input id="org-admin-password" type="password" value={orgAdminPassword} onChange={(e) => setOrgAdminPassword(e.target.value)} autoComplete="new-password" /></Field>
-                <Field label="Role" htmlFor="org-admin-role">
-                  <Select id="org-admin-role" value={orgAdminRole} onChange={(e) => setOrgAdminRole(e.target.value)}>
-                    <option value="organization_owner">organization_owner — runs the tenant</option>
-                    <option value="auditor">auditor — read-only oversight</option>
-                  </Select>
-                </Field>
-              </div>
-              <footer className="ps-drawer-foot">
-                <Button variant="secondary" onClick={closeNewOrg}>{orgEnrollment ? 'Done' : 'Cancel'}</Button>
-                <Button onClick={() => void createOrg()} disabled={loading || !newOrgName || !newOrgSlug || (Boolean(orgAdminEmail) && orgAdminPassword.length < 12)}>Create organization</Button>
-              </footer>
-            </aside>
-          </>
-        )}
-
-        <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
-        <ConfirmDialog
-          open={confirm !== null}
-          title={confirm?.title ?? ''}
-          message={confirm?.message}
-          confirmLabel="Confirm"
-          onConfirm={() => { const c = confirm; setConfirm(null); c?.action(); }}
-          onCancel={() => setConfirm(null)}
-        />
-      </main>
-    </div>
+      </>
+    </ConsoleShell>
   );
 }

@@ -3,12 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Field, Input } from './ui';
+import { Icon } from './icons';
 
 export default function ElectionAccess() {
   const router = useRouter();
   const [slug, setSlug] = useState('');
   return (
-    <div className="card" style={{ boxShadow: 'var(--shadow-md)' }}>
+    <div className="access-card">
+      <span className="access-icon"><Icon name="ballot" size={22} /></span>
       <p className="eyebrow">Election access</p>
       <h2>Find your election</h2>
       <p className="muted small" style={{ marginTop: 0 }}>
@@ -18,7 +20,7 @@ export default function ElectionAccess() {
         <Field label="Organization code" htmlFor="org-code">
           <Input id="org-code" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="e.g. acme" autoComplete="organization" required />
         </Field>
-        <Button type="submit" variant="primary" block disabled={!slug.trim()}>Continue to voter verification</Button>
+        <Button type="submit" variant="primary" size="lg" block disabled={!slug.trim()}>Continue to voter verification</Button>
       </form>
       <p className="small muted" style={{ margin: '14px 0 0' }}>
         Need help? <a href="/help">Read the voting guide</a> or contact your election officer.

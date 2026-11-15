@@ -7,6 +7,8 @@ import {
   Select, Skeleton, Stat, Table, Textarea, Toast,
 } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
+import { Icon } from '../../components/icons';
+import { ConsoleShell, Kpi, Panel } from '../../components/saas';
 import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut } from '../../lib/auth';
 import { hasCapability, type AssignmentInfo } from '../../lib/capabilities';
 import { downloadRegisterTemplate, previewRegisterCsv } from '../../lib/register-csv';
@@ -57,18 +59,23 @@ const PLATFORM_UI_CAPS = new Set([
   'organization.create', 'platform.tenants.read', 'platform.tenants.provision', 'platform.health.read',
 ]);
 
+const LIFECYCLE_ORDER = [
+  'DRAFT', 'CONFIGURED', 'REGISTRATION', 'REGISTER_FROZEN', 'READY', 'OPEN',
+  'CLOSED', 'TALLIED', 'VERIFIED', 'CERTIFIED', 'PUBLISHED',
+] as const;
+
 type Section = 'overview' | 'organization' | 'users' | 'setup' | 'voters' | 'results' | 'audit' | 'fraud' | 'session';
 
-const SECTIONS: { id: Section; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'organization', label: 'Organization' },
-  { id: 'users', label: 'Users and roles' },
-  { id: 'setup', label: 'Election setup' },
-  { id: 'voters', label: 'Voter register' },
-  { id: 'results', label: 'Results and reports' },
-  { id: 'audit', label: 'Security and audit' },
-  { id: 'fraud', label: 'Fraud signals' },
-  { id: 'session', label: 'Session' },
+const SECTIONS: { id: Section; label: string; icon: string }[] = [
+  { id: 'overview', label: 'Overview', icon: 'grid' },
+  { id: 'organization', label: 'Organization', icon: 'building' },
+  { id: 'users', label: 'Users and roles', icon: 'users' },
+  { id: 'setup', label: 'Election setup', icon: 'sliders' },
+  { id: 'voters', label: 'Voter register', icon: 'clipboard' },
+  { id: 'results', label: 'Results and reports', icon: 'chart' },
+  { id: 'audit', label: 'Security and audit', icon: 'filetext' },
+  { id: 'fraud', label: 'Fraud signals', icon: 'flag' },
+  { id: 'session', label: 'Session', icon: 'user' },
 ];
 
 // Minimum capabilities for a section to be worth showing. Empty = always.
@@ -566,44 +573,41 @@ export default function AdminPage() {
     </div>
   );
 
-  const nav = (
-    <nav className="admin-nav" aria-label="Administration">
-      {visibleSections.map((s) => (
-        <button key={s.id} type="button" className={activeSection === s.id ? 'active' : ''} onClick={() => { setSection(s.id); setMobileNav(false); }}>
-          {s.label}
-        </button>
-      ))}
-    </nav>
+  const overlays = (
+    <>
+      <ConfirmDialog open={!!confirm} title={confirm?.title ?? ''} message={confirm?.message ?? ''} confirmLabel="Confirm" onCancel={() => setConfirm(null)} onConfirm={() => { confirm?.action(); setConfirm(null); }} />
+      <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
+    </>
   );
 
   return (
-    <div className="admin-shell">
+    <ConsoleShell
+      subtitle="Election console"
+      navLabel="Administration"
+      nav={visibleSections.map((x) => ({ id: x.id, label: x.label, icon: x.icon }))}
+      active={activeSection}
+      onSelect={(id) => setSection(id as Section)}
+      footer={
+        <>
+          <div className="ps-env">
+            <i className={`ps-dot ${election ? 'ok' : 'off'}`} />
+            <span>{election ? election.name : 'No election selected'}</span>
+          </div>
+          <button type="button" className="ps-signout" onClick={signOut}><Icon name="logout" /><span>Sign out</span></button>
+        </>
+      }
+      title={visibleSections.find((x) => x.id === activeSection)?.label}
+      description={election ? `${election.name} · ${election.state.replace('_', ' ').toLowerCase()}` : 'Manage your organization and elections.'}
+      actions={
+        <>
+          {election && <Badge tone={electionPill(election.state)}>{election.state}</Badge>}
+          <button type="button" className="ps-icon-btn" aria-label="Refresh all" title="Refresh all" onClick={() => void refreshAll()}><Icon name="refresh" /></button>
+        </>
+      }
+      after={overlays}
+    >
       <>
-        <aside className={`admin-sidebar ${mobileNav ? 'open' : ''}`}>
-          <div className="admin-brand">VoteMax Administration</div>
-          {nav}
-        </aside>
-        {mobileNav && <div className="drawer-backdrop" onClick={() => setMobileNav(false)} />}
-      </>
-
-      <main className="admin-main">
-        <div className="admin-topbar">
-          <div>
-            <Button variant="secondary" size="sm" className="nav-toggle" onClick={() => setMobileNav((v) => !v)}>Sections</Button>
-            <h1>{visibleSections.find((s) => s.id === activeSection)?.label}</h1>
-            <div className="breadcrumbs">
-              <a href="/">Home</a><span>/</span><span>Administration</span><span>/</span><span>{visibleSections.find((s) => s.id === activeSection)?.label}</span>
-            </div>
-          </div>
-          <div className="card-actions">
-            <Badge tone="success">Signed in</Badge>
-            {election && <Badge tone={electionPill(election.state)}>{election.state}</Badge>}
-          </div>
-        </div>
-
-        <Alert kind={statusKind === 'error' ? 'error' : 'info'} title="Console status">{status}</Alert>
-
-        <div className="admin-content">
+        {statusKind === 'error' && <Alert kind="error" title="Console status">{status}</Alert>}
           {activeSection === 'session' && (
             <Card title="Session">
               <p>You are signed in as user <code>{userId || 'unknown'}</code>.</p>
@@ -1111,44 +1115,57 @@ export default function AdminPage() {
 
           {activeSection === 'overview' && (
             <>
-              <div className="stat-grid">
-                <Stat label="Organization" value={orgId ? 'Set' : 'Not set'} note={orgSlug ? `voter code: ${orgSlug}` : undefined} />
-                <Stat label="Election" value={election ? election.name : 'None'} note={election ? election.state : 'select or create'} />
-                <Stat label="Eligible voters" value={election?.register.eligible ?? '—'} />
-                <Stat label="Ballots cast" value={participation?.ballotsCast ?? '—'} />
+              <div className="ps-kpis">
+                <Kpi icon="building" label="Organization" value={orgId ? 'Connected' : 'Not set'} note={orgSlug ? `voter code: ${orgSlug}` : undefined} />
+                <Kpi icon="calendar" label="Election" value={election ? election.name : 'None'} note={election ? election.state : 'select or create'} tone="navy" />
+                <Kpi icon="users" label="Eligible voters" value={election?.register.eligible ?? '—'} note={election ? `${election.register.total} on register` : undefined} />
+                <Kpi icon="ballot" label="Ballots cast" value={participation?.ballotsCast ?? '—'} note={participation ? `${participation.turnoutPercent}% turnout` : undefined} tone="green" />
               </div>
-              <div className="admin-grid">
-                <Card title="Current election">
+              <div className="ps-split">
+                <Panel
+                  title="Current election"
+                  subtitle={election ? `${fmtDate(election.votingOpensAt)} → ${fmtDate(election.votingClosesAt)}` : undefined}
+                  actions={election ? <Badge tone={electionPill(election.state)}>{election.state}</Badge> : undefined}
+                >
                   {election ? (
                     <>
-                      <div className="result-row"><div><strong>{election.name}</strong><div className="small muted">{fmtDate(election.votingOpensAt)} → {fmtDate(election.votingClosesAt)}</div></div><Badge tone={electionPill(election.state)}>{election.state}</Badge></div>
-                      <div className="stat-grid" style={{ marginTop: 14 }}>
+                      <ol className="lifecycle" aria-label="Election lifecycle">
+                        {LIFECYCLE_ORDER.map((st, i) => {
+                          const idx = LIFECYCLE_ORDER.indexOf(election.state as (typeof LIFECYCLE_ORDER)[number]);
+                          const cls = idx < 0 ? '' : i < idx ? 'done' : i === idx ? 'current' : '';
+                          return <li key={st} className={cls}><span>{st.replace('_', ' ').toLowerCase()}</span></li>;
+                        })}
+                      </ol>
+                      <div className="stat-grid" style={{ margin: '18px 0 0' }}>
                         <Stat label="Total" value={election.register.total} />
                         <Stat label="Eligible" value={election.register.eligible} />
                         <Stat label="Duplicates" value={election.register.duplicatesUnresolved} />
                         <Stat label="Entitlements" value={election.register.entitlements} />
                       </div>
-                      <div className="form-actions"><Button variant="secondary" size="sm" onClick={() => { setSection('voters'); }}>Manage register</Button><Button variant="secondary" size="sm" onClick={() => { setSection('results'); }}>Results</Button></div>
+                      <div className="form-actions"><Button variant="secondary" size="sm" onClick={() => setSection('voters')}>Manage register</Button><Button variant="secondary" size="sm" onClick={() => setSection('results')}>Results</Button></div>
                     </>
-                  ) : <EmptyState title="No election selected">Create an election or load one by ID.</EmptyState>}
-                </Card>
-                <Card title="Quick actions" className="context-card">
-                  <div className="inline-form">
-                    <Button variant="secondary" block onClick={() => void refreshAll()}>Refresh all</Button>
-                    <Button variant="secondary" block onClick={() => setSection('organization')}>Organization</Button>
-                    <Button variant="secondary" block onClick={() => setSection('users')}>Users and roles</Button>
-                    <Button variant="secondary" block onClick={() => setSection('setup')}>Election setup</Button>
-                    <Button variant="secondary" block onClick={() => setSection('audit')}>Audit log</Button>
-                  </div>
-                </Card>
+                  ) : <EmptyState title="No election selected">Create an election in Election setup, or pick one there.</EmptyState>}
+                </Panel>
+                <Panel title="Quick actions">
+                  <ul className="ps-list">
+                    {([
+                      ['setup', 'sliders', 'Election setup', 'Guided wizard for a new vote'],
+                      ['users', 'users', 'Users and roles', 'Staff accounts and assignments'],
+                      ['voters', 'clipboard', 'Voter register', 'Import, resolve duplicates, invite'],
+                      ['audit', 'filetext', 'Audit log', 'Verify the hash chain'],
+                    ] as const).filter(([id]) => visibleSections.some((x) => x.id === id)).map(([id, icon, label, hint]) => (
+                      <li key={id}>
+                        <span className="ps-avatar"><Icon name={icon} size={16} /></span>
+                        <div className="ps-list-main"><strong>{label}</strong><span>{hint}</span></div>
+                        <button type="button" className="ps-icon-btn" aria-label={label} onClick={() => setSection(id)}><Icon name="chevron" /></button>
+                      </li>
+                    ))}
+                  </ul>
+                </Panel>
               </div>
             </>
           )}
-        </div>
-      </main>
-
-      <ConfirmDialog open={!!confirm} title={confirm?.title ?? ''} message={confirm?.message ?? ''} confirmLabel="Confirm" onCancel={() => setConfirm(null)} onConfirm={() => { confirm?.action(); setConfirm(null); }} />
-      <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
-    </div>
+      </>
+    </ConsoleShell>
   );
 }
