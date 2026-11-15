@@ -110,6 +110,7 @@ function VoteFlow() {
 
   return (
     <main className="vote-shell">
+      <div className="vote-aside">
       <div className="vote-head">
         <p className="eyebrow">Secure voting</p>
         <h1>Cast your ballot</h1>
@@ -127,7 +128,8 @@ function VoteFlow() {
           </li>
         ))}
       </ol>
-
+      </div>
+      <div className="vote-main">
       {error && <Alert kind="error" title="Something needs attention">{error}</Alert>}
       {notice && <Alert kind="success">{notice}</Alert>}
 
@@ -292,6 +294,7 @@ function VoteFlow() {
           <Button variant="secondary" block onClick={() => window.location.href = '/'}>Return home</Button>
         </Card>
       )}
+      </div>
     </main>
   );
 }

@@ -676,3 +676,45 @@ body:has(.ps-shell) .site-footer, body:has(.auth-split) .site-footer { display: 
 .faq-body { padding: 4px 20px 18px; color: var(--text-secondary); line-height: 1.75; font-size: 15px; }
 .faq-body ul, .faq-body ol { margin: 0; padding-left: 20px; }
 @media (max-width: 700px) { .help-cards { grid-template-columns: 1fr; } }
+
+/* fit-to-screen layout: pages fill the viewport exactly; they only scroll
+   when their content really is taller than the screen. */
+html { height: 100%; }
+body { min-height: 100dvh; display: flex; flex-direction: column; }
+body > main, body > .ps-shell { flex: 1 0 auto; }
+.auth-split { flex: 1 0 auto; min-height: 0; }
+.auth-page { min-height: 0; flex: 1 0 auto; }
+.ps-shell { min-height: 0; }
+body:has(.vote-shell) .site-footer { display: none; }
+
+/* voter page: heading + progress on the left, active step on the right */
+.vote-shell { flex: 1 0 auto; display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 540px); gap: 56px; justify-content: center; align-content: center; width: 100%; max-width: 1040px; margin: 0 auto; padding: 24px; }
+.vote-aside { align-self: center; }
+.vote-main { min-width: 0; }
+.vote-head { text-align: left; margin-bottom: 22px; }
+.vote-head h1 { font-size: clamp(26px, 3vw, 34px); }
+.vote-head .lede { margin: 0; max-width: none; }
+.stepper { flex-direction: column; margin: 0; }
+.stepper li { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 9px 0; font-size: 14px; text-align: left; }
+.stepper li::before { top: -50%; left: 15px; width: 2px; height: 100%; }
+.stepper li.done::before { background: var(--blue-600); }
+.vote-shell .card { padding: 24px; }
+@media (max-width: 860px) {
+  .vote-shell { display: block; padding: 20px 16px 40px; }
+  .vote-head { text-align: center; margin-bottom: 18px; }
+  .vote-head .lede { margin: 0 auto; max-width: 480px; font-size: 14px; }
+  .stepper { flex-direction: row; margin: 0 0 20px; }
+  .stepper li { flex-direction: column; justify-content: flex-start; gap: 6px; padding: 0; font-size: 12px; text-align: center; }
+  .stepper li::before { top: 15px; left: -50%; width: 100%; height: 2px; }
+}
+/* short screens: tighten vertical rhythm so forms still fit without scroll */
+@media (max-height: 860px) {
+  .auth-pane { padding-top: 20px; padding-bottom: 20px; }
+  .auth-form .lede { margin-bottom: 14px; }
+  .auth-form h1 { font-size: 24px; margin-bottom: 8px; }
+  .auth-form .field { margin-bottom: 12px; }
+  .vote-shell { padding-top: 14px; padding-bottom: 14px; }
+  .vote-shell .card { padding: 20px; }
+  .vote-shell .field { margin-bottom: 12px; }
+  .vote-shell .divider { margin: 12px 0; }
+}
