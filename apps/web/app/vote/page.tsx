@@ -77,6 +77,9 @@ function VoteFlow() {
   useEffect(() => {
     const org = params.get('org');
     const election = params.get('election');
+    // Personal links from invitation emails/SMS carry the voter's member ID.
+    const id = params.get('id');
+    if (id) setMemberId(id.trim());
     if (org) {
       setOrgSlug(org);
       void findElections(org, election ?? undefined);
@@ -178,11 +181,11 @@ function VoteFlow() {
 
           <hr className="divider" />
           <form onSubmit={(e) => { e.preventDefault(); if (!electionId) return; void act(async () => {
-            const r = await call(`/elections/${electionId}/voting/otp/request`, { memberId });
+            const r = await call(`/elections/${electionId}/voting/otp/request`, { memberId: memberId.trim() });
             if (typeof r.devCode === 'string') setDevHint(`Local test code: ${r.devCode} (shown only outside production)`);
             setStep('code');
           }); }}>
-            <Field label="Member ID" htmlFor="member-id">
+            <Field label="Member ID" htmlFor="member-id" hint="Sent to you with your voting link by email or text message.">
               <Input id="member-id" value={memberId} onChange={(e) => setMemberId(e.target.value)} required autoComplete="username" />
             </Field>
             <Button type="submit" variant="primary" size="lg" block disabled={busy || !electionId}>
@@ -199,7 +202,7 @@ function VoteFlow() {
           </p>
           {devHint && <Alert kind="info">{devHint}</Alert>}
           <form onSubmit={(e) => { e.preventDefault(); void act(async () => {
-            const r = await call(`/elections/${electionId}/voting/otp/verify`, { memberId, code });
+            const r = await call(`/elections/${electionId}/voting/otp/verify`, { memberId: memberId.trim(), code: code.trim() });
             const s = String(r.ballotSession);
             setSession(s);
             const status = await getJson(`/elections/${electionId}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
@@ -277,7 +280,7 @@ function VoteFlow() {
             <Button variant="primary" size="lg" block disabled={busy} onClick={() => void act(async () => {
               const r = await call('/voting/submit', {
                 ballotSession: session, selections,
-                idempotencyKey: `${electionId}-${memberId}-submit`,
+                idempotencyKey: `${electionId}-${memberId.trim()}-submit`,
               });
               setReceipt(String(r.receiptId));
               setStep('done');

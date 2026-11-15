@@ -31,7 +31,7 @@ import {
   type VoterRecord,
 } from '../register/csv-import';
 import { OtpDelivery } from '../otp/otp-delivery';
-import { renderVoterMessage, VoterNotifier } from '../notify/voter-notifier';
+import { renderVoterMessage, renderVoterSms, VoterNotifier } from '../notify/voter-notifier';
 import { InMemoryStore } from '../store/memory.store';
 import { StoreError, StoreErrorCode } from '../store/types';
 import type {
@@ -551,9 +551,15 @@ export class PlatformService {
 
   // ---- Voter notifications ----------------------------------------------------
 
-  private voterLink(orgSlug: string, electionId: string): string {
+  /**
+   * Voting link. With a member ID it is personal: the ID arrives pre-filled so
+   * the voter only has to ask for their one-time code. The ID is an identifier,
+   * not a secret — the one-time code is what proves it is the voter.
+   */
+  private voterLink(orgSlug: string, electionId: string, memberId?: string): string {
     const base = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').replace(/\/$/, '');
-    return `${base}/vote?org=${encodeURIComponent(orgSlug)}&election=${electionId}`;
+    const id = memberId ? `&id=${encodeURIComponent(memberId)}` : '';
+    return `${base}/vote?org=${encodeURIComponent(orgSlug)}&election=${electionId}${id}`;
   }
 
   /**
@@ -598,24 +604,30 @@ export class PlatformService {
   private async runNotificationBatch(batch: NotificationBatch, election: Election, org: Organization): Promise<void> {
     await this.store.updateNotificationBatch(batch.id, { status: 'running' });
     const voters = await this.recipientsFor(election.id, batch.kind);
-    const link = this.voterLink(org.slug, election.id);
     let sent = 0, failed = 0, skipped = 0;
     const CONCURRENCY = 8;
     for (let i = 0; i < voters.length; i += CONCURRENCY) {
       await Promise.all(voters.slice(i, i + CONCURRENCY).map(async (voter) => {
-        if (!voter.email) { skipped += 1; return; }
-        const { subject, text } = renderVoterMessage(batch.kind, {
+        // Reachable by email or SMS; only voters with neither are skipped.
+        if (!voter.email && !voter.phone) { skipped += 1; return; }
+        const ctx = {
           organizationName: org.name, electionName: election.name, memberId: voter.memberId,
-          link, votingOpensAt: election.votingOpensAt, votingClosesAt: election.votingClosesAt,
-        });
+          link: this.voterLink(org.slug, election.id, voter.memberId),
+          votingOpensAt: election.votingOpensAt, votingClosesAt: election.votingClosesAt,
+        };
+        const { subject, text } = renderVoterMessage(batch.kind, ctx);
         try {
-          await this.voterNotifier.send({ to: voter.email as string, subject, text });
+          await this.voterNotifier.send({
+            email: voter.email || undefined, phone: voter.phone || undefined,
+            subject, text, sms: renderVoterSms(batch.kind, ctx),
+          });
           sent += 1;
         } catch { failed += 1; }
       }));
       await this.store.updateNotificationBatch(batch.id, { sent, failed, skipped });
     }
-    const status = failed === voters.filter((v) => v.email).length && voters.length > 0 ? 'failed' : 'completed';
+    const reachable = voters.filter((v) => v.email || v.phone).length;
+    const status = reachable > 0 && failed === reachable ? 'failed' : 'completed';
     await this.store.updateNotificationBatch(batch.id, {
       status, sent, failed, skipped, completedAt: new Date().toISOString(),
     });

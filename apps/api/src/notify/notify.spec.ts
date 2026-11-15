@@ -55,13 +55,39 @@ describe('voter notifications', () => {
     expect(batch.total).toBe(3);
     const done = await waitForBatch(batch.id);
     expect(done.status).toBe('completed');
-    expect(done.sent).toBe(2); // N002 has no email -> skipped
-    expect(done.skipped).toBe(1);
+    expect(done.sent).toBe(3); // N002 has only a phone -> reached by SMS, not skipped
+    expect(done.skipped).toBe(0);
     expect(done.failed).toBe(0);
-    const outbox = (svc as unknown as { voterNotifier?: { outbox: { to: string; text: string }[] } }).voterNotifier;
-    expect(outbox?.outbox.length).toBe(2);
+    const outbox = (svc as unknown as { voterNotifier?: { outbox: { to: string; channel: string; text: string }[] } }).voterNotifier;
+    expect(outbox?.outbox.length).toBe(3);
     expect(outbox?.outbox[0].text).toContain('/vote?org=notify-org&election=');
     expect(outbox?.outbox[0].text).toContain('N00');
+    // Every message carries that voter's own ID, and the link pre-fills it.
+    const sms = outbox!.outbox.find((m) => m.to === '+231 88 000 0002')!;
+    expect(sms.channel).toBe('sms');
+    expect(sms.text).toContain('N002');
+    expect(sms.text).toContain('&id=N002');
+    const mail = outbox!.outbox.find((m) => m.to === 'email1@example.org')!;
+    expect(mail.channel).toBe('email');
+    expect(mail.text).toContain('Your member ID: N001');
+    expect(mail.text).toContain('&id=N001');
+  });
+
+  it('gives voters imported without IDs a unique ID and sends it to them', async () => {
+    const csv = ['fullName,email,phone', 'Dee No-Id,dee@example.org,', 'Eli No-Id,,+231 88 000 0005'].join('\n');
+    await svc.importRegister(adminId, electionId, csv);
+    const generated = (await store.listVoters(electionId)).filter((v) => v.fullName.endsWith('No-Id'));
+    expect(generated).toHaveLength(2);
+    expect(new Set(generated.map((v) => v.memberId)).size).toBe(2);
+    for (const v of generated) expect(v.memberId).toMatch(/^VM-[A-HJKMNP-Z2-9]{8}$/);
+
+    const batch = await svc.notifyVoters(adminId, electionId, 'invite');
+    await waitForBatch(batch.id);
+    const outbox = (svc as unknown as { voterNotifier: { outbox: { to: string; text: string }[] } }).voterNotifier.outbox;
+    for (const v of generated) {
+      const msg = outbox.find((m) => m.to === (v.email || v.phone))!;
+      expect(msg.text).toContain(v.memberId);
+    }
   });
 
   it('queues open/close reminders once inside the window and dedupes', async () => {

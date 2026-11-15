@@ -386,6 +386,19 @@ export default function AdminPage() {
     await refreshNotifications();
   }
 
+  /** Download the register with every voter's ID, so officers can hand IDs out directly. */
+  function exportRegister() {
+    const esc = (x: string) => (/[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x);
+    const rows = [['memberId', 'fullName', 'email', 'phone', 'status'], ...voters.map((v) => [v.memberId, v.fullName, v.email ?? '', v.phone ?? '', v.status])];
+    const blob = new Blob([rows.map((r) => r.map(esc).join(',')).join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${orgSlug || 'voter'}-register.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function copyVoterLink() {
     const link = voterLink();
     if (!link) return;
@@ -492,7 +505,7 @@ export default function AdminPage() {
     <div className="import-box">
       <div className="import-bar">
         <Button variant="secondary" size="sm" onClick={downloadRegisterTemplate}>Download template</Button>
-        <span className="muted small">CSV · memberId optional (auto-generated VM- IDs) · email or phone required for OTP delivery</span>
+        <span className="muted small">CSV · memberId optional — voters without one are given a unique ID automatically · email or phone required</span>
       </div>
       <div
         className={`dropzone ${dragOver ? 'drag-over' : ''}`}
@@ -514,7 +527,7 @@ export default function AdminPage() {
         <strong>{csvName || 'Drop your voter CSV here'}</strong>
         <span className="muted small">or click to browse — you can also paste rows below</span>
       </div>
-      <Field label="Or paste CSV" htmlFor="register-csv" hint="fullName is required. Blank memberId cells get an auto-generated VM- ID. Voters need an email or phone to receive their OTP code.">
+      <Field label="Or paste CSV" htmlFor="register-csv" hint="fullName is required. Blank memberId cells get a unique VM- ID, which is sent to the voter with their voting link. Voters need an email or phone to receive it.">
         <Textarea
           id="register-csv"
           name="csv"
@@ -908,19 +921,19 @@ export default function AdminPage() {
                         <Button variant="secondary" size="sm" onClick={() => void copyVoterLink()}>{copiedLink ? 'Copied!' : 'Copy link'}</Button>
                       </div>
                     )}
-                    <p className="muted small">Share this link with voters — they&apos;ll enter their member ID and receive a one-time code. You can also email every eligible voter their member ID and this link directly.</p>
+                    <p className="muted small">Share this link with voters — they&apos;ll enter their member ID and receive a one-time code. Or send every eligible voter their own member ID and a personal link by email, or by text message when they have no email.</p>
                     <div className="form-actions">
                       <Button variant="primary" size="sm" disabled={!electionId || !cap('register.manage')}
-                        title={cap('register.manage') ? 'Email every eligible voter their voting link and member ID' : 'Requires register.manage — assigned to organization_owner'}
+                        title={cap('register.manage') ? 'Send every eligible voter their member ID and personal voting link' : 'Requires register.manage — assigned to organization_owner'}
                         onClick={() => setConfirm({
-                          title: 'Email voters',
-                          message: `Send voting invitations by email to all eligible voters in ${election?.name}?`,
-                          action: () => void act('Email voters', doNotify),
-                        })}>Email all eligible voters</Button>
+                          title: 'Send invitations',
+                          message: `Send each eligible voter in ${election?.name} their member ID and voting link? They are sent by email, or by text message to voters without an email.`,
+                          action: () => void act('Send invitations', doNotify),
+                        })}>Send invitations to all eligible voters</Button>
                       <Button variant="ghost" size="sm" onClick={() => void refreshNotifications().catch(() => undefined)}>Refresh status</Button>
                     </div>
                     {notifyBatches.length > 0 && (
-                      <Table head={['Type', 'Status', 'Sent', 'Failed', 'Skipped', 'When']}>
+                      <Table head={['Type', 'Status', 'Sent', 'Failed', 'No contact', 'When']}>
                         {notifyBatches.slice(0, 6).map((b) => (
                           <tr key={b.id}>
                             <td className="small">{b.kind === 'invite' ? 'Invitation' : b.kind === 'reminder_open' ? 'Opens soon' : 'Closes soon'}</td>
@@ -951,6 +964,7 @@ export default function AdminPage() {
               <div className="toolbar" style={{ marginBottom: 16 }}>
                 <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.manage')} onClick={() => void act('Refresh voters', refreshVoters)}>Refresh voters</Button>
                 <Button variant="secondary" size="sm" disabled={!electionId || !capAny(['election.configure', 'register.manage', 'participation.viewAggregate', 'audit.read'])} onClick={() => void act('Refresh register stats', async () => { await refreshElection(); })}>Refresh stats</Button>
+                <Button variant="secondary" size="sm" disabled={voters.length === 0} title={voters.length === 0 ? 'Refresh voters first' : 'Download the register with each voter\'s member ID'} onClick={exportRegister}>Export with IDs (CSV)</Button>
               </div>
               {election?.register && (
                 <div className="stat-grid" style={{ marginBottom: 16 }}>

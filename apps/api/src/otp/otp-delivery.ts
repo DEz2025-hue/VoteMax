@@ -87,10 +87,15 @@ export class AfricaTalkingSmsSender implements OtpSender {
 
   async send(msg: OtpMessage): Promise<void> {
     if (!msg.phone) throw new Error('No phone number for SMS delivery');
+    await this.sendText(msg.phone, otpText(msg));
+  }
+
+  /** Send any short text (one-time codes, voter invitations). */
+  async sendText(to: string, text: string): Promise<void> {
     const body = new URLSearchParams({
       username: this.username,
-      to: msg.phone,
-      message: otpText(msg),
+      to,
+      message: text,
     });
     if (this.senderId) body.set('from', this.senderId);
     const res = await fetch('https://api.africastalking.com/version1/messaging', {
@@ -130,13 +135,18 @@ export class WebhookSmsSender implements OtpSender {
 
   async send(msg: OtpMessage): Promise<void> {
     if (!msg.phone) throw new Error('No phone number for SMS delivery');
+    await this.sendText(msg.phone, otpText(msg));
+  }
+
+  /** Send any short text (one-time codes, voter invitations). */
+  async sendText(to: string, text: string): Promise<void> {
     const res = await fetch(this.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(this.authHeader ? { authorization: this.authHeader } : {}),
       },
-      body: JSON.stringify({ to: msg.phone, message: otpText(msg) }),
+      body: JSON.stringify({ to, message: text }),
     });
     if (!res.ok) throw new Error(`SMS webhook failed: HTTP ${res.status}`);
   }
