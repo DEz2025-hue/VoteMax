@@ -46,6 +46,10 @@ export interface NotificationContext {
   votingClosesAt: string | null;
 }
 
+/** Sent from a no-reply address, so say so and point voters to a real contact. */
+export const NO_REPLY_NOTE =
+  '\n\n—\nThis is an automated message from VoteMax. Please do not reply to it; if you need help, contact your election officer.';
+
 export function renderVoterMessage(kind: NotificationKind, ctx: NotificationContext): { subject: string; text: string } {
   const window =
     ctx.votingOpensAt && ctx.votingClosesAt
@@ -60,21 +64,21 @@ export function renderVoterMessage(kind: NotificationKind, ctx: NotificationCont
           `Your member ID: ${ctx.memberId}\n` +
           `Vote here: ${ctx.link}\n` +
           window +
-          `\n\nYou will receive a one-time verification code when you vote. Never share it with anyone.`,
+          `\n\nYou will receive a one-time verification code when you vote. Never share it with anyone.` + NO_REPLY_NOTE,
       };
     case 'reminder_open':
       return {
         subject: `Voting opens soon — ${ctx.electionName}`,
         text:
           `Hello,\n\nVoting for "${ctx.electionName}" (${ctx.organizationName}) is about to begin.${window}\n\n` +
-          `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nCast your ballot before it closes.`,
+          `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nCast your ballot before it closes.` + NO_REPLY_NOTE,
       };
     case 'reminder_close':
       return {
         subject: `Last chance to vote — ${ctx.electionName}`,
         text:
           `Hello,\n\nVoting for "${ctx.electionName}" (${ctx.organizationName}) closes soon.${window}\n\n` +
-          `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nThis is your final reminder — ballots cannot be cast after closing.`,
+          `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nThis is your final reminder — ballots cannot be cast after closing.` + NO_REPLY_NOTE,
       };
   }
 }

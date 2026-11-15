@@ -29,7 +29,8 @@ export interface OtpSender {
 }
 
 function otpText(msg: OtpMessage): string {
-  return `Your Votemax verification code is ${msg.code}. It expires in 10 minutes. Do not share it with anyone.`;
+  return `Your Votemax verification code is ${msg.code}. It expires in 10 minutes. Do not share it with anyone.` +
+    (msg.email ? '\n\nThis is an automated message — please do not reply to it.' : '');
 }
 
 /** SMTP email sender (nodemailer). Configured via SMTP_* env vars. */

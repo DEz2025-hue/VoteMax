@@ -40,7 +40,12 @@ try {
     console.log(`OK  ${provider} accepted the message (HTTP ${res.status}). Check the inbox AND the spam folder.`);
   } else {
     console.error(`FAIL  HTTP ${res.status}: ${out}`);
-    if (res.status === 401 || res.status === 403) console.error('Hint: wrong API key, or the sender address/domain is not verified with the provider.');
+    if (/unrecogni[sz]ed IP/i.test(out)) {
+      console.error('Hint: Brevo is blocking this IP address. In Brevo open Security -> Authorised IPs (https://app.brevo.com/security/authorised_ips)');
+      console.error('      and deactivate blocking. Railway\'s IP changes, so adding only your own IP would not fix the live app.');
+    } else if (res.status === 401 || res.status === 403) {
+      console.error('Hint: wrong API key, or the sender address/domain is not verified with the provider.');
+    }
     process.exit(1);
   }
 } catch (err) {
