@@ -75,6 +75,7 @@ const CERTIFICATION_APPROVER_ROLES = new Set<Role>([
   'auditor',
 ]);
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_TTL_MS = 10 * 60_000;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
 
@@ -226,13 +227,61 @@ export class PlatformService {
 
   /** Voter register rows for an election (admin review; PII — register.manage only). */
   async listVoters(electionId: string): Promise<
-    { id: string; memberId: string; fullName: string; status: string; statusReason: string | null }[]
+    { id: string; memberId: string; fullName: string; email: string; phone: string; status: string; statusReason: string | null }[]
   > {
     const voters = await this.store.listVoters(electionId);
     return voters.map((v) => ({
       id: v.id, memberId: v.memberId, fullName: v.fullName,
+      email: v.email, phone: v.phone,
       status: v.status, statusReason: v.statusReason,
     }));
+  }
+
+  /**
+   * Correct a voter's name or contact details (e.g. a mistyped email that
+   * would otherwise stop their one-time code arriving). The member ID,
+   * eligibility status and entitlement are never touched here. Allowed until
+   * voting closes; the register hash covers member IDs only, so a frozen
+   * register stays valid.
+   */
+  async updateVoter(
+    actorId: string, electionId: string, voterId: string,
+    input: { fullName?: string; email?: string; phone?: string },
+  ): Promise<{ id: string; memberId: string; fullName: string; email: string; phone: string; status: string }> {
+    const election = await this.electionOrThrow(electionId);
+    if (!['REGISTRATION', 'REGISTER_FROZEN', 'READY', 'OPEN', 'SUSPENDED'].includes(election.state)) {
+      throw new Error(`INVALID_STATE: voter details can be edited until voting closes, current ${election.state}`);
+    }
+    const voter = await this.store.getVoter(voterId);
+    if (!voter || voter.electionId !== electionId) throw new Error('NOT_FOUND: voter record');
+
+    const next = {
+      fullName: input.fullName === undefined ? voter.fullName : input.fullName.trim(),
+      email: input.email === undefined ? voter.email : input.email.trim(),
+      phone: input.phone === undefined ? voter.phone : input.phone.trim(),
+    };
+    if (!next.fullName) throw new Error('INVALID_INPUT: full name is required');
+    if (next.email && !EMAIL_RE.test(next.email)) throw new Error('INVALID_INPUT: email address is not valid');
+    if (!next.email && !next.phone) throw new Error('INVALID_INPUT: a voter needs an email or phone to receive their code');
+    if (next.email) {
+      const clash = (await this.store.listVoters(electionId)).some(
+        (v) => v.id !== voterId && v.email && v.email.toLowerCase() === next.email.toLowerCase(),
+      );
+      if (clash) throw new Error('EMAIL_EXISTS: another voter on this register already uses that email');
+    }
+
+    const changed = (['fullName', 'email', 'phone'] as const).filter((k) => next[k] !== voter[k]);
+    if (changed.length > 0) {
+      await this.store.updateVoterContact(voterId, next);
+      // A code already sent to the old address must not stay usable.
+      if (changed.includes('email') || changed.includes('phone')) {
+        await this.store.deleteOtpChallenge(`${electionId}:${voterId}`);
+      }
+    }
+    // Audit records the fact and the field names — never the values (PII).
+    await this.log(election.organizationId, actorId, 'register.updateVoter', `election:${electionId}`,
+      `success:voter=${voterId.slice(0, 8)},fields=${changed.join('+') || 'none'}`);
+    return { id: voter.id, memberId: voter.memberId, ...next, status: voter.status };
   }
 
   /** Assign a role with SoD enforcement; attempts are audited (SoD-9). */
@@ -507,7 +556,22 @@ export class PlatformService {
     return `${base}/vote?org=${encodeURIComponent(orgSlug)}&election=${electionId}`;
   }
 
-  /** Queue a bulk email to every eligible voter (invite or reminder). */
+  /**
+   * Who a batch goes to. Invitations reach every eligible voter; reminders
+   * skip voters who have already voted (consumed entitlement) — nobody wants
+   * a "last chance to vote" email after voting. This reads participation
+   * from the identity domain only and never touches ballots (SEC-BAL-02).
+   */
+  private async recipientsFor(electionId: string, kind: NotificationKind): Promise<VoterRecord[]> {
+    const eligible = (await this.store.listVoters(electionId)).filter((v) => v.status === 'eligible');
+    if (kind === 'invite') return eligible;
+    const voted = new Set(
+      (await this.store.listEntitlements(electionId)).filter((e) => e.consumedAt).map((e) => e.voterRecordId),
+    );
+    return eligible.filter((v) => !voted.has(v.id));
+  }
+
+  /** Queue a bulk email (invite to every eligible voter; reminders only to those yet to vote). */
   async notifyVoters(actorId: string, electionId: string, kind: NotificationKind = 'invite'): Promise<NotificationBatch> {
     const election = await this.electionOrThrow(electionId);
     if (kind !== 'invite') {
@@ -516,7 +580,7 @@ export class PlatformService {
     }
     const org = await this.store.getOrganization(election.organizationId);
     if (!org) throw new Error('NOT_FOUND: organization');
-    const voters = (await this.store.listVoters(electionId)).filter((v) => v.status === 'eligible');
+    const voters = await this.recipientsFor(electionId, kind);
     const batch: NotificationBatch = {
       id: randomUUID(), electionId, organizationId: election.organizationId, kind,
       status: 'queued', total: voters.length, sent: 0, failed: 0, skipped: 0,
@@ -533,7 +597,7 @@ export class PlatformService {
 
   private async runNotificationBatch(batch: NotificationBatch, election: Election, org: Organization): Promise<void> {
     await this.store.updateNotificationBatch(batch.id, { status: 'running' });
-    const voters = (await this.store.listVoters(election.id)).filter((v) => v.status === 'eligible');
+    const voters = await this.recipientsFor(election.id, batch.kind);
     const link = this.voterLink(org.slug, election.id);
     let sent = 0, failed = 0, skipped = 0;
     const CONCURRENCY = 8;
@@ -587,7 +651,7 @@ export class PlatformService {
     if (existing) return;
     const org = await this.store.getOrganization(election.organizationId);
     if (!org) return;
-    const voters = (await this.store.listVoters(election.id)).filter((v) => v.status === 'eligible');
+    const voters = await this.recipientsFor(election.id, kind);
     const batch: NotificationBatch = {
       id: randomUUID(), electionId: election.id, organizationId: election.organizationId, kind,
       status: 'queued', total: voters.length, sent: 0, failed: 0, skipped: 0,

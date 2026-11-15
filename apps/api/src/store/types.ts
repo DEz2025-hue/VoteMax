@@ -200,6 +200,8 @@ export interface PlatformStore {
   findVoterByMemberId(electionId: string, memberId: string): Promise<VoterRecord | null>;
   getVoter(id: string): Promise<VoterRecord | null>;
   updateVoterStatus(voterId: string, status: VoterRecord['status'], reason: string): Promise<void>;
+  /** Update a voter's name/contact details only — never member ID or status. */
+  updateVoterContact(voterId: string, patch: { fullName: string; email: string; phone: string }): Promise<void>;
   /** Resolve a duplicate and (for 'eligible') create its entitlement atomically. */
   resolveDuplicateVoter(voterId: string, status: 'eligible' | 'ineligible', reason: string, entitlement: Entitlement | null): Promise<void>;
   addEntitlement(entitlement: Entitlement): Promise<void>;

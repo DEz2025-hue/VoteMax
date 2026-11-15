@@ -169,6 +169,19 @@ export class PlatformController {
     return guard(() => this.platform.freezeRegister(actor(req), id));
   }
 
+  @Patch('elections/:id/register/voters/:voterId')
+  @RequireCapability('register.manage')
+  updateVoter(
+    @Req() req: { principal?: Principal }, @Param('id') id: string, @Param('voterId') voterId: string,
+    @Body() body: { fullName?: string; email?: string; phone?: string },
+  ) {
+    return guard(() => this.platform.updateVoter(actor(req), id, voterId, {
+      fullName: typeof body?.fullName === 'string' ? body.fullName : undefined,
+      email: typeof body?.email === 'string' ? body.email : undefined,
+      phone: typeof body?.phone === 'string' ? body.phone : undefined,
+    }));
+  }
+
   @Get('elections/:id/register/stats')
   @RequireCapability('register.manage', 'participation.viewAggregate')
   registerStats(@Param('id') id: string) {

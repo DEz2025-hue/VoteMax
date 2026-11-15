@@ -92,6 +92,71 @@ describe('voter notifications', () => {
   });
 });
 
+describe('reminders skip voters who already voted', () => {
+  it('sends the closing reminder only to voters yet to vote; invites still reach everyone', async () => {
+    // N001 (Ada) has voted: her entitlement is consumed.
+    const ada = (await store.listVoters(electionId)).find((v) => v.memberId === 'N001')!;
+    const ent = (await store.listEntitlements(electionId)).find((e) => e.voterRecordId === ada.id)!;
+    ent.consumedAt = new Date().toISOString();
+
+    const reminder = await svc.notifyVoters(adminId, electionId, 'reminder_close');
+    expect(reminder.total).toBe(2); // Ben and Cy only
+    const done = await waitForBatch(reminder.id);
+    expect(done.sent + done.skipped).toBe(2);
+    const outbox = (svc as unknown as { voterNotifier: { outbox: { to: string }[] } }).voterNotifier.outbox;
+    expect(outbox.some((m) => m.to === 'email1@example.org')).toBe(false); // Ada not emailed
+    expect(outbox.some((m) => m.to === 'email3@example.org')).toBe(true);
+
+    const invite = await svc.notifyVoters(adminId, electionId, 'invite');
+    expect(invite.total).toBe(3);
+    await waitForBatch(invite.id);
+  });
+});
+
+describe('voter edits', () => {
+  async function voterId(memberId: string): Promise<string> {
+    return (await store.listVoters(electionId)).find((v) => v.memberId === memberId)!.id;
+  }
+
+  it('corrects contact details, keeps member ID and status, and audits fields without values', async () => {
+    const id = await voterId('N002');
+    const updated = await svc.updateVoter(adminId, electionId, id, { email: 'ben.new@example.org' });
+    expect(updated).toMatchObject({ memberId: 'N002', email: 'ben.new@example.org', status: 'eligible' });
+    expect(updated.phone).toBe('+231 88 000 0002'); // untouched fields stay
+    expect((await svc.listVoters(electionId)).find((v) => v.id === id)?.email).toBe('ben.new@example.org');
+    const audit = (await store.listAudit(orgId)).find((a) => a.action === 'register.updateVoter')!;
+    expect(audit.outcome).toContain('fields=email');
+    expect(JSON.stringify(audit)).not.toContain('ben.new@example.org');
+  });
+
+  it('rejects invalid input, duplicate emails and removing every contact', async () => {
+    const ben = await voterId('N002');
+    const ada = await voterId('N001');
+    await expect(svc.updateVoter(adminId, electionId, ben, { email: 'not-an-email' })).rejects.toThrow(/INVALID_INPUT/);
+    await expect(svc.updateVoter(adminId, electionId, ben, { fullName: '  ' })).rejects.toThrow(/full name/);
+    await expect(svc.updateVoter(adminId, electionId, ben, { email: 'EMAIL1@example.org' })).rejects.toThrow(/EMAIL_EXISTS/);
+    await expect(svc.updateVoter(adminId, electionId, ben, { phone: '' })).rejects.toThrow(/email or phone/);
+    // Clearing email is fine while a phone remains.
+    await expect(svc.updateVoter(adminId, electionId, ada, { email: '', phone: '+231 88 111 1111' })).resolves.toMatchObject({ email: '' });
+  });
+
+  it('invalidates a pending one-time code when contact details change, and locks after close', async () => {
+    const ben = await voterId('N002');
+    await store.upsertOtpChallenge({ key: `${electionId}:${ben}`, voterId: ben, electionId, codeHash: 'x', expiresAt: Date.now() + 60_000, attempts: 0 });
+    await svc.updateVoter(adminId, electionId, ben, { phone: '+231 88 999 9999' });
+    expect(await store.getOtpChallenge(`${electionId}:${ben}`)).toBeNull();
+
+    await store.updateElection(electionId, { state: 'CLOSED' });
+    await expect(svc.updateVoter(adminId, electionId, ben, { phone: '+231 88 000 0000' })).rejects.toThrow(/INVALID_STATE/);
+  });
+
+  it('refuses a voter from another election', async () => {
+    const other = await svc.createElection(adminId, orgId, { name: 'Other' });
+    await store.updateElection(other.id, { state: 'REGISTRATION' });
+    await expect(svc.updateVoter(adminId, other.id, await voterId('N001'), { fullName: 'X' })).rejects.toThrow(/NOT_FOUND/);
+  });
+});
+
 describe('ballot config deletion', () => {
   it('removes a candidate and cascades a position delete', async () => {
     const election = await store.getElection(electionId);

@@ -93,7 +93,7 @@ const SECTION_CAPS: Record<Section, string[]> = {
 };
 
 interface AdminUser { id: string; email: string; displayName: string; mfaEnrolled: boolean }
-interface VoterRow { id: string; memberId: string; fullName: string; status: string; statusReason: string | null }
+interface VoterRow { id: string; memberId: string; fullName: string; email?: string; phone?: string; status: string; statusReason: string | null }
 interface PositionRow { id: string; title: string; seats: number; maxChoices: number; candidates?: { id: string; fullName: string; statement: string | null }[] }
 interface ElectionDetail {
   id: string; name: string; state: string; organizationId: string;
@@ -176,6 +176,7 @@ export default function AdminPage() {
   const [importResult, setImportResult] = useState<{ eligible: number; duplicates: number; errors: { line: number; message: string }[] } | null>(null);
   const [notifyBatches, setNotifyBatches] = useState<NotificationBatch[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [editVoter, setEditVoter] = useState<VoterRow | null>(null);
   const csvFileRef = useRef<HTMLInputElement>(null);
 
   const registerPreview = useMemo(() => (csvText.trim() ? previewRegisterCsv(csvText) : null), [csvText]);
@@ -482,6 +483,7 @@ export default function AdminPage() {
 
   const visibleSections = SECTIONS.filter((s) => sectionAllowed(SECTION_CAPS[s.id]));
   const activeSection: Section = visibleSections.some((s) => s.id === section) ? section : 'overview';
+  const voterEditable = !!election && ['REGISTRATION', 'REGISTER_FROZEN', 'READY', 'OPEN', 'SUSPENDED'].includes(election.state);
   const configEditable = !!election && ['DRAFT', 'CONFIGURED', 'REGISTRATION'].includes(election.state);
 
   // Shared bulk-upload block — used by the setup wizard (step 3) and the
@@ -576,6 +578,35 @@ export default function AdminPage() {
   const overlays = (
     <>
       <ConfirmDialog open={!!confirm} title={confirm?.title ?? ''} message={confirm?.message ?? ''} confirmLabel="Confirm" onCancel={() => setConfirm(null)} onConfirm={() => { confirm?.action(); setConfirm(null); }} />
+      {editVoter && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditVoter(null); }}>
+          <form
+            className="modal" role="dialog" aria-modal="true" aria-labelledby="edit-voter-title"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              const v = editVoter;
+              void act('Update voter', async () => {
+                await call(`/elections/${electionId}/register/voters/${v.id}`, {
+                  fullName: String(f.get('fullName') ?? ''), email: String(f.get('email') ?? ''), phone: String(f.get('phone') ?? ''),
+                }, 'PATCH');
+                setEditVoter(null);
+                await refreshVoters();
+              });
+            }}
+          >
+            <h2 id="edit-voter-title">Edit voter</h2>
+            <p className="muted small">Member ID <code>{editVoter.memberId}</code> and eligibility don&apos;t change. Updating email or phone cancels any one-time code already sent.</p>
+            <Field label="Full name" htmlFor="ev-name"><Input id="ev-name" name="fullName" defaultValue={editVoter.fullName} required /></Field>
+            <Field label="Email" htmlFor="ev-email"><Input id="ev-email" name="email" type="email" defaultValue={editVoter.email ?? ''} /></Field>
+            <Field label="Phone" hint="At least one of email or phone is required" htmlFor="ev-phone"><Input id="ev-phone" name="phone" defaultValue={editVoter.phone ?? ''} /></Field>
+            <div className="form-actions">
+              <Button type="button" variant="secondary" onClick={() => setEditVoter(null)}>Cancel</Button>
+              <Button type="submit" variant="primary" disabled={loading}>Save changes</Button>
+            </div>
+          </form>
+        </div>
+      )}
       <Toast message={toast?.message ?? null} kind={toast?.kind} onClose={() => setToast(null)} />
     </>
   );
@@ -944,17 +975,18 @@ export default function AdminPage() {
               {registerImportBox}
               <div style={{ marginTop: 18 }}>
                 {voters.length ? (
-                  <Table head={['Member ID', 'Name', 'Status', 'Resolve']}>
+                  <Table head={['Member ID', 'Name', 'Status', 'Actions']}>
                     {voters.map((v) => (
                       <tr key={v.id}>
-                        <td><code>{v.memberId}</code></td><td>{v.fullName}</td>
+                        <td><code>{v.memberId}</code></td><td>{v.fullName}<div className="small muted">{[v.email, v.phone].filter(Boolean).join(' · ') || 'no contact'}</div></td>
                         <td><Badge tone={statusPill(v.status)}>{v.status}</Badge>{v.statusReason ? <span className="small muted"> — {v.statusReason}</span> : null}</td>
-                        <td>{v.status === 'duplicate_unresolved' && (
-                          <span style={{ display: 'inline-flex', gap: 6 }}>
+                        <td><span style={{ display: 'inline-flex', gap: 6 }}>
+                          {voterEditable && cap('register.manage') && <Button size="sm" variant="ghost" onClick={() => setEditVoter(v)}>Edit</Button>}
+                          {v.status === 'duplicate_unresolved' && (<>
                             <Button size="sm" disabled={!cap('register.manage')} onClick={() => void act('Resolve eligible', async () => { await call(`/elections/${electionId}/register/resolve`, { voterId: v.id, decision: 'eligible' }); await refreshVoters(); })}>Eligible</Button>
                             <Button size="sm" variant="secondary" disabled={!cap('register.manage')} onClick={() => void act('Resolve ineligible', async () => { await call(`/elections/${electionId}/register/resolve`, { voterId: v.id, decision: 'ineligible' }); await refreshVoters(); })}>Ineligible</Button>
-                          </span>
-                        )}</td>
+                          </>)}
+                        </span></td>
                       </tr>
                     ))}
                   </Table>

@@ -198,6 +198,11 @@ export class InMemoryStore implements PlatformStore {
     return this.voters.find((v) => v.id === id) ?? null;
   }
 
+  async updateVoterContact(voterId: string, patch: { fullName: string; email: string; phone: string }): Promise<void> {
+    const voter = this.voters.find((v) => v.id === voterId);
+    if (voter) Object.assign(voter, patch);
+  }
+
   async updateVoterStatus(voterId: string, status: VoterRecord['status'], reason: string): Promise<void> {
     const voter = this.voters.find((v) => v.id === voterId);
     if (voter) { voter.status = status; voter.statusReason = reason; }

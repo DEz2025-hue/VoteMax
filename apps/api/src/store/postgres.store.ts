@@ -323,6 +323,12 @@ export class PostgresStore implements PlatformStore {
     return row ? this.mapVoter(row) : null;
   }
 
+  async updateVoterContact(voterId: string, patch: { fullName: string; email: string; phone: string }): Promise<void> {
+    await this.database.update(schema.voterRecords)
+      .set({ fullName: patch.fullName, email: patch.email || null, phone: patch.phone || null })
+      .where(eq(schema.voterRecords.id, voterId));
+  }
+
   async updateVoterStatus(voterId: string, status: VoterStatus, reason: string): Promise<void> {
     await this.database.update(schema.voterRecords)
       .set({ status, statusReason: reason })
