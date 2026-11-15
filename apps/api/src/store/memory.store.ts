@@ -137,6 +137,13 @@ export class InMemoryStore implements PlatformStore {
     return [...this.elections.values()].filter((e) => e.organizationId === organizationId);
   }
 
+  async updateElectionStateIf(id: string, from: Election['state'], to: Election['state']): Promise<boolean> {
+    const e = this.elections.get(id);
+    if (!e || e.state !== from) return false;
+    e.state = to;
+    return true;
+  }
+
   async updateElection(id: string, patch: Partial<Election>): Promise<void> {
     const e = this.elections.get(id);
     if (e) Object.assign(e, patch);

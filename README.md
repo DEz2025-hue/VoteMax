@@ -20,7 +20,7 @@ Phases 1–4 implemented on a **repository abstraction**: `PostgresStore` (durab
 
 ### Election lifecycle
 
-`DRAFT → CONFIGURED → REGISTRATION → REGISTER_FROZEN → READY → OPEN → CLOSED → TALLIED → VERIFIED → (RECOUNT) → CERTIFIED → PUBLISHED → ARCHIVED`, with `SUSPENDED`/`CANCELLED` off-ramps. Every transition is enforced server-side with a per-target capability (e.g. register freeze requires `committee_chair`; configure/publish requires `election_admin`).
+`DRAFT → CONFIGURED → REGISTRATION → REGISTER_FROZEN → READY → OPEN → CLOSED → TALLIED → VERIFIED → (RECOUNT) → CERTIFIED → PUBLISHED → ARCHIVED`, with `SUSPENDED`/`CANCELLED` off-ramps. **Scheduled start and close:** a `READY` election opens itself at its opening time and an `OPEN` one closes itself at its closing time (per-election switches, on by default; checked every minute and at startup, so nothing that came due during a restart is missed). Paused (`SUSPENDED`) elections are never closed automatically, a `READY` election whose whole window has passed is not opened (extend the schedule instead), and once `READY` the closing time can only be extended. Manual open/close still works as an override; automatic changes are audited as `system:scheduler`. Every transition is enforced server-side with a per-target capability (e.g. register freeze requires `committee_chair`; configure/publish requires `election_admin`).
 
 ### Voting flow
 

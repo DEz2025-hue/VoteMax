@@ -5,6 +5,10 @@ import { logEvent } from '../common/logger';
 const TICK_MS = 60_000;
 
 /**
+ * Election scheduler (runs every minute and once at startup, so anything that came
+ * due while the API was down is handled right away): opens READY elections and
+ * closes OPEN ones at their scheduled times, then queues voter reminders.
+ *
  * Scheduled voter reminders: queues reminder_open / reminder_close
  * notification batches ~5 minutes around each election's voting window.
  * Dedupe lives in the notification_batches table, so restarts and multiple
@@ -33,6 +37,12 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
       for (const org of orgs) {
         const elections = await this.platform.store.listElections(org.id);
         for (const election of elections) {
+          // Open/close on schedule first, so reminders see the up-to-date state.
+          await this.platform.runElectionSchedule(election.id).then((moved) => {
+            if (moved) logEvent('info', `election.auto${moved === 'opened' ? 'Open' : 'Close'}`, { electionId: election.id });
+          }).catch((err) => {
+            logEvent('warn', 'election.schedule_failed', { electionId: election.id, error: err instanceof Error ? err.message : 'unknown' });
+          });
           await this.platform.reapStaleNotificationBatches(election.id).catch(() => undefined);
           await this.platform.maybeQueueReminder(election.id).catch((err) => {
             logEvent('warn', 'reminder.tick_failed', {

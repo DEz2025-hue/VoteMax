@@ -96,6 +96,10 @@ export const elections = adminSchema.table('elections', {
   voteType: text('vote_type').notNull().default('online'),
   resultsMode: text('results_mode').notNull().default('live'),
   announcement: text('announcement'),
+  // Scheduled start/stop: the scheduler opens a READY election at votingOpensAt and
+  // closes an OPEN one at votingClosesAt, unless the owner switched these off.
+  autoOpen: boolean('auto_open').notNull().default(true),
+  autoClose: boolean('auto_close').notNull().default(true),
   registerHash: text('register_hash'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

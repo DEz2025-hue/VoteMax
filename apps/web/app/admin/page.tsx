@@ -98,6 +98,7 @@ interface PositionRow { id: string; title: string; seats: number; maxChoices: nu
 interface ElectionDetail {
   id: string; name: string; state: string; organizationId: string;
   description: string | null; voteType: string; resultsMode: string; announcement: string | null;
+  autoOpen: boolean; autoClose: boolean;
   votingOpensAt: string | null; votingClosesAt: string | null; timezone: string;
   positions: PositionRow[];
   register: { total: number; eligible: number; duplicatesUnresolved: number; entitlements: number };
@@ -329,6 +330,8 @@ export default function AdminPage() {
       voteType: String(f.get('voteType') ?? 'online'),
       resultsMode: String(f.get('resultsMode') ?? 'live'),
       announcement: String(f.get('announcement') ?? '').trim() || undefined,
+      autoOpen: f.get('autoOpen') === 'on',
+      autoClose: f.get('autoClose') === 'on',
     };
     if (!payload.name || !payload.votingOpensAt || !payload.votingClosesAt) {
       throw new Error('Election name and both voting times are required.');
@@ -796,6 +799,16 @@ export default function AdminPage() {
                     </Select></Field>
                     <Field label="Results announcement (optional)" htmlFor="wiz-announcement" hint="Message shown with the published report"><Textarea id="wiz-announcement" name="announcement" rows={2} defaultValue={election?.announcement ?? ''} disabled={!!election && election.state !== 'DRAFT'} placeholder="e.g. Results certified by the election committee on …" /></Field>
                   </div>
+                  <div className="schedule-switches">
+                    <label className="check-row">
+                      <input type="checkbox" name="autoOpen" defaultChecked={election?.autoOpen ?? true} disabled={!!election && election.state !== 'DRAFT'} />
+                      <span><strong>Start voting automatically</strong><span className="muted small"> — a ready election opens by itself at the opening time.</span></span>
+                    </label>
+                    <label className="check-row">
+                      <input type="checkbox" name="autoClose" defaultChecked={election?.autoClose ?? true} disabled={!!election && election.state !== 'DRAFT'} />
+                      <span><strong>Close voting automatically</strong><span className="muted small"> — an open election closes by itself at the closing time.</span></span>
+                    </label>
+                  </div>
                   {election && election.state !== 'DRAFT' && <Alert kind="info" title="Details locked">This election is {election.state} — details can only change while it is a draft.</Alert>}
                   <div className="form-actions">
                     <Button type="submit" name="intent" value="continue" variant="primary" disabled={!orgId || !capOrg('election.configure')}>Save &amp; continue →</Button>
@@ -946,6 +959,53 @@ export default function AdminPage() {
                     <Stat label="Eligible voters" value={election.register.eligible} />
                     <Stat label="State" value={<Badge tone={electionPill(election.state)}>{election.state}</Badge>} />
                   </div>
+                  {(() => {
+                    const preOpen = ['DRAFT', 'CONFIGURED', 'REGISTRATION', 'REGISTER_FROZEN', 'READY'].includes(election.state);
+                    const running = ['OPEN', 'SUSPENDED'].includes(election.state);
+                    const editable = (preOpen || running) && cap('election.openClose');
+                    return (
+                      <form
+                        key={`${election.id}-${election.votingClosesAt}-${election.autoOpen}-${election.autoClose}`}
+                        className="import-box" style={{ marginBottom: 16 }}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const f = new FormData(e.currentTarget);
+                          const body: Record<string, unknown> = { autoClose: f.get('autoClose') === 'on' };
+                          if (preOpen) body.autoOpen = f.get('autoOpen') === 'on';
+                          const closes = String(f.get('closes') ?? '');
+                          if (closes && closes !== toLocalInput(election.votingClosesAt)) body.votingClosesAt = new Date(closes).toISOString();
+                          void act('Save schedule', async () => {
+                            await call(`/elections/${electionId}/schedule`, body, 'PATCH');
+                            await refreshElection();
+                            await refreshElections();
+                          });
+                        }}
+                      >
+                        <h3 className="card-title" style={{ marginTop: 0 }}>Schedule</h3>
+                        <p className="muted small" style={{ marginTop: 0 }}>
+                          Opens {fmtDate(election.votingOpensAt)} · closes {fmtDate(election.votingClosesAt)}. A check runs every minute, so
+                          the change happens within about a minute of the time. You can still open or close by hand with the buttons below.
+                        </p>
+                        <div className="schedule-switches">
+                          <label className="check-row">
+                            <input type="checkbox" name="autoOpen" defaultChecked={election.autoOpen} disabled={!editable || !preOpen} />
+                            <span><strong>Start automatically</strong><span className="muted small"> at the opening time (once the election is ready).</span></span>
+                          </label>
+                          <label className="check-row">
+                            <input type="checkbox" name="autoClose" defaultChecked={election.autoClose} disabled={!editable} />
+                            <span><strong>Close automatically</strong><span className="muted small"> at the closing time. A paused election is never closed automatically.</span></span>
+                          </label>
+                        </div>
+                        <Field label="Closing time" htmlFor="sched-closes" hint={election.state === 'DRAFT' || election.state === 'CONFIGURED' || election.state === 'REGISTRATION' || election.state === 'REGISTER_FROZEN' ? 'Set the closing time in the Details step before the election is ready.' : 'Once the election is ready, voting can be extended but not shortened.'}>
+                          <Input id="sched-closes" name="closes" type="datetime-local" defaultValue={toLocalInput(election.votingClosesAt)} disabled={!editable || !['READY', 'OPEN', 'SUSPENDED'].includes(election.state)} />
+                        </Field>
+                        <div className="form-actions">
+                          <Button type="submit" variant="secondary" size="sm" disabled={!editable || loading}>Save schedule</Button>
+                        </div>
+                      </form>
+                    );
+                  })()}
+
                   <p className="muted small">Next lifecycle steps (each is audited and capability-checked):</p>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                     {LIFECYCLE_STEPS.map(([to, label]) => (

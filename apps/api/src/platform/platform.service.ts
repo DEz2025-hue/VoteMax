@@ -76,6 +76,8 @@ const CERTIFICATION_APPROVER_ROLES = new Set<Role>([
 ]);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Audit actor for changes made by the scheduler rather than a signed-in person. */
+const SCHEDULER_ACTOR = 'system:scheduler';
 const OTP_TTL_MS = 10 * 60_000;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
 
@@ -358,7 +360,7 @@ export class PlatformService {
 
   async createElection(actorId: string, organizationId: string, input: {
     name: string; description?: string; votingOpensAt?: string; votingClosesAt?: string; ballotOrderPolicy?: string;
-    voteType?: string; resultsMode?: string; announcement?: string;
+    voteType?: string; resultsMode?: string; announcement?: string; autoOpen?: boolean; autoClose?: boolean;
   }): Promise<Election> {
     if (!(await this.store.getOrganization(organizationId))) throw new Error('NOT_FOUND: organization');
     const voteType = input.voteType ?? 'online';
@@ -373,6 +375,7 @@ export class PlatformService {
       votingOpensAt: input.votingOpensAt ?? null, votingClosesAt: input.votingClosesAt ?? null,
       ballotOrderPolicy: input.ballotOrderPolicy ?? 'fixed', registerHash: null,
       voteType, resultsMode, announcement: input.announcement ?? null,
+      autoOpen: input.autoOpen !== false, autoClose: input.autoClose !== false,
     };
     await this.store.createElection(election);
     await this.log(organizationId, actorId, 'election.create', `election:${election.id}`, 'success');
@@ -382,7 +385,7 @@ export class PlatformService {
   /** Edit election details while still in DRAFT (wizard "save & continue"). */
   async updateElectionDetails(actorId: string, electionId: string, input: {
     name?: string; description?: string; votingOpensAt?: string; votingClosesAt?: string;
-    voteType?: string; resultsMode?: string; announcement?: string;
+    voteType?: string; resultsMode?: string; announcement?: string; autoOpen?: boolean; autoClose?: boolean;
   }): Promise<Election> {
     const election = await this.electionOrThrow(electionId);
     if (election.state !== 'DRAFT') {
@@ -395,7 +398,7 @@ export class PlatformService {
       throw new Error(`INVALID_INPUT: resultsMode must be 'live' or 'final'`);
     }
     const patch: Partial<Election> = {};
-    for (const key of ['name', 'description', 'votingOpensAt', 'votingClosesAt', 'voteType', 'resultsMode', 'announcement'] as const) {
+    for (const key of ['name', 'description', 'votingOpensAt', 'votingClosesAt', 'voteType', 'resultsMode', 'announcement', 'autoOpen', 'autoClose'] as const) {
       if (input[key] !== undefined) (patch as Record<string, unknown>)[key] = input[key];
     }
     await this.store.updateElection(electionId, patch);
@@ -1037,6 +1040,85 @@ export class PlatformService {
       await this.store.getOrCreateElectionKey(election.id);
       await this.log(election.organizationId, null, 'keys.prepare', `election:${election.id}`, 'success:mock-single-key');
     }
+  }
+
+  // ---- Scheduled start / close ---------------------------------------------------
+
+  /**
+   * Adjust the schedule: switch automatic start/close on or off, or move the
+   * closing time. Once an election is READY the closing time can only be
+   * extended, never shortened — cutting voting short could shut out voters.
+   */
+  async updateSchedule(
+    actorId: string, electionId: string,
+    input: { autoOpen?: boolean; autoClose?: boolean; votingClosesAt?: string },
+  ): Promise<Election> {
+    const election = await this.electionOrThrow(electionId);
+    const preOpen = ['DRAFT', 'CONFIGURED', 'REGISTRATION', 'REGISTER_FROZEN', 'READY'].includes(election.state);
+    const running = ['OPEN', 'SUSPENDED'].includes(election.state);
+    if (!preOpen && !running) {
+      throw new Error(`INVALID_STATE: the schedule can't be changed once voting has closed, current ${election.state}`);
+    }
+    const patch: Partial<Election> = {};
+    if (input.autoOpen !== undefined) {
+      if (typeof input.autoOpen !== 'boolean') throw new Error('INVALID_INPUT: automatic start must be on or off');
+      if (!preOpen) throw new Error(`INVALID_STATE: automatic start can only change before voting opens, current ${election.state}`);
+      patch.autoOpen = input.autoOpen;
+    }
+    if (input.autoClose !== undefined) {
+      if (typeof input.autoClose !== 'boolean') throw new Error('INVALID_INPUT: automatic close must be on or off');
+      patch.autoClose = input.autoClose;
+    }
+    if (input.votingClosesAt !== undefined) {
+      const t = new Date(input.votingClosesAt).getTime();
+      if (!Number.isFinite(t)) throw new Error('INVALID_INPUT: the closing time is not valid');
+      if (t <= Date.now()) throw new Error('INVALID_INPUT: the closing time must be in the future');
+      if (election.votingOpensAt && t <= new Date(election.votingOpensAt).getTime()) {
+        throw new Error('INVALID_INPUT: the closing time must be after the opening time');
+      }
+      const current = election.votingClosesAt ? new Date(election.votingClosesAt).getTime() : 0;
+      if (['READY', 'OPEN', 'SUSPENDED'].includes(election.state) && t < current) {
+        throw new Error('INVALID_INPUT: once the election is ready, voting can only be extended, not shortened');
+      }
+      patch.votingClosesAt = new Date(t).toISOString();
+    }
+    if (Object.keys(patch).length === 0) return election;
+    await this.store.updateElection(electionId, patch);
+    await this.log(election.organizationId, actorId, 'election.schedule', `election:${electionId}`, `success:${Object.keys(patch).join('+')}`);
+    return { ...election, ...patch };
+  }
+
+  /**
+   * Called by the scheduler every minute: open a READY election whose time has
+   * come, and close an OPEN one whose time is up. Each move is a compare-and-set,
+   * so with several API instances (or a restart mid-tick) it happens exactly once.
+   * Deliberately NOT automatic: SUSPENDED elections (a person paused it — a
+   * person decides), and a READY election whose whole window already passed
+   * (opening it would be meaningless; extend the schedule instead).
+   */
+  async runElectionSchedule(electionId: string, now = Date.now()): Promise<'opened' | 'closed' | null> {
+    const election = await this.store.getElection(electionId);
+    if (!election || !election.votingOpensAt || !election.votingClosesAt) return null;
+    const opens = new Date(election.votingOpensAt).getTime();
+    const closes = new Date(election.votingClosesAt).getTime();
+
+    if (election.autoOpen && election.state === 'READY' && now >= opens && now < closes) {
+      await this.prepareKeys(election);
+      if (!(await this.store.updateElectionStateIf(election.id, 'READY', 'OPEN'))) return null;
+      await this.log(election.organizationId, SCHEDULER_ACTOR, 'election.autoOpen', `election:${election.id}`, 'success');
+      return 'opened';
+    }
+
+    if (election.autoClose && election.state === 'OPEN' && now >= closes) {
+      if (!(await this.store.updateElectionStateIf(election.id, 'OPEN', 'CLOSED'))) return null;
+      const entitlements = await this.store.listEntitlements(election.id);
+      const consumed = entitlements.filter((e) => e.consumedAt).length;
+      const ballotsCast = await this.store.countBallots(election.id);
+      await this.log(election.organizationId, SCHEDULER_ACTOR, 'election.autoClose', `election:${election.id}`,
+        `success:consumed=${consumed},ballots=${ballotsCast}${consumed === ballotsCast ? '' : ',RECONCILE'}`);
+      return 'closed';
+    }
+    return null;
   }
 
   async closeElection(actorId: string, electionId: string) {

@@ -95,7 +95,7 @@ export class PlatformController {
   @RequireCapability('election.configure')
   createElection(@Req() req: { principal?: Principal }, @Body() body: {
     organizationId: string; name: string; description?: string; votingOpensAt?: string; votingClosesAt?: string; ballotOrderPolicy?: string;
-    voteType?: string; resultsMode?: string; announcement?: string;
+    voteType?: string; resultsMode?: string; announcement?: string; autoOpen?: boolean; autoClose?: boolean;
   }) {
     return guard(() => this.platform.createElection(actor(req), body.organizationId, body));
   }
@@ -104,9 +104,18 @@ export class PlatformController {
   @RequireCapability('election.configure')
   updateElection(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: {
     name?: string; description?: string; votingOpensAt?: string; votingClosesAt?: string;
-    voteType?: string; resultsMode?: string; announcement?: string;
+    voteType?: string; resultsMode?: string; announcement?: string; autoOpen?: boolean; autoClose?: boolean;
   }) {
     return guard(() => this.platform.updateElectionDetails(actor(req), id, body));
+  }
+
+  // Automatic start/close switches and extending the closing time.
+  @Patch('elections/:id/schedule')
+  @RequireCapability('election.openClose')
+  updateSchedule(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { autoOpen?: boolean; autoClose?: boolean; votingClosesAt?: string }) {
+    return guard(() => this.platform.updateSchedule(actor(req), id, {
+      autoOpen: body?.autoOpen, autoClose: body?.autoClose, votingClosesAt: body?.votingClosesAt,
+    }));
   }
 
   @Get('elections')

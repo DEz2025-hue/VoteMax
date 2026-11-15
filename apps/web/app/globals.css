@@ -753,3 +753,9 @@ body:has(.vote-shell) .site-footer { display: none; }
 .chip-link { border: 0; background: transparent; color: var(--text-muted); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0 4px; }
 .chip-link:hover { color: var(--danger); }
 .candidate-chip { align-items: center; }
+
+/* schedule switches */
+.schedule-switches { display: grid; gap: 10px; margin: 12px 0 14px; }
+.check-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; line-height: 1.45; }
+.check-row input { margin-top: 4px; width: 17px; height: 17px; accent-color: var(--blue-600); flex-shrink: 0; }
+.check-row input:disabled + span { opacity: .6; }

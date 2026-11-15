@@ -17,6 +17,10 @@ export interface Election {
   votingOpensAt: string | null; votingClosesAt: string | null;
   ballotOrderPolicy: string; registerHash: string | null;
   voteType: string; resultsMode: string; announcement: string | null;
+  /** Open the election automatically at votingOpensAt (from READY). */
+  autoOpen: boolean;
+  /** Close the election automatically at votingClosesAt (from OPEN). */
+  autoClose: boolean;
 }
 export interface Position {
   id: string; electionId: string; title: string; seats: number; maxChoices: number; allowAbstain: boolean;
@@ -184,6 +188,12 @@ export interface PlatformStore {
   getElection(id: string): Promise<Election | null>;
   listElections(organizationId: string): Promise<Election[]>;
   updateElection(id: string, patch: Partial<Election>): Promise<void>;
+  /**
+   * Compare-and-set state change: only moves the election if it is still in
+   * `from`. Returns false when another actor/instance got there first, so a
+   * scheduled transition can never run twice.
+   */
+  updateElectionStateIf(id: string, from: ElectionState, to: ElectionState): Promise<boolean>;
   addPosition(position: Position): Promise<void>;
   getPosition(id: string): Promise<Position | null>;
   listPositions(electionId: string): Promise<Position[]>;

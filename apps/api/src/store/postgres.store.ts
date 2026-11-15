@@ -179,6 +179,7 @@ export class PostgresStore implements PlatformStore {
       votingOpensAt: iso(row.votingOpensAt), votingClosesAt: iso(row.votingClosesAt),
       ballotOrderPolicy: row.ballotOrderPolicy, registerHash: row.registerHash,
       voteType: row.voteType, resultsMode: row.resultsMode, announcement: row.announcement,
+      autoOpen: row.autoOpen, autoClose: row.autoClose,
     };
   }
 
@@ -196,6 +197,8 @@ export class PostgresStore implements PlatformStore {
       voteType: election.voteType,
       resultsMode: election.resultsMode,
       announcement: election.announcement,
+      autoOpen: election.autoOpen,
+      autoClose: election.autoClose,
       registerHash: election.registerHash,
     });
   }
@@ -223,7 +226,17 @@ export class PostgresStore implements PlatformStore {
       ...(patch.voteType !== undefined ? { voteType: patch.voteType } : {}),
       ...(patch.resultsMode !== undefined ? { resultsMode: patch.resultsMode } : {}),
       ...(patch.announcement !== undefined ? { announcement: patch.announcement } : {}),
+      ...(patch.autoOpen !== undefined ? { autoOpen: patch.autoOpen } : {}),
+      ...(patch.autoClose !== undefined ? { autoClose: patch.autoClose } : {}),
     }).where(eq(schema.elections.id, id));
+  }
+
+  async updateElectionStateIf(id: string, from: Election['state'], to: Election['state']): Promise<boolean> {
+    const rows = await this.database.update(schema.elections)
+      .set({ state: to })
+      .where(and(eq(schema.elections.id, id), eq(schema.elections.state, from)))
+      .returning({ id: schema.elections.id });
+    return rows.length > 0;
   }
 
   async addPosition(position: Position): Promise<void> {
