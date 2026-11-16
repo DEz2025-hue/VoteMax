@@ -104,6 +104,7 @@ interface ElectionDetail {
   positions: PositionRow[];
   register: { total: number; eligible: number; duplicatesUnresolved: number; entitlements: number };
 }
+interface ApprovalRow { userId: string; kind: 'tally' | 'certify'; role: string; displayName: string; email: string; createdAt: string }
 interface Participation { eligible: number; ballotsCast: number; turnoutPercent: number }
 interface Report {
   election: { id: string; name: string; state: string; announcement?: string | null };
@@ -229,6 +230,7 @@ export default function AdminPage() {
   const [election, setElection] = useState<ElectionDetail | null>(null);
   const [participation, setParticipation] = useState<Participation | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
   const [audit, setAudit] = useState<AuditResponse | null>(null);
   const [fraudEvents, setFraudEvents] = useState<FraudEventRow[] | null>(null);
   const [fraudBlocks, setFraudBlocks] = useState<FraudBlockRow[] | null>(null);
@@ -500,12 +502,14 @@ export default function AdminPage() {
     if (!electionId) return;
     // Stage first: each result action (tally, verify, certify, publish) moves the election on.
     await refreshElection().catch(() => undefined);
-    const [part, rep] = await Promise.all([
+    const [part, rep, appr] = await Promise.all([
       get(`/elections/${electionId}/participation`).catch(() => null),
       get(`/elections/${electionId}/report`).catch(() => null),
+      get(`/elections/${electionId}/approvals`).catch(() => null),
     ]);
     setParticipation(part as Participation | null);
     setReport(rep as Report | null);
+    setApprovals(Array.isArray(appr) ? (appr as unknown as ApprovalRow[]) : []);
   }
 
   async function refreshAudit() {
@@ -666,6 +670,59 @@ export default function AdminPage() {
       </div>
     </div>
   );
+
+  // ---- Sign-offs: who has approved, what the executor's form pre-fills with ----
+  const tallyRows = approvals.filter((a) => a.kind === 'tally' && a.userId !== userId);
+  const preAuth = tallyRows.find((a) => a.role === 'organization_owner')?.userId ?? '';
+  const preApprovers = tallyRows
+    .filter((a) => a.userId !== preAuth)
+    .sort((a, b) => (a.role === 'auditor' ? 0 : 1) - (b.role === 'auditor' ? 0 : 1))
+    .map((a) => a.userId);
+  const tallyReady = !!preAuth && preApprovers.length >= 2 &&
+    preApprovers.slice(0, 2).some((id) => tallyRows.find((a) => a.userId === id)?.role === 'auditor');
+  const prefillKey = tallyRows.map((a) => a.userId).join('|');
+  const certApprovers = approvals.filter((a) => a.kind === 'certify');
+  const certKey = certApprovers.map((a) => a.userId).join('|');
+
+  function signOffs(kind: 'tally' | 'certify', title: string) {
+    const rows = approvals.filter((a) => a.kind === kind);
+    const mine = rows.find((a) => a.userId === userId);
+    const isAuthorizer = kind === 'tally' && cap('tally.authorize');
+    const canSign = kind === 'tally' ? (cap('tally.verify') || cap('tally.authorize')) : (cap('tally.verify') && !cap('results.certify'));
+    const owners = rows.filter((a) => a.role === 'organization_owner');
+    const approvers = rows.filter((a) => a.role !== 'organization_owner' || kind === 'certify');
+    const who = (a: ApprovalRow) => <li key={a.userId}>✓ <strong>{a.displayName}</strong> <span className="small muted">({a.role === 'organization_owner' ? 'owner' : 'auditor'}, {fmtDate(a.createdAt)})</span></li>;
+    return (
+      <div className="signoff-box">
+        <h3 style={{ marginTop: 0 }}>{title}</h3>
+        {kind === 'tally' ? (
+          <ul className="signoffs">
+            <li><span className="muted">Authorization from an owner (not the person running the count):</span> {owners.length ? <ul>{owners.map(who)}</ul> : <span className="small">waiting</span>}</li>
+            <li><span className="muted">Approvals ({Math.min(approvers.length, 2)} of 2, at least one an auditor):</span> {approvers.length ? <ul>{approvers.map(who)}</ul> : <span className="small">waiting</span>}</li>
+          </ul>
+        ) : (
+          <ul className="signoffs">
+            <li><span className="muted">Approval from an auditor (second approver):</span> {rows.length ? <ul>{rows.map(who)}</ul> : <span className="small">waiting</span>}</li>
+          </ul>
+        )}
+        {canSign ? (
+          mine ? (
+            <div className="form-actions">
+              <Badge tone="success">You {isAuthorizer ? 'authorized' : 'approved'} this</Badge>
+              <Button size="sm" variant="ghost" onClick={() => void act('Withdraw approval', async () => { await call(`/elections/${electionId}/approvals/${kind}`, {}, 'DELETE'); await refreshResults(); })}>Withdraw</Button>
+            </div>
+          ) : (
+            <div className="form-actions">
+              <Button variant="primary" onClick={() => void act(isAuthorizer ? 'Authorize count' : 'Approve', async () => { await call(`/elections/${electionId}/approvals`, { kind }); await refreshResults(); })}>
+                {kind === 'certify' ? 'Approve certification' : isAuthorizer ? 'Authorize the count' : 'Approve the count'}
+              </Button>
+              {isAuthorizer && kind === 'tally' && <span className="small muted">Authorize only if you will not run the count yourself.</span>}
+            </div>
+          )
+        ) : <p className="small muted" style={{ margin: '8px 0 0' }}>{kind === 'tally' ? 'Owners and auditors sign off here.' : 'Only an auditor can approve certification.'}</p>}
+      </div>
+    );
+  }
 
   const overlays = (
     <>
@@ -1296,12 +1353,23 @@ export default function AdminPage() {
 
           {activeSection === 'results' && (
             <Card title="Results and reports">
-              {!electionId && <Alert kind="info" title="Choose an election">Pick an election from the Overview to see its results.</Alert>}
+              <Field label="Election" htmlFor="res-election" hint="Choose which election to work on">
+                <Select id="res-election" value={electionId} onChange={(e) => { setElectionId(e.target.value); setReport(null); setParticipation(null); setApprovals([]); }}>
+                  <option value="">Select an election…</option>
+                  {elections.map((el) => <option key={el.id} value={el.id}>{el.name} - {el.state}</option>)}
+                </Select>
+              </Field>
+              {!electionId && <Alert kind="info" title="Choose an election">Pick an election above to see its results and what is waiting for you.</Alert>}
               {election && (() => {
                 const progress = resultsProgress(election.state);
-                const next = RESULT_NEXT[progress];
+                // The generic guidance assumes you do everything; tailor it to what this person can actually do.
+                let next = RESULT_NEXT[progress];
+                if (progress === 1 && !cap('tally.execute')) next = { title: 'Next: sign off on the count', text: cap('tally.verify') ? 'Approve the count below. Once an owner and two approvers (at least one an auditor) have signed off, an owner runs the count.' : 'Owners and auditors sign off below. Once an owner and two approvers have done so, an owner runs the count.' };
+                if (progress === 2 && !cap('tally.verify')) next = { title: 'Waiting for an auditor to verify', text: 'Only an auditor can verify the count. It moves on as soon as they do.' };
+                if (progress === 3 && !cap('results.certify')) next = { title: 'Next: approve certification', text: cap('tally.verify') ? 'Approve certification below. An owner then certifies the results.' : 'An auditor approves certification, then an owner certifies the results.' };
+                if (progress === 4 && !cap('results.publish')) next = { title: 'Waiting for an owner to publish', text: 'The results are certified. An owner publishes them.' };
                 return (
-                  <div style={{ marginBottom: 16 }}>
+                  <div style={{ margin: '16px 0' }}>
                     <ol className="lifecycle" aria-label="Results progress">
                       {RESULT_STEPS.map((label, i) => <li key={label} className={i < progress ? 'done' : i === progress ? 'current' : ''}>{i < progress ? '✓ ' : `${i + 1}. `}{label}</li>)}
                     </ol>
@@ -1322,51 +1390,94 @@ export default function AdminPage() {
                 <Stat label="Turnout" value={participation ? `${participation.turnoutPercent}%` : '-'} />
                 <Stat label="State" value={election ? <Badge tone={electionPill(election.state)}>{election.state}</Badge> : '-'} />
               </div>
-              <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                void act('Run tally', async () => {
-                  await call(`/elections/${electionId}/tally`, { authorizedBy: f.get('authorizedBy'), approvers: [f.get('approver1'), f.get('approver2')] });
-                  await refreshResults();
-                }); }}>
-                <div className="form-grid">
-                  <Field label="Authorized by (owner)" htmlFor="tally-chair"><Select id="tally-chair" name="authorizedBy" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
-                  <Field label="Approver 1" htmlFor="tally-a1"><Select id="tally-a1" name="approver1" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
-                  <Field label="Approver 2" htmlFor="tally-a2"><Select id="tally-a2" name="approver2" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
+              <div className="toolbar" style={{ marginBottom: 12 }}>
+                <Button variant="secondary" size="sm" disabled={!electionId} onClick={() => void act('Refresh results', refreshResults)}>Refresh</Button>
+                <Button variant="ghost" size="sm" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('View report', async () => { const r = await get(`/elections/${electionId}/report`); setReport(r as unknown as Report); })}>View report</Button>
+              </div>
+
+              {election && ['CLOSED', 'RECOUNT'].includes(election.state) && (
+                <>
+                  {signOffs('tally', 'Sign-offs for the count')}
+                  {cap('tally.execute') && (
+                    <form key={`tally-${prefillKey}`} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
+                      void act('Run tally', async () => {
+                        await call(`/elections/${electionId}/tally`, { authorizedBy: f.get('authorizedBy'), approvers: [f.get('approver1'), f.get('approver2')] });
+                        await refreshResults();
+                      }); }}>
+                      <h3 style={{ marginTop: 0 }}>Run the count</h3>
+                      {tallyReady
+                        ? <Alert kind="success" title="All sign-offs received">The people below approved themselves, so the form is already filled in.</Alert>
+                        : <Alert kind="info" title="Waiting for sign-offs">The form fills in automatically as an owner and two approvers (at least one an auditor) sign off above.</Alert>}
+                      <div className="form-grid" style={{ marginTop: 12 }}>
+                        <Field label="Authorized by (owner)" htmlFor="tally-chair"><Select id="tally-chair" name="authorizedBy" required defaultValue={preAuth}><option value="">Select…</option>{userOptions}</Select></Field>
+                        <Field label="Approver 1" htmlFor="tally-a1"><Select id="tally-a1" name="approver1" required defaultValue={preApprovers[0] ?? ''}><option value="">Select…</option>{userOptions}</Select></Field>
+                        <Field label="Approver 2" htmlFor="tally-a2"><Select id="tally-a2" name="approver2" required defaultValue={preApprovers[1] ?? ''}><option value="">Select…</option>{userOptions}</Select></Field>
+                      </div>
+                      <div className="form-actions">
+                        <Button type="submit" variant="primary" disabled={!electionId || !tallyReady}>Run tally</Button>
+                      </div>
+                    </form>
+                  )}
+                </>
+              )}
+
+              {election && election.state === 'TALLIED' && cap('tally.verify') && (
+                <div className="signoff-box">
+                  <h3 style={{ marginTop: 0 }}>Verify the count</h3>
+                  <p className="muted small" style={{ marginTop: 0 }}>Recounts every stored ballot independently and checks it matches the tally. Only an auditor can do this.</p>
+                  <Button variant="primary" onClick={() => void act('Verify tally', async () => { await call(`/elections/${electionId}/tally/verify`, {}, 'POST'); await refreshResults(); })}>Verify tally</Button>
                 </div>
-                <div className="form-actions">
-                  <Button type="submit" variant="primary" disabled={!electionId || users.length < 4 || !cap('tally.execute') || !['CLOSED', 'RECOUNT'].includes(election?.state ?? '')}>Run tally</Button>
-                  <Button variant="secondary" disabled={!electionId || !cap('tally.verify') || election?.state !== 'TALLIED'} onClick={() => void act('Verify tally', async () => { await call(`/elections/${electionId}/tally/verify`, {}, 'POST'); await refreshResults(); })}>Verify tally</Button>
-                  <Button variant="secondary" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('Refresh results', refreshResults)}>Refresh</Button>
+              )}
+
+              {election && election.state === 'VERIFIED' && (
+                <>
+                  {signOffs('certify', 'Sign-off for certification')}
+                  {cap('results.certify') && (
+                    <form key={`cert-${certKey}`} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
+                      void act('Certify results', async () => {
+                        await call(`/elections/${electionId}/certify`, { certifiedBy: userId, secondApprover: f.get('secondApprover') });
+                        await refreshResults();
+                      }); }}>
+                      <h3 style={{ marginTop: 0 }}>Certify the results</h3>
+                      <div className="form-grid">
+                        <Field label="Certified by" htmlFor="certify-by"><Input id="certify-by" value={users.find((u) => u.id === userId)?.displayName ?? userId} readOnly /></Field>
+                        <Field label="Second approver (auditor)" htmlFor="certify-second"><Select id="certify-second" name="secondApprover" required defaultValue={certApprovers[0]?.userId ?? ''}><option value="">Select…</option>{userOptions}</Select></Field>
+                      </div>
+                      <div className="form-actions">
+                        <Button type="submit" variant="primary" disabled={!userId || certApprovers.length === 0}>Certify results</Button>
+                      </div>
+                    </form>
+                  )}
+                </>
+              )}
+
+              {election && election.state === 'CERTIFIED' && cap('results.publish') && (
+                <div className="signoff-box">
+                  <h3 style={{ marginTop: 0 }}>Publish the results</h3>
+                  <Button variant="primary" onClick={() => setPublishOpen(true)}>Publish results</Button>
                 </div>
-              </form>
-              <hr className="divider" />
-              <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                void act('Recount', async () => {
-                  await call(`/elections/${electionId}/tally/recount`, { authorizedBy: f.get('authorizedBy'), approvers: [f.get('approver1'), f.get('approver2')] });
-                  await refreshResults();
-                }); }}>
-                <div className="form-grid">
-                  <Field label="Recount authorized by (owner)" htmlFor="recount-chair"><Select id="recount-chair" name="authorizedBy" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
-                  <Field label="Approver 1" htmlFor="recount-a1"><Select id="recount-a1" name="approver1" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
-                  <Field label="Approver 2" htmlFor="recount-a2"><Select id="recount-a2" name="approver2" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
-                </div>
-                <Button type="submit" variant="secondary" disabled={!electionId || users.length < 4 || !cap('tally.execute') || !['TALLIED', 'VERIFIED'].includes(election?.state ?? '')}>Recount</Button>
-              </form>
-              <hr className="divider" />
-              <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
-                void act('Certify results', async () => {
-                  await call(`/elections/${electionId}/certify`, { certifiedBy: userId, secondApprover: f.get('secondApprover') });
-                  await refreshResults();
-                }); }}>
-                <div className="form-grid">
-                  <Field label="Certified by" htmlFor="certify-by"><Input id="certify-by" value={userId} readOnly /></Field>
-                  <Field label="Second approver" htmlFor="certify-second"><Select id="certify-second" name="secondApprover" required disabled={users.length < 2}><option value="">Select…</option>{userOptions}</Select></Field>
-                </div>
-                <div className="form-actions">
-                  <Button type="submit" variant="primary" disabled={!electionId || !userId || users.length < 2 || !cap('results.certify') || election?.state !== 'VERIFIED'}>Certify results</Button>
-                  <Button variant="secondary" disabled={!electionId || !cap('results.publish') || election?.state !== 'CERTIFIED'} onClick={() => setPublishOpen(true)}>Publish results</Button>
-                  <Button variant="ghost" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('View report', async () => { const r = await get(`/elections/${electionId}/report`); setReport(r as unknown as Report); })}>View report</Button>
-                </div>
-              </form>
+              )}
+
+              {election && ['TALLIED', 'VERIFIED'].includes(election.state) && cap('tally.execute') && (
+                <details style={{ margin: '14px 0' }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Recount (only if the result is disputed)</summary>
+                  <div style={{ marginTop: 12 }}>
+                    {signOffs('tally', 'Sign-offs for a recount')}
+                    <form key={`recount-${prefillKey}`} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
+                      void act('Recount', async () => {
+                        await call(`/elections/${electionId}/tally/recount`, { authorizedBy: f.get('authorizedBy'), approvers: [f.get('approver1'), f.get('approver2')] });
+                        await refreshResults();
+                      }); }}>
+                      <div className="form-grid">
+                        <Field label="Recount authorized by (owner)" htmlFor="recount-chair"><Select id="recount-chair" name="authorizedBy" required defaultValue={preAuth}><option value="">Select…</option>{userOptions}</Select></Field>
+                        <Field label="Approver 1" htmlFor="recount-a1"><Select id="recount-a1" name="approver1" required defaultValue={preApprovers[0] ?? ''}><option value="">Select…</option>{userOptions}</Select></Field>
+                        <Field label="Approver 2" htmlFor="recount-a2"><Select id="recount-a2" name="approver2" required defaultValue={preApprovers[1] ?? ''}><option value="">Select…</option>{userOptions}</Select></Field>
+                      </div>
+                      <Button type="submit" variant="secondary" disabled={!tallyReady}>Recount</Button>
+                    </form>
+                  </div>
+                </details>
+              )}
               {report && (
                 <div style={{ marginTop: 18 }}>
                   {(() => {

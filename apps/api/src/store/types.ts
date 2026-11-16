@@ -65,6 +65,13 @@ export interface OtpChallenge { voterId: string; electionId: string; codeHash: s
 export type OtpVerifyResult = 'ok' | 'invalid' | 'locked' | 'expired' | 'missing';
 export interface BallotSession { voterId: string; electionId: string; entitlementId: string; expiresAt: number; channel: 'online' }
 
+export type ApprovalKind = 'tally' | 'certify';
+export interface ElectionApproval {
+  electionId: string; userId: string; kind: ApprovalKind;
+  /** The role the user was acting in: organization_owner (authorizer) or auditor (approver). */
+  role: string; createdAt: string;
+}
+
 export type NotificationKind = 'invite' | 'reminder_open' | 'reminder_close' | 'results';
 export type NotificationStatus = 'queued' | 'running' | 'completed' | 'failed';
 export interface NotificationBatch {
@@ -185,6 +192,14 @@ export interface PlatformStore {
    * Audit entries and past tally/certification records keep the user's id as history.
    */
   deleteUser(id: string): Promise<void>;
+
+  // ---- sign-offs required before a count or certification ----
+  listApprovals(electionId: string): Promise<ElectionApproval[]>;
+  /** Record (or refresh) one person's approval for a step; one row per election, user and kind. */
+  upsertApproval(approval: ElectionApproval): Promise<void>;
+  deleteApproval(electionId: string, userId: string, kind: ApprovalKind): Promise<void>;
+  /** Consume every approval of a kind once the step it covered has completed. */
+  clearApprovals(electionId: string, kind: ApprovalKind): Promise<void>;
   createSession(userId: string, tokenHash: string, expiresAt: number): Promise<void>;
   findSession(tokenHash: string): Promise<Session | null>;
   /** Revoke a session by token hash; subsequent findSession returns null. */

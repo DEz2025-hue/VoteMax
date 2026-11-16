@@ -41,8 +41,10 @@ import type {
   BallotRecord,
   BallotSession,
   Candidate,
+  ApprovalKind,
   Certification,
   Election,
+  ElectionApproval,
   Entitlement,
   NotificationBatch,
   NotificationKind,
@@ -1272,6 +1274,51 @@ export class PlatformService {
     }
   }
 
+  // ---- Sign-offs before a count or certification ----
+
+  /**
+   * The signed-in user records their own approval: an owner authorizes the count,
+   * an auditor approves it (or, once verified, approves certification). The people
+   * the executor later names must have done this, so approval is real consent.
+   */
+  async recordApproval(actorId: string, electionId: string, kind: ApprovalKind): Promise<ElectionApproval> {
+    const election = await this.electionOrThrow(electionId);
+    const open = kind === 'tally' ? ['CLOSED', 'TALLIED', 'VERIFIED'] : ['VERIFIED'];
+    if (!open.includes(election.state)) {
+      throw new Error(`INVALID_STATE: approving the ${kind === 'tally' ? 'count' : 'certification'} is not possible while the election is ${election.state}`);
+    }
+    const roles = kind === 'tally' ? TALLY_APPROVER_ROLES : CERTIFICATION_APPROVER_ROLES;
+    const assignments = await this.store.listAssignments();
+    await this.assertElectionParticipant(actorId, election, roles, kind === 'tally' ? 'approver' : 'certification approver', assignments);
+    const isOwner = assignments.some((a) => a.userId === actorId && a.role === 'organization_owner' &&
+      a.organizationId === election.organizationId && isAssignmentActive(a) && (!a.electionId || a.electionId === election.id));
+    const approval: ElectionApproval = {
+      electionId, userId: actorId, kind, role: kind === 'tally' && isOwner ? 'organization_owner' : 'auditor',
+      createdAt: new Date().toISOString(),
+    };
+    await this.store.upsertApproval(approval);
+    await this.log(election.organizationId, actorId, 'approval.record', `election:${electionId}`, `success:${kind},${approval.role}`);
+    return approval;
+  }
+
+  async withdrawApproval(actorId: string, electionId: string, kind: ApprovalKind): Promise<void> {
+    const election = await this.electionOrThrow(electionId);
+    await this.store.deleteApproval(electionId, actorId, kind);
+    await this.log(election.organizationId, actorId, 'approval.withdraw', `election:${electionId}`, `success:${kind}`);
+  }
+
+  /** Who has signed off so far, with names, so the console can pre-fill the executor's form. */
+  async listApprovals(electionId: string): Promise<(ElectionApproval & { displayName: string; email: string })[]> {
+    await this.electionOrThrow(electionId);
+    const rows = await this.store.listApprovals(electionId);
+    const out: (ElectionApproval & { displayName: string; email: string })[] = [];
+    for (const a of rows) {
+      const u = await this.store.findUser(a.userId);
+      if (u) out.push({ ...a, displayName: u.displayName, email: u.email });
+    }
+    return out;
+  }
+
   /** Multi-party tally (SoD-4/5): owner authorizes, executor differs, 2+ approvers incl. an auditor. */
   async tally(actorId: string, electionId: string, input: { authorizedBy: string; approvers: string[] }): Promise<TallyRun> {
     const election = await this.electionOrThrow(electionId);
@@ -1287,6 +1334,7 @@ export class PlatformService {
     // Tally run + state transition commit atomically (Postgres transaction).
     await this.store.recordTally(run, 'TALLIED');
     election.state = 'TALLIED';
+    await this.store.clearApprovals(electionId, 'tally'); // spent; a recount needs fresh sign-offs
     await this.log(election.organizationId, actorId, 'tally.execute', `election:${electionId}`, `success:ballots=${run.ballotCount},hash=${run.tallyHash}`);
     return run;
   }
@@ -1321,6 +1369,17 @@ export class PlatformService {
         (!a.electionId || a.electionId === election.id),
     ));
     if (!auditorApproved) throw new Error('PRECONDITION: at least one tally approver must be an auditor');
+    // Naming someone is not consent: each must have signed off themselves (recordApproval).
+    await this.assertApproved(election.id, 'tally', [input.authorizedBy, ...approvers], 'tally');
+  }
+
+  /** Throws a PRECONDITION naming anyone who has not yet recorded an approval of this kind. */
+  private async assertApproved(electionId: string, kind: ApprovalKind, userIds: string[], what: string): Promise<void> {
+    const given = new Set((await this.store.listApprovals(electionId)).filter((a) => a.kind === kind).map((a) => a.userId));
+    const missing = [...new Set(userIds)].filter((id) => !given.has(id));
+    if (!missing.length) return;
+    const names = await Promise.all(missing.map(async (id) => (await this.store.findUser(id))?.displayName ?? id));
+    throw new Error(`PRECONDITION: waiting for ${names.join(', ')} to approve the ${what} first`);
   }
 
   /** Independent verification: recompute from ciphertexts and compare. */
@@ -1369,6 +1428,7 @@ export class PlatformService {
     const assignments = await this.store.listAssignments();
     await this.assertElectionParticipant(input.certifiedBy, election, new Set<Role>(['organization_owner']), 'certifier', assignments);
     await this.assertElectionParticipant(input.secondApprover, election, CERTIFICATION_APPROVER_ROLES, 'second approver', assignments);
+    await this.assertApproved(electionId, 'certify', [input.secondApprover], 'certification');
     if (run.executedBy === input.certifiedBy) throw new Error('SOD_VIOLATION: tally executor cannot certify (SoD-5)');
     if (input.certifiedBy === input.secondApprover) throw new Error('SOD_VIOLATION: certification needs a second, separate approver');
     const record: Certification = {
@@ -1378,6 +1438,7 @@ export class PlatformService {
     // Certification record + CERTIFIED state commit atomically.
     await this.store.recordCertification(record);
     election.state = 'CERTIFIED';
+    await this.store.clearApprovals(electionId, 'certify');
     await this.log(election.organizationId, actorId, 'results.certify', `election:${electionId}`, `success:hash=${run.tallyHash}`);
     return record;
   }

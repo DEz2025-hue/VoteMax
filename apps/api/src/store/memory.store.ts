@@ -7,6 +7,8 @@ import {
   StoreErrorCode,
   type AcceptBallotInput,
   type AcceptBallotResult,
+  type ApprovalKind,
+  type ElectionApproval,
   type BallotRecord,
   type BallotSession,
   type Candidate,
@@ -46,6 +48,7 @@ export class InMemoryStore implements PlatformStore {
   readonly entitlements: Entitlement[] = [];
   readonly audit: AuditEntry[] = [];
   readonly sessions = new Map<string, Session>();
+  private approvals: ElectionApproval[] = [];
   readonly ballots: BallotRecord[] = [];
   readonly tallyRuns: TallyRun[] = [];
   readonly certifications = new Map<string, Certification>();
@@ -112,9 +115,27 @@ export class InMemoryStore implements PlatformStore {
   }
 
   async deleteUser(id: string): Promise<void> {
+    this.approvals = this.approvals.filter((a) => a.userId !== id);
     for (const [hash, s] of this.sessions) if (s.userId === id) this.sessions.delete(hash);
     for (let i = this.assignments.length - 1; i >= 0; i--) if (this.assignments[i].userId === id) this.assignments.splice(i, 1);
     this.users.delete(id);
+  }
+
+  async listApprovals(electionId: string): Promise<ElectionApproval[]> {
+    return this.approvals.filter((a) => a.electionId === electionId).map((a) => ({ ...a }));
+  }
+
+  async upsertApproval(approval: ElectionApproval): Promise<void> {
+    const i = this.approvals.findIndex((a) => a.electionId === approval.electionId && a.userId === approval.userId && a.kind === approval.kind);
+    if (i >= 0) this.approvals[i] = { ...approval }; else this.approvals.push({ ...approval });
+  }
+
+  async deleteApproval(electionId: string, userId: string, kind: ApprovalKind): Promise<void> {
+    this.approvals = this.approvals.filter((a) => !(a.electionId === electionId && a.userId === userId && a.kind === kind));
+  }
+
+  async clearApprovals(electionId: string, kind: ApprovalKind): Promise<void> {
+    this.approvals = this.approvals.filter((a) => !(a.electionId === electionId && a.kind === kind));
   }
 
   async createSession(userId: string, tokenHash: string, expiresAt: number): Promise<void> {

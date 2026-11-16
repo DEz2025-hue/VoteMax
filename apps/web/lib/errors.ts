@@ -158,12 +158,14 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
       if (d.includes('register must be frozen')) return make(code, raw, 'guidance', 'One more thing first', 'Lock the voter register before marking the election ready.');
       const dup = /(\d+)\s+duplicate/.exec(detail);
       if (dup) return make(code, raw, 'guidance', 'One more thing first', `Resolve the ${dup[1]} duplicate voter ${Number(dup[1]) === 1 ? 'record' : 'records'} before locking the register.`, 'Open Voter register and choose "Eligible" or "Ineligible" for each one.');
+      if (d.startsWith('waiting for')) return make(code, raw, 'guidance', 'Waiting for sign-off', `${detail.replace(/^./, (c) => c.toUpperCase())}.`, 'They can approve under Results and reports; the form fills in once they do.');
       if (d.includes('two approvers')) return make(code, raw, 'guidance', 'One more thing first', 'Choose two different approvers to run the tally.');
       if (d.includes('must be an auditor')) return make(code, raw, 'guidance', 'One more thing first', 'At least one of the approvers must be an auditor.');
       return make(code, raw, 'guidance', 'One more thing first', detail ? `${detail.replace(/\s*\([^)]*\)\s*$/, '').replace(/^./, (c) => c.toUpperCase())}.` : 'Something needs to be completed before this step.');
     }
     case 'RECONCILIATION':
     case 'BLOCKER':
+      if (detail.toLowerCase().includes('only owner')) return make(code, raw, 'guidance', "Can't remove the only owner", 'Every organization needs at least one owner.', 'Add another owner first, then remove this one.');
       return make(code, raw, 'guidance', "Can't continue yet", "We found a mismatch that has to be resolved before this step can go ahead, to keep the election accurate.", 'Share the technical details below with your platform administrator.');
 
     // ---- permissions / separation of duties ----

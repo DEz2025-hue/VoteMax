@@ -33,6 +33,10 @@ async function vote(memberId: string, candidateId: string | null, key?: string):
   return receipt.receiptId;
 }
 
+// Approvers must sign off themselves before the executor may name them.
+const signTally = async (...ids: string[]) => { for (const id of ids) await svc.recordApproval(id, electionId, 'tally'); };
+const signCertify = (id: string) => svc.recordApproval(id, electionId, 'certify');
+
 beforeEach(async () => {
   svc = new PlatformService();
   store = svc.store as InMemoryStore;
@@ -83,6 +87,7 @@ describe('Phase 3 voting and results (mock election)', () => {
     const close = await svc.closeElection(executorId, electionId);
     expect(close).toMatchObject({ reconciled: true, ballotsCast: 4, consumedEntitlements: 4 });
 
+    await signTally(chairId, approver1, approver2);
     const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     expect(run.ballotCount).toBe(4);
     expect(run.counts[adaId]).toBe(2);
@@ -90,6 +95,7 @@ describe('Phase 3 voting and results (mock election)', () => {
     expect(run.counts[`abstain:${positionId}`]).toBe(1);
 
     expect((await svc.verifyTally(electionId)).verified).toBe(true);
+    await signCertify(approver1);
     await svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: approver1 });
     const report = await svc.publish(executorId, electionId);
     expect(report.election.state).toBe('PUBLISHED');
@@ -102,8 +108,10 @@ describe('Phase 3 voting and results (mock election)', () => {
     await vote('S002', adaId);
     await vote('S003', benId);
     await svc.closeElection(executorId, electionId);
+    await signTally(chairId, approver1, approver2);
     await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     await svc.verifyTally(electionId);
+    await signCertify(approver1);
     await svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: approver1 });
   }
   const outbox = () => (svc as unknown as { voterNotifier: { outbox: { to: string; channel: string; subject: string; text: string }[] } }).voterNotifier.outbox;
@@ -217,6 +225,10 @@ describe('Phase 3 voting and results (mock election)', () => {
     // Two owner approvers are not enough - at least one must be an auditor.
     await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [owner2Id, owner3Id] }))
       .rejects.toThrow(/auditor/);
+    // Properly composed, but nobody has signed off yet.
+    await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] }))
+      .rejects.toThrow(/waiting for .* to approve/);
+    await signTally(chairId, approver1, approver2);
     const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     expect(run.ballotCount).toBe(1);
   });
@@ -225,8 +237,10 @@ describe('Phase 3 voting and results (mock election)', () => {
     await vote('S001', adaId);
     await vote('S002', benId);
     await svc.closeElection(executorId, electionId);
+    await signTally(chairId, approver1, approver2);
     const first = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     expect((await svc.verifyTally(electionId)).verified).toBe(true);
+    await signTally(chairId, approver1, approver2); // the first round's sign-offs were spent
     const recount = await svc.recount(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     expect(recount.tallyHash).toBe(first.tallyHash);
   });
@@ -234,6 +248,7 @@ describe('Phase 3 voting and results (mock election)', () => {
   it('a rejected recount leaves the election in TALLIED, not RECOUNT', async () => {
     await vote('S001', adaId);
     await svc.closeElection(executorId, electionId);
+    await signTally(chairId, approver1, approver2);
     await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     await expect(svc.recount(executorId, electionId, { authorizedBy: chairId, approvers: [approver1] }))
       .rejects.toThrow(/PRECONDITION/);
@@ -273,12 +288,17 @@ describe('Phase 3 voting and results (mock election)', () => {
 
     await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, nobody.id] }))
       .rejects.toThrow(/oversight role/);
+    await signTally(chairId, approver1, approver2);
     const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
     expect(run.ballotCount).toBe(1);
     expect((await svc.verifyTally(electionId)).verified).toBe(true);
 
     await expect(svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: nobody.id }))
       .rejects.toThrow(/oversight role/);
+    // Properly composed, but the auditor has not approved certification yet.
+    await expect(svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: approver1 }))
+      .rejects.toThrow(/waiting for .* to approve the certification/);
+    await signCertify(approver1);
     await expect(svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: approver1 }))
       .resolves.toMatchObject({ electionId });
   });

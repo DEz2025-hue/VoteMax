@@ -765,3 +765,8 @@ body:has(.vote-shell) .site-footer { display: none; }
 .cand-bar { height: 8px; border-radius: 999px; background: #eef2f7; overflow: hidden; margin-top: 4px; }
 .cand-bar span { display: block; height: 100%; border-radius: 999px; background: #94a3b8; }
 .cand-bar span.win { background: var(--blue-600); }
+
+/* Results: sign-off panels */
+.signoff-box { border: 1px solid var(--border); border-radius: var(--radius-md); background: #fff; padding: 14px 16px; margin: 0 0 14px; }
+.signoffs { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; }
+.signoffs ul { list-style: none; margin: 4px 0 0; padding-left: 0; display: grid; gap: 2px; }

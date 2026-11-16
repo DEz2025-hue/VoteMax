@@ -10,6 +10,8 @@ import {
   StoreErrorCode,
   type AcceptBallotInput,
   type AcceptBallotResult,
+  type ApprovalKind,
+  type ElectionApproval,
   type BallotRecord,
   type BallotSession,
   type Candidate,
@@ -144,11 +146,45 @@ export class PostgresStore implements PlatformStore {
   async deleteUser(id: string): Promise<void> {
     await this.database.transaction(async (tx) => {
       await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+      await tx.delete(schema.electionApprovals).where(eq(schema.electionApprovals.userId, id));
       // Assignments this user granted to others stay; only the pointer to the deleted user is cleared.
       await tx.update(schema.roleAssignments).set({ grantedBy: null }).where(eq(schema.roleAssignments.grantedBy, id));
       await tx.delete(schema.roleAssignments).where(eq(schema.roleAssignments.userId, id));
       await tx.delete(schema.users).where(eq(schema.users.id, id));
     });
+  }
+
+  async listApprovals(electionId: string): Promise<ElectionApproval[]> {
+    const rows = await this.database.select().from(schema.electionApprovals)
+      .where(eq(schema.electionApprovals.electionId, electionId))
+      .orderBy(schema.electionApprovals.createdAt);
+    return rows.map((r) => ({
+      electionId: r.electionId, userId: r.userId, kind: r.kind, role: r.role, createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  async upsertApproval(a: ElectionApproval): Promise<void> {
+    await this.database.insert(schema.electionApprovals)
+      .values({ electionId: a.electionId, userId: a.userId, kind: a.kind, role: a.role })
+      .onConflictDoUpdate({
+        target: [schema.electionApprovals.electionId, schema.electionApprovals.userId, schema.electionApprovals.kind],
+        set: { role: a.role, createdAt: new Date() },
+      });
+  }
+
+  async deleteApproval(electionId: string, userId: string, kind: ApprovalKind): Promise<void> {
+    await this.database.delete(schema.electionApprovals).where(and(
+      eq(schema.electionApprovals.electionId, electionId),
+      eq(schema.electionApprovals.userId, userId),
+      eq(schema.electionApprovals.kind, kind),
+    ));
+  }
+
+  async clearApprovals(electionId: string, kind: ApprovalKind): Promise<void> {
+    await this.database.delete(schema.electionApprovals).where(and(
+      eq(schema.electionApprovals.electionId, electionId),
+      eq(schema.electionApprovals.kind, kind),
+    ));
   }
 
   async createSession(userId: string, tokenHash: string, expiresAt: number): Promise<void> {

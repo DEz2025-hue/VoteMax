@@ -10,6 +10,7 @@ import {
   jsonb,
   primaryKey,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 // Schemas mirror the logical security domains in EMP-ARCH-001 section 6.
@@ -400,6 +401,24 @@ export const notificationBatches = adminSchema.table('notification_batches', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
 }, (t) => [
   index('notification_batches_election').on(t.electionId),
+]);
+
+// Recorded consent of people who must sign off on a step before it can run:
+// 'tally' = owner authorization and auditor approvals for a count/recount,
+// 'certify' = the auditor second approver for certification. Consumed (deleted)
+// when the step they cover completes. user_id has no FK so history never blocks
+// removing a user; deleteUser clears a removed user's approvals itself.
+export const electionApprovals = adminSchema.table('election_approvals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  electionId: uuid('election_id')
+    .notNull()
+    .references(() => elections.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull(),
+  kind: text('kind', { enum: ['tally', 'certify'] }).notNull(),
+  role: text('role').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('election_approvals_unique').on(t.electionId, t.userId, t.kind),
 ]);
 
 export type Role = (typeof roleEnum.enumValues)[number];

@@ -56,6 +56,8 @@ await assign(ap2.id, 'observer');
 const registrarToken = await login(API, `reg-${stamp}@x.edu`, 'pw-long-enough', registrar.totpSecret);
 const chairToken = await login(API, `chair-${stamp}@x.edu`, 'pw-long-enough', chair.totpSecret);
 const auditorToken = await login(API, `aud-${stamp}@x.edu`, 'pw-long-enough', auditor.totpSecret);
+const ap1Token = await login(API, `ap1-${stamp}@x.edu`, 'pw-long-enough', ap1.totpSecret);
+const ap2Token = await login(API, `ap2-${stamp}@x.edu`, 'pw-long-enough', ap2.totpSecret);
 
 const pos1 = mustOk('pos1', await apiPost(API, `/elections/${el.id}/positions`, { title: 'President', seats: 1, maxChoices: 1 }, adminToken));
 const pos2 = mustOk('pos2', await apiPost(API, `/elections/${el.id}/positions`, { title: 'Vice President', seats: 1, maxChoices: 1 }, adminToken));
@@ -125,6 +127,15 @@ record('S5', 'Assisted station flow requires the assigned officer',
 const close = mustOk('close', await apiPost(API, `/elections/${el.id}/close`, {}, chairToken));
 record('S6', 'Close + reconciliation', close.reconciled === true && close.ballotsCast === 13, JSON.stringify(close));
 
+// Sign-offs: the owner authorizes, the two approvers approve, each as themselves.
+const signOff = async (kind) => {
+  mustOk(`approve ${kind} chair`, await apiPost(API, `/elections/${el.id}/approvals`, { kind }, chairToken));
+  mustOk(`approve ${kind} ap1`, await apiPost(API, `/elections/${el.id}/approvals`, { kind }, ap1Token));
+  mustOk(`approve ${kind} ap2`, await apiPost(API, `/elections/${el.id}/approvals`, { kind }, ap2Token));
+};
+const unsigned = await apiPost(API, `/elections/${el.id}/tally`, { authorizedBy: chair.id, approvers: [ap1.id, ap2.id] }, adminToken);
+record('S6b', 'Tally refused until the named people have approved', unsigned.status >= 400, `status=${unsigned.status}`);
+await signOff('tally');
 const forged = await apiPost(API, `/elections/${el.id}/tally`, { authorizedBy: admin.id, approvers: [ap1.id, ap2.id] }, adminToken);
 record('S7', 'Tally authorization cannot be forged by a non-chair', forged.status >= 400, `status=${forged.status}`);
 const run = mustOk('tally', await apiPost(API, `/elections/${el.id}/tally`, { authorizedBy: chair.id, approvers: [ap1.id, ap2.id] }, adminToken));
@@ -133,11 +144,13 @@ const earlyCertify = await apiPost(API, `/elections/${el.id}/certify`, { certifi
 record('S8', 'Certification refused before verification (blocker)', earlyCertify.status >= 400, `status=${earlyCertify.status}`);
 
 const verify = mustOk('verify', await apiPost(API, `/elections/${el.id}/tally/verify`, {}, auditorToken));
+await signOff('tally'); // the first round's sign-offs were spent
 const recount = mustOk('recount', await apiPost(API, `/elections/${el.id}/tally/recount`, { authorizedBy: chair.id, approvers: [ap1.id, ap2.id] }, adminToken));
 record('S9', 'Independent verification + recount reproduces tally hash',
   verify.verified === true && recount.tallyHash === run.tallyHash, `verified=${verify.verified}, hashMatch=${recount.tallyHash === run.tallyHash}`);
 
 mustOk('verify2', await apiPost(API, `/elections/${el.id}/tally/verify`, {}, auditorToken));
+mustOk('approve certify ap1', await apiPost(API, `/elections/${el.id}/approvals`, { kind: 'certify' }, ap1Token));
 mustOk('certify', await apiPost(API, `/elections/${el.id}/certify`, { certifiedBy: chair.id, secondApprover: ap1.id }, chairToken));
 const report = mustOk('publish', await apiPost(API, `/elections/${el.id}/publish`, {}, adminToken));
 const audit = mustOk('audit', await apiGet(API, `/audit?organizationId=${org.id}`, auditorToken));

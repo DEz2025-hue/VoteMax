@@ -44,6 +44,11 @@ export function actor(req: { principal?: Principal }): string {
   return req.principal?.userId ?? 'bootstrap';
 }
 
+function approvalKind(value: unknown): 'tally' | 'certify' {
+  if (value === 'tally' || value === 'certify') return value;
+  throw new BadRequestException("INVALID_INPUT: kind must be 'tally' or 'certify'");
+}
+
 function fraudScope(req: { principal?: Principal }): { platform: boolean; organizationId: string | null } {
   return {
     platform: req.principal?.assignments.some((a) => a.role === 'platform_admin') ?? false,
@@ -320,6 +325,28 @@ export class PlatformController {
   @RequireCapability('participation.viewAggregate')
   participation(@Req() req: { principal?: Principal }, @Param('id') id: string) {
     return guard(() => this.platform.participation(id, actor(req)));
+  }
+
+  // ---- Sign-offs before a count / certification ----
+
+  @Get('elections/:id/approvals')
+  @RequireCapability('participation.viewAggregate', 'tally.verify', 'tally.execute', 'tally.authorize', 'results.certify', 'audit.read')
+  approvals(@Param('id') id: string) {
+    return guard(() => this.platform.listApprovals(id));
+  }
+
+  @Post('elections/:id/approvals')
+  @RequireCapability('tally.verify', 'tally.authorize')
+  recordApproval(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { kind?: string }) {
+    const kind = approvalKind(body?.kind);
+    return guard(() => this.platform.recordApproval(actor(req), id, kind));
+  }
+
+  @Delete('elections/:id/approvals/:kind')
+  @RequireCapability('tally.verify', 'tally.authorize')
+  withdrawApproval(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('kind') kindParam: string) {
+    const kind = approvalKind(kindParam);
+    return guard(async () => { await this.platform.withdrawApproval(actor(req), id, kind); return { withdrawn: true }; });
   }
 
   @Post('elections/:id/close')
