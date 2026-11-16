@@ -13,7 +13,7 @@ Phases 1-4 implemented on a **repository abstraction**: `PostgresStore` (durable
 - `apps/web` - Next.js 15 + React 19 + TypeScript (public vote, admin console, platform portal)
 - `apps/api` - NestJS + TypeScript modular monolith
 - PostgreSQL + Drizzle ORM (schema-per-domain: `admin`, `identity`, `ballot`, `results`, `audit`, `fraud`)
-- Auth: scrypt password hashing, bearer sessions, TOTP MFA for privileged roles
+- Auth: scrypt password hashing, bearer sessions, emailed one-time sign-in codes for staff
 - Decision record: `votemax md/DEC-003_FRAMEWORK_ORM_DECISION.md`
 
 ## Features
@@ -36,12 +36,12 @@ Four roles mapped to capabilities, scoped organization-wide or per-election: `pl
 ### Platform admin portal (`/platform`)
 
 - Tenant directory: per-org user/election counts, elections-by-state, staffed status.
-- One-step organization creation with **optional first-admin provisioning** - creates an MFA-enrolled account and returns its one-time TOTP secret.
+- One-step organization creation with **optional first-admin provisioning** - creates the account; staff sign in with a code emailed to them.
 - Platform health dashboard: store type, DB latency, OTP provider availability, security-signal counts, uptime.
 
 ## Security
 
-- **AuthN/Z:** scrypt (memory-hard KDF) password hashing; revocable bearer sessions; mandatory TOTP MFA for all privileged accounts; tenant resolved from the session principal, never client input.
+- **AuthN/Z:** scrypt (memory-hard KDF) password hashing; revocable bearer sessions; emailed one-time code at every staff sign-in; tenant resolved from the session principal, never client input.
 - **Secret ballot by architecture:** no role or capability can link a ballot selection to a voter - ballots are stored against election keys only. Audit records contain no selections.
 - **Anti-fraud engine (SEC-VOT-10):** evaluates OTP requests/verifies, logins, ballot fetches, and submissions against rules such as `otp_harvest_device`, `login_stuffing_device`, `ip_otp_sweep`, `submit_replay`. Emits allow/throttle/block decisions with salted hashes only (no raw IPs or device fingerprints persisted). Blocks are reviewable and liftable from the admin console's Fraud signals section.
 - **Audit trail:** append-only, hash-chained records via a transactional outbox; tamper-evident and verifiable (`GET /audit` reports `verified`).

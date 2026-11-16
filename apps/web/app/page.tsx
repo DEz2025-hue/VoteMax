@@ -36,7 +36,7 @@ export default function HomePage() {
             <div className="hero-chips">
               <span><Icon name="check" size={16} />Secret ballots</span>
               <span><Icon name="check" size={16} />Audit trail</span>
-              <span><Icon name="check" size={16} />MFA for staff</span>
+              <span><Icon name="check" size={16} />Emailed sign-in codes for staff</span>
             </div>
           </div>
           <ElectionAccess />

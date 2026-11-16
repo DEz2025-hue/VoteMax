@@ -3,17 +3,15 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Alert, Button, Field, Input, Skeleton } from '../../components/ui';
+import { Skeleton } from '../../components/ui';
+import { StaffSignInForm } from '../../components/staff-sign-in';
 import { AuthLayout } from '../../components/saas';
-import { clearSession, fetchPrincipal, isPlatformOnly, signIn, storeSession } from '../../lib/auth';
-import { friendlyFromUnknown } from '../../lib/errors';
+import { clearSession, fetchPrincipal, isPlatformOnly, storeSession, type SessionData } from '../../lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
-  const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
-  const [statusKind, setStatusKind] = useState<'info' | 'error'>('info');
 
   useEffect(() => {
     const t = sessionStorage.getItem('votemax.session');
@@ -33,29 +31,12 @@ export default function LoginPage() {
     });
   }, [router]);
 
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    setLoading(true);
-    setStatus('Signing in…');
-    setStatusKind('info');
-    try {
-      const data = await signIn(
-        String(f.get('email') ?? ''),
-        String(f.get('password') ?? ''),
-        String(f.get('totp') ?? ''),
-      );
-      storeSession(data);
-      // Platform-only accounts belong to the control-plane portal.
-      const platformOnly = (data.assignments ?? []).length > 0 &&
-        (data.assignments ?? []).every((a) => a.role === 'platform_admin');
-      router.replace(platformOnly ? '/platform' : '/admin');
-    } catch (err) {
-      const f = friendlyFromUnknown(err);
-      setStatus(f.hint ? `${f.message} ${f.hint}` : f.message);
-      setStatusKind(f.severity === 'guidance' ? 'info' : 'error');
-      setLoading(false);
-    }
+  function done(data: SessionData) {
+    storeSession(data);
+    // Platform-only accounts belong to the control-plane portal.
+    const platformOnly = (data.assignments ?? []).length > 0 &&
+      (data.assignments ?? []).every((a) => a.role === 'platform_admin');
+    router.replace(platformOnly ? '/platform' : '/admin');
   }
 
   if (checking) {
@@ -75,13 +56,7 @@ export default function LoginPage() {
       lede="Sign in to the election console for your organization."
       footer={<>Don&apos;t have an account? Organizations and staff accounts are provisioned through the <Link href="/platform">platform administration portal</Link>. Platform administrators sign in there directly.</>}
     >
-      {status && <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>}
-      <form onSubmit={submit} className="inline-form">
-        <Field label="Email" htmlFor="login-email"><Input id="login-email" name="email" type="email" required autoComplete="username" /></Field>
-        <Field label="Password" htmlFor="login-password"><Input id="login-password" name="password" type="password" required autoComplete="current-password" /></Field>
-        <Field label="TOTP code" hint="Required for privileged accounts" htmlFor="login-totp"><Input id="login-totp" name="totp" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" /></Field>
-        <Button type="submit" variant="primary" size="lg" block disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</Button>
-      </form>
+      <StaffSignInForm onSignedIn={done} notice={status} />
     </AuthLayout>
   );
 }

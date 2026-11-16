@@ -62,6 +62,7 @@ export interface Certification {
   electionId: string; certifiedBy: string; secondApprover: string; tallyHash: string; createdAt: string;
 }
 export interface OtpChallenge { voterId: string; electionId: string; codeHash: string; expiresAt: number; attempts: number }
+export interface LoginChallenge { userId: string; codeHash: string; expiresAt: number; attempts: number }
 export type OtpVerifyResult = 'ok' | 'invalid' | 'locked' | 'expired' | 'missing';
 export interface BallotSession { voterId: string; electionId: string; entitlementId: string; expiresAt: number; channel: 'online' }
 
@@ -268,6 +269,10 @@ export interface PlatformStore {
    */
   consumeOtpChallenge(key: string, codeHash: string, maxAttempts: number): Promise<OtpVerifyResult>;
   deleteOtpChallenge(key: string): Promise<void>;
+  /** Staff sign-in codes (one pending code per user). */
+  upsertLoginChallenge(challenge: LoginChallenge): Promise<void>;
+  getLoginChallenge(userId: string): Promise<LoginChallenge | null>;
+  consumeLoginChallenge(userId: string, codeHash: string, maxAttempts: number): Promise<OtpVerifyResult>;
   createBallotSession(tokenHash: string, session: BallotSession): Promise<void>;
   getBallotSession(tokenHash: string): Promise<BallotSession | null>;
   deleteBallotSession(tokenHash: string): Promise<void>;

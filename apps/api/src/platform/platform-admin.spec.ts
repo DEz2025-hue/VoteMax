@@ -2,14 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { PlatformService } from './platform.service';
 import { InMemoryStore } from '../store/memory.store';
 import { ROLE_CAPABILITIES, type Role } from '../auth/roles';
-import { totpCode } from '../auth/credentials';
+import { signIn } from './test-signin';
 
 let svc: PlatformService;
 let store: InMemoryStore;
 let orgA: string;
 let orgB: string;
 let platformAdminId: string;
-let platformAdminTotp: string;
 
 beforeEach(async () => {
   svc = new PlatformService();
@@ -18,9 +17,8 @@ beforeEach(async () => {
   orgB = (await svc.createOrganization(null, 'Org B', 'orgb')).id;
   // First-run bootstrap: seed the platform_admin anonymously before the
   // window closes (mirrors real deployment ordering).
-  const pa = await svc.createUser(null, 'root@platform', 'Root Admin', 'correct horse battery');
+  const pa = await svc.createUser(null, 'root@platform.test', 'Root Admin', 'correct horse battery');
   platformAdminId = pa.id;
-  platformAdminTotp = pa.totpSecret;
   await svc.assignRole('bootstrap', orgA, pa.id, 'platform_admin');
 });
 
@@ -62,7 +60,7 @@ describe('tenant directory', () => {
     expect(detail.roleAssignments).toEqual([]);
 
     await svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'owner@orgb', displayName: 'Org B Owner', password: 'correct horse battery',
+      email: 'owner@orgb.test', displayName: 'Org B Owner', password: 'correct horse battery',
     });
     const after = await svc.tenantDetail(orgB);
     expect(after.users).toHaveLength(1);
@@ -73,20 +71,20 @@ describe('tenant directory', () => {
 });
 
 describe('tenant provisioning', () => {
-  it('creates an org owner who can log in with MFA', async () => {
+  it('creates an org owner who signs in with an emailed code', async () => {
     const res = await svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'owner@orgb', displayName: 'Org B Owner', password: 'correct horse battery',
+      email: 'owner@orgb.test', displayName: 'Org B Owner', password: 'correct horse battery',
     });
-    expect(res.totpSecret).toBeTruthy();
+    expect(res).not.toHaveProperty('totpSecret');
 
-    const login = await svc.login('owner@orgb', 'correct horse battery', totpCode(res.totpSecret));
+    const login = await signIn(svc, 'owner@orgb.test', 'correct horse battery');
     expect(login.token).toBeTruthy();
     expect(login.userId).toBe(res.userId);
   });
 
   it('audits provisioning under the platform actor', async () => {
     await svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'owner@orgb', displayName: 'Org B Owner', password: 'correct horse battery',
+      email: 'owner@orgb.test', displayName: 'Org B Owner', password: 'correct horse battery',
     });
     const audit = await svc.auditEntries(orgB);
     expect(audit.some((a) => a.action === 'platform.provisionAdmin' && a.actorId === platformAdminId)).toBe(true);
@@ -95,20 +93,20 @@ describe('tenant provisioning', () => {
 
   it('rejects duplicate emails and weak passwords', async () => {
     await svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'owner@orgb', displayName: 'Org B Owner', password: 'correct horse battery',
+      email: 'owner@orgb.test', displayName: 'Org B Owner', password: 'correct horse battery',
     });
     await expect(svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'OWNER@orgb', displayName: 'Dup', password: 'correct horse battery',
+      email: 'OWNER@orgb.test', displayName: 'Dup', password: 'correct horse battery',
     })).rejects.toThrow(/EMAIL_EXISTS/);
-    await expect(svc.createUser(orgB, 'weak@orgb', 'Weak', 'short')).rejects.toThrow(/WEAK_PASSWORD/);
-    await expect(svc.createUser('missing-org', 'x@orgb', 'X', 'correct horse battery'))
+    await expect(svc.createUser(orgB, 'weak@orgb.test', 'Weak', 'short')).rejects.toThrow(/WEAK_PASSWORD/);
+    await expect(svc.createUser('missing-org', 'x@orgb.test', 'X', 'correct horse battery'))
       .rejects.toThrow(/NOT_FOUND: organization/);
   });
 
   it('provisions an auditor scoped to a specific election', async () => {
     const election = await svc.createElection(platformAdminId, orgB, { name: 'Org B Election' });
     const res = await svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'auditor@orgb', displayName: 'Auditor', password: 'correct horse battery',
+      email: 'auditor@orgb.test', displayName: 'Auditor', password: 'correct horse battery',
       role: 'auditor', electionId: election.id,
     });
     expect(res.role).toBe('auditor');
@@ -125,14 +123,14 @@ describe('tenant provisioning', () => {
       })).rejects.toThrow(/FORBIDDEN: role/);
     }
     await expect(svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'bad@orgb', displayName: 'Bad', password: 'correct horse battery',
+      email: 'bad@orgb.test', displayName: 'Bad', password: 'correct horse battery',
       role: 'auditor', electionId: foreign.id,
     })).rejects.toThrow(/FORBIDDEN: election does not belong/);
   });
 
   it('marks the tenant staffed after provisioning', async () => {
     await svc.provisionTenantAdmin(platformAdminId, orgB, {
-      email: 'owner@orgb', displayName: 'Org B Owner', password: 'correct horse battery',
+      email: 'owner@orgb.test', displayName: 'Org B Owner', password: 'correct horse battery',
     });
     const b = (await svc.listTenantDirectory()).find((d) => d.id === orgB)!;
     expect(b.staffed).toBe(true);

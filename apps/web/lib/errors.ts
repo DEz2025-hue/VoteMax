@@ -190,10 +190,10 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
       return make(code, raw, 'guidance', 'Please sign in again', 'Your session has ended.', 'Sign in again to carry on.');
     case 'AUTH_FAILED':
       return /mfa|code/i.test(detail)
-        ? make(code, raw, 'guidance', "That code isn't right", "The authentication code wasn't accepted.", 'Open your authenticator app and enter the current 6-digit code.')
+        ? make(code, raw, 'guidance', "That code isn't right", "The sign-in code wasn't accepted.", 'Use the latest code we emailed you.')
         : make(code, raw, 'guidance', "Those details don't match", 'The email or password is incorrect.', 'Check them and try again.');
     case 'MFA_REQUIRED':
-      return make(code, raw, 'guidance', 'One more step', 'Enter the 6-digit code from your authenticator app to sign in.');
+      return make(code, raw, 'guidance', 'One more step', 'Enter the 6-digit code we emailed you to sign in.');
     case 'AUTH_LOCKED':
       return make(code, raw, 'guidance', 'Please wait a few minutes', 'There have been several unsuccessful sign-in attempts, so sign-in is paused briefly to protect the account.', 'Try again in about five minutes.');
     case 'WEAK_PASSWORD':

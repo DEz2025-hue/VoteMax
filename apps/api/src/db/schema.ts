@@ -422,3 +422,13 @@ export const electionApprovals = adminSchema.table('election_approvals', {
 ]);
 
 export type Role = (typeof roleEnum.enumValues)[number];
+
+// Staff sign-in codes: one pending emailed code per user, single use, attempt-limited, short-lived.
+export const loginChallenges = identitySchema.table('login_challenges', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  codeHash: text('code_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  attempts: integer('attempts').notNull().default(0),
+});

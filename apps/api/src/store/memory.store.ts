@@ -21,6 +21,7 @@ import {
   type FraudSignalFilter,
   type NewFraudBlock,
   type NotificationBatch,
+  type LoginChallenge,
   type OtpChallenge,
   type OtpVerifyResult,
   type Organization,
@@ -53,6 +54,7 @@ export class InMemoryStore implements PlatformStore {
   readonly tallyRuns: TallyRun[] = [];
   readonly certifications = new Map<string, Certification>();
   readonly otpChallenges = new Map<string, OtpChallenge & { key: string }>();
+  readonly loginChallenges = new Map<string, LoginChallenge>();
   readonly ballotSessions = new Map<string, BallotSession>();
   readonly electionKeys = new Map<string, Buffer>();
   readonly fraudSignals: FraudSignal[] = [];
@@ -366,6 +368,28 @@ export class InMemoryStore implements PlatformStore {
 
   async deleteOtpChallenge(key: string): Promise<void> {
     this.otpChallenges.delete(key);
+  }
+
+  async upsertLoginChallenge(challenge: LoginChallenge): Promise<void> {
+    this.loginChallenges.set(challenge.userId, { ...challenge });
+  }
+
+  async getLoginChallenge(userId: string): Promise<LoginChallenge | null> {
+    return this.loginChallenges.get(userId) ?? null;
+  }
+
+  async consumeLoginChallenge(userId: string, codeHash: string, maxAttempts: number): Promise<OtpVerifyResult> {
+    const challenge = this.loginChallenges.get(userId);
+    if (!challenge) return 'missing';
+    if (challenge.expiresAt < Date.now()) {
+      this.loginChallenges.delete(userId);
+      return 'expired';
+    }
+    challenge.attempts += 1;
+    if (challenge.attempts > maxAttempts) return 'locked';
+    if (challenge.codeHash !== codeHash) return 'invalid';
+    this.loginChallenges.delete(userId);
+    return 'ok';
   }
 
   async createBallotSession(tokenHash: string, session: BallotSession): Promise<void> {

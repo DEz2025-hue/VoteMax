@@ -11,7 +11,6 @@ import { prepareCandidatePhoto } from '../../lib/image';
 import { apiRequest } from '../../lib/http';
 import { friendlyFromUnknown } from '../../lib/errors';
 import { Icon } from '../../components/icons';
-import { TotpQr, totpUri } from '../../components/totp-qr';
 import { ConsoleShell, Kpi, Panel } from '../../components/saas';
 import { plainAction, plainActor, plainOutcome, plainRule, plainSignal, plainTarget } from '../../lib/plain';
 import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut, SIGNOUT_EVENT } from '../../lib/auth';
@@ -92,7 +91,7 @@ const SECTION_CAPS: Record<Section, string[]> = {
   fraud: ['fraud.read'],
 };
 
-interface AdminUser { id: string; email: string; displayName: string; mfaEnrolled: boolean }
+interface AdminUser { id: string; email: string; displayName: string }
 interface VoterRow { id: string; memberId: string; fullName: string; email?: string; phone?: string; status: string; statusReason: string | null }
 interface PositionRow { id: string; title: string; seats: number; maxChoices: number; candidates?: { id: string; fullName: string; statement: string | null; photoUrl?: string | null }[] }
 interface ElectionDetail {
@@ -224,8 +223,8 @@ export default function AdminPage() {
   const [userId, setUserId] = useState('');
   const [me, setMe] = useState<{ displayName?: string; email?: string } | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
-  // One-time TOTP secret for a just-created staff account; kept on screen until dismissed.
-  const [newUserEnrollment, setNewUserEnrollment] = useState<{ email: string; totpSecret: string } | null>(null);
+  // Email of a just-created staff account; the confirmation stays on screen until dismissed.
+  const [newUserEnrollment, setNewUserEnrollment] = useState<{ email: string } | null>(null);
   const [voters, setVoters] = useState<VoterRow[]>([]);
   const [elections, setElections] = useState<ElectionSummary[]>([]);
   const [election, setElection] = useState<ElectionDetail | null>(null);
@@ -923,11 +922,11 @@ export default function AdminPage() {
 
           {activeSection === 'users' && (
             <Card title="Users and roles">
-              <p className="muted small" style={{ marginTop: 0 }}>Create staff accounts, then assign roles. Privileged roles require the TOTP secret shown once at creation. SoD rules block conflicting combinations.</p>
+              <p className="muted small" style={{ marginTop: 0 }}>Create staff accounts, then assign roles. They sign in with their password and a code emailed to their address, so use a working email. SoD rules block conflicting combinations.</p>
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 void act('Create user', async () => {
-                  const u = await call('/users', { organizationId: orgId, email: f.get('email'), displayName: f.get('name'), password: f.get('password') }) as { id: string; totpSecret?: string };
-                  setNewUserEnrollment(u.totpSecret ? { email: String(f.get('email')), totpSecret: u.totpSecret } : null);
+                  const u = await call('/users', { organizationId: orgId, email: f.get('email'), displayName: f.get('name'), password: f.get('password') }) as { id: string };
+                  setNewUserEnrollment(u.id ? { email: String(f.get('email')) } : null);
                   await refreshUsers();
                 }); }}>
                 <div className="form-grid">
@@ -939,17 +938,9 @@ export default function AdminPage() {
               </form>
               {newUserEnrollment && (
                 <div style={{ marginTop: 14 }}>
-                  <Alert kind="success" title="Authenticator secret - share it once">
-                    <p style={{ margin: '4px 0' }}><strong>{newUserEnrollment.email}</strong> must scan this QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, Authy). It is not shown again:</p>
-                    <div style={{ margin: '8px 0' }}><TotpQr email={newUserEnrollment.email} secret={newUserEnrollment.totpSecret} /></div>
-                    <p className="small" style={{ margin: '4px 0' }}>Can't scan? Enter this setup key instead:</p>
-                    <code style={{ wordBreak: 'break-all' }}>{newUserEnrollment.totpSecret}</code>
-                    <p className="small" style={{ margin: '8px 0 0' }}>
-                      Choose "Enter a setup key", account <code>{newUserEnrollment.email}</code>, type "Time based". On phones, <a href={totpUri(newUserEnrollment.email, newUserEnrollment.totpSecret)}>tap here to add it directly</a>.
-                      Assign a role below, then they sign in at <a href="/login">/login</a> with email, password and the 6-digit code.
-                    </p>
-                    <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                      <Button type="button" variant="secondary" onClick={() => { void navigator.clipboard?.writeText(newUserEnrollment.totpSecret).catch(() => undefined); }}>Copy secret</Button>
+                  <Alert kind="success" title="Account created">
+                    <p style={{ margin: '4px 0' }}><strong>{newUserEnrollment.email}</strong> can sign in at <a href="/login">/login</a> with their password and a code we email to that address. Assign a role below.</p>
+                    <div style={{ marginTop: 8 }}>
                       <Button type="button" variant="secondary" onClick={() => setNewUserEnrollment(null)}>Done</Button>
                     </div>
                   </Alert>
@@ -974,25 +965,15 @@ export default function AdminPage() {
               </form>
               <div style={{ marginTop: 18 }}>
                 {users.length ? (
-                  <Table head={['Name', 'Email', 'MFA', 'Actions']}>
+                  <Table head={['Name', 'Email', 'Actions']}>
                     {users.map((u) => {
                       const self = u.id === userId;
                       return (
                         <tr key={u.id}>
                           <td>{u.displayName}{self && <span className="small muted"> (you)</span>}</td>
                           <td>{u.email}</td>
-                          <td><Badge tone={u.mfaEnrolled ? 'success' : 'warning'}>{u.mfaEnrolled ? 'enrolled' : 'no'}</Badge></td>
                           <td>
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              <Button size="sm" variant="ghost" disabled={self || !capOrg('roles.assign')} title={self ? 'Ask another administrator to reset your authenticator' : undefined}
-                                onClick={() => setConfirm({
-                                  title: 'Reset authenticator',
-                                  message: `Issue a new authenticator secret for ${u.email}? Their current one stops working and they are signed out. You will see the new secret once.`,
-                                  action: () => void act('Reset authenticator', async () => {
-                                    const r = await call(`/users/${u.id}/totp-reset`, {}) as { totpSecret?: string };
-                                    setNewUserEnrollment(r.totpSecret ? { email: u.email, totpSecret: r.totpSecret } : null);
-                                  }),
-                                })}>Reset authenticator</Button>
                               <Button size="sm" variant="ghost" disabled={self || !capOrg('roles.assign')} title={self ? 'You cannot remove your own account' : undefined}
                                 onClick={() => setConfirm({
                                   title: 'Remove user',

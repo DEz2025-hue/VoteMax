@@ -6,12 +6,12 @@ import {
   Select, Skeleton, Table, Toast, errorToast, type ToastData,
 } from '../../components/ui';
 import { Icon } from '../../components/icons';
-import { TotpQr } from '../../components/totp-qr';
 import { AuthLayout, ConsoleShell, Kpi, Panel, StatusRow } from '../../components/saas';
 import { fraudHeaders } from '../../lib/fraud';
 import { apiRequest } from '../../lib/http';
 import { friendlyFromUnknown } from '../../lib/errors';
-import { API, sessionIsValid, signIn as apiSignIn, signOut as apiSignOut, SIGNOUT_EVENT, storeSession } from '../../lib/auth';
+import { API, sessionIsValid, signOut as apiSignOut, SIGNOUT_EVENT, storeSession, type SessionData } from '../../lib/auth';
+import { StaffSignInForm } from '../../components/staff-sign-in';
 
 let sessionToken = '';
 
@@ -53,7 +53,7 @@ interface TenantRow {
   staffed: boolean;
 }
 interface TenantDetail extends Omit<TenantRow, 'staffed' | 'electionsByState' | 'userCount' | 'electionCount'> {
-  users: { id: string; email: string; displayName: string; mfaEnrolled: boolean }[];
+  users: { id: string; email: string; displayName: string }[];
   elections: { id: string; name: string; state: string; votingOpensAt: string | null; votingClosesAt: string | null }[];
   roleAssignments: { userId?: string; role: string; electionId: string | null }[];
 }
@@ -126,11 +126,6 @@ export default function PlatformPage() {
   const [toast, setToast] = useState<ToastData | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: ReactNode; action: () => void } | null>(null);
 
-  // Sign-in
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [totp, setTotp] = useState('');
-
   // Directory browsing
   const [tenantQuery, setTenantQuery] = useState('');
   const [tenantFilter, setTenantFilter] = useState<'all' | 'staffed' | 'unstaffed'>('all');
@@ -151,7 +146,7 @@ export default function PlatformPage() {
   const [orgAdminName, setOrgAdminName] = useState('');
   const [orgAdminPassword, setOrgAdminPassword] = useState('');
   const [orgAdminRole, setOrgAdminRole] = useState('organization_owner');
-  const [orgEnrollment, setOrgEnrollment] = useState<{ email: string; role: string; totpSecret: string } | null>(null);
+  const [orgEnrollment, setOrgEnrollment] = useState<{ email: string; role: string } | null>(null);
 
   // Provisioning
   const [provEmail, setProvEmail] = useState('');
@@ -159,7 +154,7 @@ export default function PlatformPage() {
   const [provPassword, setProvPassword] = useState('');
   const [provRole, setProvRole] = useState('organization_owner');
   const [provElection, setProvElection] = useState('');
-  const [enrolled, setEnrolled] = useState<{ email: string; totpSecret: string } | null>(null);
+  const [enrolled, setEnrolled] = useState<{ email: string } | null>(null);
 
   const [health, setHealth] = useState<PlatformHealth | null>(null);
 
@@ -236,13 +231,10 @@ export default function PlatformPage() {
     }
   }
 
-  async function signIn() {
-    await act('Sign in', async () => {
-      const data = await apiSignIn(email, password, totp || undefined);
-      sessionToken = data.token;
-      storeSession(data);
-      setSignedIn(true);
-    });
+  function signedInWith(data: SessionData) {
+    sessionToken = data.token;
+    storeSession(data);
+    setSignedIn(true);
   }
 
   function signOut() {
@@ -298,12 +290,12 @@ export default function PlatformPage() {
           },
         } : {}),
       });
-      const enr = res.adminEnrollment as { email?: string; role?: string; totpSecret?: string } | undefined;
-      const enrollment = enr?.totpSecret ? { email: String(enr.email), role: String(enr.role), totpSecret: String(enr.totpSecret) } : null;
+      const enr = res.adminEnrollment as { email?: string; role?: string } | undefined;
+      const enrollment = enr?.email ? { email: String(enr.email), role: String(enr.role) } : null;
       setOrgEnrollment(enrollment);
       setNewOrgName(''); setNewOrgSlug(''); setSlugTouched(false);
       setOrgAdminEmail(''); setOrgAdminName(''); setOrgAdminPassword(''); setOrgAdminRole('organization_owner');
-      // Keep the drawer open only when a one-time TOTP secret must be shown.
+      // Keep the drawer open to confirm who can now sign in.
       if (!enrollment) setShowNewOrg(false);
       await refreshAll();
     });
@@ -316,20 +308,11 @@ export default function PlatformPage() {
         email: provEmail, displayName: provName, password: provPassword,
         role: provRole, electionId: provElection || null,
       });
-      const secret = { email: String(res.email ?? provEmail), totpSecret: String(res.totpSecret ?? '') };
+      const secret = { email: String(res.email ?? provEmail) };
       setProvEmail(''); setProvName(''); setProvPassword(''); setProvRole('organization_owner'); setProvElection('');
       await openTenant(detail.id, 'provision');
       setEnrolled(secret);
       await refreshAll();
-    });
-  }
-
-  async function resetUserTotp(orgId: string, userId: string) {
-    await act('Reset authenticator', async () => {
-      const res = await call(`/platform/organizations/${orgId}/users/${userId}/totp-reset`, {});
-      const secret = { email: String(res.email ?? ''), totpSecret: String(res.totpSecret ?? '') };
-      setDetail(await get(`/platform/organizations/${orgId}`) as unknown as TenantDetail);
-      setEnrolled(secret);
     });
   }
 
@@ -376,13 +359,7 @@ export default function PlatformPage() {
     }
     return (
       <AuthLayout eyebrow="Platform administration" title="Sign in to the console" lede="Control-plane access for platform administrators. Tenant election operations stay in Administration.">
-        {status && <Alert kind={statusKind === 'error' ? 'error' : 'info'}>{status}</Alert>}
-        <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void signIn(); }}>
-          <Field label="Email" htmlFor="p-email"><Input id="p-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required /></Field>
-          <Field label="Password" htmlFor="p-password"><Input id="p-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></Field>
-          <Field label="TOTP code" hint="Required for privileged accounts" htmlFor="p-totp"><Input id="p-totp" inputMode="numeric" autoComplete="one-time-code" value={totp} onChange={(e) => setTotp(e.target.value)} /></Field>
-          <Button type="submit" variant="primary" size="lg" block disabled={loading || !email || !password}>Sign in</Button>
-        </form>
+        <StaffSignInForm onSignedIn={signedInWith} notice={status} idPrefix="p" />
       </AuthLayout>
     );
   }
@@ -416,12 +393,8 @@ export default function PlatformPage() {
             </header>
             <div className="ps-drawer-body">
               {orgEnrollment && (
-                <Alert kind="success" title="Organization created - share the TOTP secret once">
-                  <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) - enroll this secret in their authenticator now; it is not shown again:</p>
-                  <div style={{ margin: '8px 0' }}><TotpQr email={orgEnrollment.email} secret={orgEnrollment.totpSecret} /></div>
-                  <p className="small" style={{ margin: '4px 0' }}>Can't scan? Enter this setup key instead:</p>
-                  <code style={{ wordBreak: 'break-all' }}>{orgEnrollment.totpSecret}</code>
-                  <p className="small" style={{ margin: '8px 0 0' }}>They sign in at <a href="/login">/login</a> with email, password and TOTP code.</p>
+                <Alert kind="success" title="Organization created">
+                  <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) can now sign in at <a href="/login">/login</a> with their password and a code we email to that address.</p>
                 </Alert>
               )}
               <h3 className="ps-form-heading">Organization</h3>
@@ -429,7 +402,7 @@ export default function PlatformPage() {
               <Field label="Slug" hint="Auto-generated from the name - used in voter-facing URLs" htmlFor="org-slug"><Input id="org-slug" value={newOrgSlug} onChange={(e) => { setSlugTouched(true); setNewOrgSlug(slugify(e.target.value)); }} placeholder="example-org" /></Field>
 
               <h3 className="ps-form-heading">First administrator <span>optional</span></h3>
-              <p className="muted small">Leave blank to create an unstaffed tenant. When set, an MFA-enrolled account is created with the selected role.</p>
+              <p className="muted small">Leave blank to create an unstaffed tenant. When set, an account is created with the selected role. They sign in with a code emailed to this address, so it must be a working address.</p>
               <Field label="Admin email" htmlFor="org-admin-email"><Input id="org-admin-email" type="email" value={orgAdminEmail} onChange={(e) => setOrgAdminEmail(e.target.value)} placeholder="admin@org.org" /></Field>
               <Field label="Display name" htmlFor="org-admin-name"><Input id="org-admin-name" value={orgAdminName} onChange={(e) => setOrgAdminName(e.target.value)} /></Field>
               <Field label="Password" hint="Minimum 12 characters" htmlFor="org-admin-password"><Input id="org-admin-password" type="password" value={orgAdminPassword} onChange={(e) => setOrgAdminPassword(e.target.value)} autoComplete="new-password" /></Field>
@@ -655,7 +628,7 @@ export default function PlatformPage() {
 
                 {detailTab === 'overview' && (
                   <div className="ps-kpis ps-kpis-3">
-                    <Kpi icon="users" label="Users" value={detail.users.length} note={`${detail.users.filter((u) => u.mfaEnrolled).length} with MFA`} />
+                    <Kpi icon="users" label="Users" value={detail.users.length} note="sign in with an emailed code" />
                     <Kpi icon="calendar" label="Elections" value={detail.elections.length} tone="navy" note={Object.entries(countBy(detail.elections.map((e) => e.state))).map(([s, n]) => `${s.toLowerCase()} ${n}`).join(' · ') || 'none yet'} />
                     <Kpi icon="key" label="Role assignments" value={detail.roleAssignments.length} tone="green" />
                   </div>
@@ -664,33 +637,22 @@ export default function PlatformPage() {
                 {detailTab === 'users' && (
                   <>
                     {enrolled && (
-                      <Alert kind="success" title="Authenticator setup - share this once">
-                        <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> - add this to their authenticator app now; it is not shown again:</p>
-                        <div style={{ margin: '8px 0' }}><TotpQr email={enrolled.email} secret={enrolled.totpSecret} /></div>
-                        <p className="small" style={{ margin: '4px 0' }}>Can&apos;t scan? Enter this setup key instead:</p>
-                        <code style={{ wordBreak: 'break-all' }}>{enrolled.totpSecret}</code>
-                        <p className="small" style={{ margin: '8px 0 0' }}>
-                          <Button size="sm" variant="ghost" onClick={() => setEnrolled(null)}>Done</Button>
-                        </p>
+                      <Alert kind="success" title="Account ready">
+                        <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> signs in at <a href="/login">/login</a> with their password and a code emailed to them.{' '}
+                          <Button size="sm" variant="ghost" onClick={() => setEnrolled(null)}>Done</Button></p>
                       </Alert>
                     )}
                     <Panel flush>
                       {detail.users.length === 0 ? <div className="ps-panel-body"><EmptyState title="No users yet">Provision a staff account to get started.</EmptyState></div> : (
                         <div className="ps-table-wrap">
                           <table className="ps-table">
-                            <thead><tr><th>User</th><th>MFA</th><th>Actions</th></tr></thead>
+                            <thead><tr><th>User</th><th>Actions</th></tr></thead>
                             <tbody>
                               {detail.users.map((u) => (
                                 <tr key={u.id}>
                                   <td><div className="ps-org-cell"><span className="ps-avatar">{initials(u.displayName)}</span><div><strong>{u.displayName}</strong><span>{u.email}</span></div></div></td>
-                                  <td>{u.mfaEnrolled ? <Badge tone="success">enrolled</Badge> : <Badge tone="warning">none</Badge>}</td>
                                   <td>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                      <Button size="sm" variant="secondary" disabled={loading} onClick={() => setConfirm({
-                                        title: 'Reset authenticator',
-                                        message: <>Issue a new authenticator code for <strong>{u.email}</strong>? Their old code stops working and they are signed out.</>,
-                                        action: () => void resetUserTotp(detail.id, u.id),
-                                      })}>Reset authenticator</Button>
                                       <Button size="sm" variant="secondary" disabled={loading} onClick={() => setConfirm({
                                         title: 'Delete user',
                                         message: <>Remove <strong>{u.email}</strong> from <strong>{detail.name}</strong>? They lose access immediately. This cannot be undone.</>,
@@ -741,14 +703,10 @@ export default function PlatformPage() {
                 )}
 
                 {detailTab === 'provision' && (
-                  <Panel title="Provision staff account" subtitle="Creates an MFA-enrolled user and assigns the selected tenant role. Scope non-owner roles to one election for least privilege.">
+                  <Panel title="Provision staff account" subtitle="Creates a user who signs in with an emailed code, and assigns the selected tenant role. Scope non-owner roles to one election for least privilege.">
                     {enrolled && (
-                      <Alert kind="success" title="Account provisioned - share the TOTP secret once">
-                        <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> - enroll this secret in their authenticator now; it is not shown again:</p>
-                        <div style={{ margin: '8px 0' }}><TotpQr email={enrolled.email} secret={enrolled.totpSecret} /></div>
-                        <p className="small" style={{ margin: '4px 0' }}>Can't scan? Enter this setup key instead:</p>
-                        <code style={{ wordBreak: 'break-all' }}>{enrolled.totpSecret}</code>
-                        <p className="small" style={{ margin: '8px 0 0' }}>They sign in at <a href="/login">/login</a> with email, password and TOTP code.</p>
+                      <Alert kind="success" title="Account provisioned">
+                        <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> signs in at <a href="/login">/login</a> with their password and a code emailed to them.</p>
                       </Alert>
                     )}
                     <div className="form-grid">
@@ -773,7 +731,7 @@ export default function PlatformPage() {
                         disabled={loading || !provEmail || !provName || provPassword.length < 12}
                         onClick={() => setConfirm({
                           title: 'Provision staff account',
-                          message: <>Create <strong>{provEmail}</strong> as <code>{provRole}</code>{provElection ? ' scoped to one election' : ' (organization-wide)'} in <strong>{detail.name}</strong>? They will receive a one-time TOTP secret.</>,
+                          message: <>Create <strong>{provEmail}</strong> as <code>{provRole}</code>{provElection ? ' scoped to one election' : ' (organization-wide)'} in <strong>{detail.name}</strong>? They sign in with a code emailed to that address.</>,
                           action: () => void provision(),
                         })}
                       >

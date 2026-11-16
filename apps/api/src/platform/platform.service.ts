@@ -12,12 +12,10 @@ import {
 import { verifyChain, type AuditEntry, type AuditEntryInput } from '../audit/audit-chain';
 import { checkSeparationOfDuties } from '../auth/sod';
 import {
-  generateTotpSecret,
   hashPassword,
   hashToken,
   newSessionToken,
   verifyPassword,
-  verifyTotp,
 } from '../auth/credentials';
 import { isAssignmentActive, type Role, type RoleAssignment } from '../auth/roles';
 import {
@@ -122,7 +120,7 @@ export class PlatformService {
     name: string,
     slug: string,
     admin?: { email: string; displayName: string; password: string; role?: Role },
-  ): Promise<Organization & { adminEnrollment?: { userId: string; email: string; role: Role; totpSecret: string } }> {
+  ): Promise<Organization & { adminEnrollment?: { userId: string; email: string; role: Role } }> {
     const org = await this.store.createOrganization(name, slug);
     await this.log(org.id, actorId, 'organization.create', `organization:${org.id}`, 'success');
     if (!admin) return org;
@@ -137,22 +135,22 @@ export class PlatformService {
     const user = await this.createUser(org.id, admin.email, admin.displayName, admin.password);
     await this.assignRole(actorId ?? 'bootstrap', org.id, user.id, role);
     await this.log(org.id, actorId, 'platform.provisionAdmin', `user:${user.id}`, `success:${role}`);
-    return { ...org, adminEnrollment: { userId: user.id, email: user.email, role, totpSecret: user.totpSecret } };
+    return { ...org, adminEnrollment: { userId: user.id, email: user.email, role } };
   }
 
-  async createUser(organizationId: string | null, email: string, displayName: string, password: string): Promise<Omit<User, 'passwordHash' | 'totpSecret'> & { totpSecret: string }> {
+  async createUser(organizationId: string | null, email: string, displayName: string, password: string): Promise<Omit<User, 'passwordHash' | 'totpSecret'>> {
+    if (!EMAIL_RE.test(email.trim())) throw new Error('INVALID_INPUT: enter a valid email address - sign-in codes are sent to it');
+    email = email.trim();
     if (password.length < 12) throw new Error('WEAK_PASSWORD: password must be at least 12 characters');
     if (organizationId && !(await this.store.getOrganization(organizationId))) throw new Error('NOT_FOUND: organization');
     // Email is the login identifier - duplicates make findUserByEmail ambiguous.
     if (await this.store.findUserByEmail(email)) throw new Error('EMAIL_EXISTS: a user with this email already exists');
-    const totpSecret = generateTotpSecret();
     const user = await this.store.createUser({
       organizationId, email, displayName,
-      passwordHash: hashPassword(password), totpSecret, mfaEnrolled: true,
+      passwordHash: hashPassword(password), totpSecret: null, mfaEnrolled: false,
     });
     await this.log(organizationId, user.id, 'user.create', `user:${user.id}`, 'success');
-    // totpSecret is returned once, at enrollment, for the user's authenticator.
-    return { id: user.id, organizationId, email, displayName, mfaEnrolled: true, totpSecret };
+    return { id: user.id, organizationId, email, displayName, mfaEnrolled: false };
   }
 
   /** A user the caller may manage: same organization, never the caller themself. */
@@ -162,20 +160,6 @@ export class PlatformService {
     if (!user || user.organizationId !== organizationId) throw new Error('NOT_FOUND: user');
     if (user.id === actorId) throw new Error('FORBIDDEN: you cannot do this to your own account; ask another administrator');
     return user;
-  }
-
-  /**
-   * Issue a fresh authenticator secret for a staff user who lost theirs (or never
-   * saw it). The old secret stops working and their live sessions end. The new
-   * secret is returned once, like at creation.
-   */
-  async resetUserTotp(actorId: string, organizationId: string, userId: string): Promise<{ id: string; email: string; totpSecret: string }> {
-    const user = await this.managedUser(actorId, organizationId, userId);
-    const totpSecret = generateTotpSecret();
-    await this.store.setUserTotpSecret(user.id, totpSecret);
-    await this.store.revokeUserSessions(user.id);
-    await this.log(organizationId, actorId, 'user.totpReset', `user:${user.id}`, 'success');
-    return { id: user.id, email: user.email, totpSecret };
   }
 
   /** Remove a staff user. Their sessions and roles go with them; audit history stays. */
@@ -192,10 +176,11 @@ export class PlatformService {
     await this.log(organizationId, actorId, 'user.delete', `user:${user.id}`, 'success');
   }
 
-  async login(email: string, password: string, totp?: string): Promise<{
-    token: string; userId: string; organizationId: string | null;
-    assignments: { role: Role; organizationId: string; electionId: string | null }[];
-  }> {
+  /**
+   * Step 1 of staff sign-in: check the password, then email a 6-digit code to the
+   * account's address. No session exists until the code is confirmed (verifyLogin).
+   */
+  async login(email: string, password: string): Promise<{ codeSent: true; email: string; devCode?: string }> {
     const lockKey = email.toLowerCase();
     const lock = loginFailures.get(lockKey);
     if (lock && lock.lockedUntil > Date.now()) {
@@ -210,16 +195,55 @@ export class PlatformService {
       throw new Error('AUTH_FAILED: invalid email or password');
     }
     loginFailures.delete(lockKey);
-    const assignments = (await this.store.listAssignments()).filter((a) => a.userId === user.id);
-    const isPrivileged = assignments.some((a) => PRIVILEGED.includes(a.role));
-    // Privileged users must present MFA (FR-IAM-001).
-    if (isPrivileged) {
-      if (!totp) throw new Error('MFA_REQUIRED: privileged accounts require a TOTP code');
-      if (!user.totpSecret || !verifyTotp(user.totpSecret, totp)) {
-        await this.log(user.organizationId, user.id, 'auth.login', `user:${user.id}`, 'mfa_failed');
-        throw new Error('AUTH_FAILED: invalid MFA code');
-      }
+
+    const throttleKey = `staff:${lockKey}`;
+    const now = Date.now();
+    const recent = (otpRequestLog.get(throttleKey) ?? []).filter((t) => now - t < 10 * 60_000);
+    if (recent.length >= 5) throw new Error('OTP_RATE_LIMITED: too many code requests; wait before trying again');
+    recent.push(now);
+    otpRequestLog.set(throttleKey, recent);
+
+    // A code sent a moment ago is still good: do not overwrite it (resend cooldown).
+    const existing = await this.store.getLoginChallenge(user.id);
+    if (existing && existing.expiresAt > now && existing.attempts === 0 && now - (existing.expiresAt - OTP_TTL_MS) < OTP_RESEND_COOLDOWN_MS) {
+      return { codeSent: true, email: user.email };
     }
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    await this.store.upsertLoginChallenge({
+      userId: user.id, codeHash: createHash('sha256').update(code).digest('hex'),
+      expiresAt: now + OTP_TTL_MS, attempts: 0,
+    });
+    // Same delivery path as voter codes; the dev outbox (and the returned devCode) exist only outside production.
+    const channel = await this.otpDelivery.deliver({ electionId: 'staff-sign-in', memberId: user.email, code, email: user.email });
+    await this.log(user.organizationId, user.id, 'auth.loginCode', `user:${user.id}`, `sent:${channel}`);
+    return channel === 'dev' ? { codeSent: true, email: user.email, devCode: code } : { codeSent: true, email: user.email };
+  }
+
+  /** Step 2 of staff sign-in: confirm the emailed code and open the session. */
+  async verifyLogin(email: string, code: string): Promise<{
+    token: string; userId: string; organizationId: string | null;
+    assignments: { role: Role; organizationId: string; electionId: string | null }[];
+  }> {
+    const verifyKey = `staff:${email.toLowerCase()}`;
+    const now = Date.now();
+    const failures = (otpVerifyFailures.get(verifyKey) ?? []).filter((t) => now - t < 10 * 60_000);
+    if (failures.length >= 10) throw new Error('OTP_RATE_LIMITED: too many failed attempts; wait before trying again');
+    const fail = (message: string) => {
+      failures.push(Date.now());
+      otpVerifyFailures.set(verifyKey, failures);
+      return new Error(message);
+    };
+    const user = await this.store.findUserByEmail(email);
+    if (!user) throw fail('OTP_INVALID: code does not match');
+    const result = await this.store.consumeLoginChallenge(user.id, createHash('sha256').update(String(code ?? '').trim()).digest('hex'), 5);
+    if (result === 'missing' || result === 'expired') throw new Error('OTP_EXPIRED: request a new code');
+    if (result === 'locked') throw fail('OTP_LOCKED: too many attempts; request a new code');
+    if (result === 'invalid') {
+      await this.log(user.organizationId, user.id, 'auth.login', `user:${user.id}`, 'code_failed');
+      throw fail('OTP_INVALID: code does not match');
+    }
+    otpVerifyFailures.delete(verifyKey);
+    const assignments = (await this.store.listAssignments()).filter((a) => a.userId === user.id);
     const { token, tokenHash } = newSessionToken();
     await this.store.createSession(user.id, tokenHash, Date.now() + 8 * 3600_000);
     await this.log(user.organizationId, user.id, 'auth.login', `user:${user.id}`, 'success');
@@ -265,11 +289,11 @@ export class PlatformService {
 
   /** Org-scoped user list for administration - never returns secrets. */
   async listUsers(organizationId: string): Promise<
-    { id: string; email: string; displayName: string; mfaEnrolled: boolean }[]
+    { id: string; email: string; displayName: string }[]
   > {
     const users = await this.store.listUsers(organizationId);
     return users.map((u) => ({
-      id: u.id, email: u.email, displayName: u.displayName, mfaEnrolled: u.mfaEnrolled,
+      id: u.id, email: u.email, displayName: u.displayName,
     }));
   }
 
@@ -1587,7 +1611,7 @@ export class PlatformService {
     return {
       ...org,
       users: users.map((u) => ({
-        id: u.id, email: u.email, displayName: u.displayName, mfaEnrolled: u.mfaEnrolled,
+        id: u.id, email: u.email, displayName: u.displayName,
       })),
       elections: elections.map((e) => ({
         id: e.id, name: e.name, state: e.state,
@@ -1603,7 +1627,7 @@ export class PlatformService {
 
   /**
    * Provision a staff account for an organization. Platform admins staff
-   * tenants directly: the account is MFA-enrolled (secret returned once) and
+   * tenants directly: the account signs in with an emailed code and
    * the selected role is assigned - organization_owner by default, or any
    * tenant staff role optionally scoped to one election. platform_admin and
    * voter are deliberately not provisionable here (delegation and
@@ -1617,7 +1641,7 @@ export class PlatformService {
     actorId: string,
     organizationId: string,
     input: { email: string; displayName: string; password: string; role?: Role; electionId?: string | null },
-  ): Promise<{ userId: string; email: string; role: Role; totpSecret: string }> {
+  ): Promise<{ userId: string; email: string; role: Role }> {
     const org = await this.store.getOrganization(organizationId);
     if (!org) throw new Error('NOT_FOUND: organization');
     const role = input.role ?? 'organization_owner';
@@ -1638,7 +1662,7 @@ export class PlatformService {
     // assignRole validates that electionId belongs to this organization.
     await this.assignRole(actorId, organizationId, user.id, role, electionId);
     await this.log(organizationId, actorId, 'platform.provisionAdmin', `user:${user.id}`, `success:${role}${electionId ? `:${electionId}` : ''}`);
-    return { userId: user.id, email: user.email, role, totpSecret: user.totpSecret };
+    return { userId: user.id, email: user.email, role };
   }
 
   /** Platform health snapshot for the ops dashboard. */

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PlatformService } from './platform.service';
 import { InMemoryStore } from '../store/memory.store';
-import { totpCode } from '../auth/credentials';
+import { signIn } from './test-signin';
 
 let svc: PlatformService;
 let store: InMemoryStore;
@@ -140,15 +140,35 @@ describe('Phase 2 core workflows', () => {
     await expect(svc.verifyAuditChain()).resolves.toBe(true);
   });
 
-  it('requires MFA for privileged login (FR-IAM-001)', async () => {
+  it('signs staff in with a code emailed after the password check', async () => {
     await setupElection();
     const user = await svc.createUser(orgId, 'auditor@example.org', 'Auditor Person', 'pw-long-enough');
     await svc.assignRole(adminId, orgId, user.id, 'auditor', null);
-    await expect(svc.login('auditor@example.org', 'pw-long-enough')).rejects.toThrow(/MFA_REQUIRED/);
-    const stored = store.users.get(user.id)!;
-    const session = await svc.login('auditor@example.org', 'pw-long-enough', totpCode(stored.totpSecret!));
+    // The password alone never yields a session.
+    const step = await svc.login('auditor@example.org', 'pw-long-enough');
+    expect(step).toMatchObject({ codeSent: true, email: 'auditor@example.org' });
+    expect(step).not.toHaveProperty('token');
+    await expect(svc.verifyLogin('auditor@example.org', '000000' === step.devCode ? '111111' : '000000')).rejects.toThrow(/OTP_INVALID/);
+    const session = await svc.verifyLogin('auditor@example.org', step.devCode!);
     expect(session.token).toBeTruthy();
-    await expect(svc.login('auditor@example.org', 'wrong-password', totpCode(stored.totpSecret!))).rejects.toThrow(/AUTH_FAILED/);
+    // A code works once.
+    await expect(svc.verifyLogin('auditor@example.org', step.devCode!)).rejects.toThrow(/OTP_EXPIRED/);
+    await expect(svc.login('auditor@example.org', 'wrong-password')).rejects.toThrow(/AUTH_FAILED/);
+  });
+
+  it('locks a staff code after too many wrong guesses and rejects an unknown email', async () => {
+    await setupElection();
+    const user = await svc.createUser(orgId, 'guess@example.org', 'Guesser', 'pw-long-enough');
+    await svc.assignRole(adminId, orgId, user.id, 'auditor', null);
+    const step = await svc.login('guess@example.org', 'pw-long-enough');
+    const wrong = step.devCode === '123456' ? '654321' : '123456';
+    for (let i = 0; i < 5; i++) await expect(svc.verifyLogin('guess@example.org', wrong)).rejects.toThrow(/OTP_INVALID/);
+    await expect(svc.verifyLogin('guess@example.org', step.devCode!)).rejects.toThrow(/OTP_LOCKED/);
+    await expect(svc.verifyLogin('nobody@example.org', '123456')).rejects.toThrow(/OTP_INVALID/);
+  });
+
+  it('refuses an account email that cannot receive a code', async () => {
+    await expect(svc.createUser(orgId, 'not-an-email', 'Bad', 'pw-long-enough')).rejects.toThrow(/INVALID_INPUT/);
   });
 
   it('imports a 10,000-record register and reconciles entitlements', async () => {

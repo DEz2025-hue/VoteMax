@@ -23,14 +23,25 @@ const SESSION_KEYS = [
   'votemax.assignments',
 ] as const;
 
-/** POST /auth/login - returns the session payload or throws with the API message. */
-export async function signIn(email: string, password: string, totp?: string): Promise<SessionData> {
+/** Step 1: check the password; the API emails a 6-digit code to the account. */
+export async function requestLoginCode(email: string, password: string): Promise<{ email: string; devCode?: string }> {
   const data = await apiRequest(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(await fraudHeaders()) },
-    body: JSON.stringify({ email, password, totp: totp || undefined }),
+    body: JSON.stringify({ email, password }),
+  }) as { codeSent?: boolean; email?: string; devCode?: string };
+  if (!data.codeSent) throw new AppError(toFriendly('AUTH_FAILED: invalid email or password', 401), 401);
+  return { email: data.email ?? email, devCode: data.devCode };
+}
+
+/** Step 2: confirm the emailed code and receive the session. */
+export async function verifyLoginCode(email: string, code: string): Promise<SessionData> {
+  const data = await apiRequest(`${API}/auth/login/verify`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(await fraudHeaders()) },
+    body: JSON.stringify({ email, code }),
   }) as Partial<SessionData>;
-  if (!data.token) throw new AppError(toFriendly('AUTH_FAILED: invalid email or password', 401), 401);
+  if (!data.token) throw new AppError(toFriendly('OTP_INVALID: code does not match', 401), 401);
   return data as SessionData;
 }
 

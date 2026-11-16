@@ -9,6 +9,7 @@ const ACTIONS: Record<string, string> = {
   'user.create': 'Created a user',
   'user.delete': 'Removed a user',
   'user.totpReset': 'Reset an authenticator',
+  'auth.loginCode': 'Sent a sign-in code',
   'role.assign': 'Assigned a role',
   'organization.create': 'Created an organization',
   'election.create': 'Created an election',

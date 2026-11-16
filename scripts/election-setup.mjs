@@ -54,10 +54,11 @@ export async function apiGet(API, path, token) {
   return { status: res.status, data: await res.json().catch(() => ({})) };
 }
 
-export async function login(API, email, password, totpSecret) {
-  const r = await apiPost(API, '/auth/login', {
-    email, password, totp: totpCode(totpSecret),
-  });
+/** Staff sign-in is two steps; against a non-production API the first step returns the emailed code. */
+export async function login(API, email, password) {
+  const step = await apiPost(API, '/auth/login', { email, password });
+  if (!step.data.devCode) throw new Error(`login failed for ${email}: ${JSON.stringify(step.data)}`);
+  const r = await apiPost(API, '/auth/login/verify', { email, code: step.data.devCode });
   if (!r.data.token) throw new Error(`login failed for ${email}: ${JSON.stringify(r.data)}`);
   return r.data.token;
 }

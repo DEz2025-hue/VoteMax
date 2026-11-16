@@ -47,12 +47,6 @@ export class PlatformAdminController {
     );
   }
 
-  @Post('organizations/:id/users/:userId/totp-reset')
-  @RequireCapability('platform.tenants.provision')
-  resetUserTotp(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('userId') userId: string) {
-    return guard(() => this.platform.resetUserTotp(actor(req), id, userId));
-  }
-
   @Delete('organizations/:id/users/:userId')
   @RequireCapability('platform.tenants.provision')
   deleteUser(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('userId') userId: string) {

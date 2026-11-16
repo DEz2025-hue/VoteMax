@@ -92,14 +92,6 @@ export class PlatformController {
     return guard(() => this.platform.assignRole(actor(req), body.organizationId, body.userId, body.role, body.electionId ?? null));
   }
 
-  @Post('users/:id/totp-reset')
-  @RequireCapability('roles.assign')
-  resetUserTotp(@Req() req: { principal?: Principal }, @Param('id') id: string) {
-    const orgId = req.principal?.organizationId;
-    if (!orgId) throw new ForbiddenException('TENANT_REQUIRED: no organization on principal');
-    return guard(() => this.platform.resetUserTotp(actor(req), orgId, id));
-  }
-
   @Delete('users/:id')
   @RequireCapability('roles.assign')
   deleteUser(@Req() req: { principal?: Principal }, @Param('id') id: string) {
@@ -462,8 +454,15 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  login(@Body() body: { email: string; password: string; totp?: string }) {
-    return guard(() => this.platform.login(body.email, body.password, body.totp));
+  login(@Body() body: { email: string; password: string }) {
+    return guard(() => this.platform.login(String(body.email ?? ''), String(body.password ?? '')));
+  }
+
+  /** Step 2: confirm the emailed code and receive the session. */
+  @Public()
+  @Post('login/verify')
+  verifyLogin(@Body() body: { email: string; code: string }) {
+    return guard(() => this.platform.verifyLogin(String(body.email ?? ''), String(body.code ?? '')));
   }
 
   /** Resolve the caller's session to a principal - lets clients validate a stored token. */

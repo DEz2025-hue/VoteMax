@@ -24,6 +24,7 @@ import {
   type FraudSignalFilter,
   type NewFraudBlock,
   type NotificationBatch,
+  type LoginChallenge,
   type OtpChallenge,
   type OtpVerifyResult,
   type Organization,
@@ -146,6 +147,7 @@ export class PostgresStore implements PlatformStore {
   async deleteUser(id: string): Promise<void> {
     await this.database.transaction(async (tx) => {
       await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+      await tx.delete(schema.loginChallenges).where(eq(schema.loginChallenges.userId, id));
       await tx.delete(schema.electionApprovals).where(eq(schema.electionApprovals.userId, id));
       // Assignments this user granted to others stay; only the pointer to the deleted user is cleared.
       await tx.update(schema.roleAssignments).set({ grantedBy: null }).where(eq(schema.roleAssignments.grantedBy, id));
@@ -621,6 +623,40 @@ export class PostgresStore implements PlatformStore {
 
   async deleteOtpChallenge(key: string): Promise<void> {
     await this.database.delete(schema.otpChallenges).where(eq(schema.otpChallenges.key, key));
+  }
+
+  async upsertLoginChallenge(challenge: LoginChallenge): Promise<void> {
+    await this.database.insert(schema.loginChallenges).values({
+      userId: challenge.userId, codeHash: challenge.codeHash,
+      expiresAt: new Date(challenge.expiresAt), attempts: challenge.attempts,
+    }).onConflictDoUpdate({
+      target: schema.loginChallenges.userId,
+      set: { codeHash: challenge.codeHash, expiresAt: new Date(challenge.expiresAt), attempts: challenge.attempts },
+    });
+  }
+
+  async getLoginChallenge(userId: string): Promise<LoginChallenge | null> {
+    const [row] = await this.database.select().from(schema.loginChallenges).where(eq(schema.loginChallenges.userId, userId));
+    return row ? { userId: row.userId, codeHash: row.codeHash, expiresAt: row.expiresAt.getTime(), attempts: row.attempts } : null;
+  }
+
+  async consumeLoginChallenge(userId: string, codeHash: string, maxAttempts: number): Promise<OtpVerifyResult> {
+    return this.database.transaction(async (tx) => {
+      const [row] = await tx.select().from(schema.loginChallenges)
+        .where(eq(schema.loginChallenges.userId, userId))
+        .for('update');
+      if (!row) return 'missing';
+      if (row.expiresAt.getTime() < Date.now()) {
+        await tx.delete(schema.loginChallenges).where(eq(schema.loginChallenges.userId, userId));
+        return 'expired';
+      }
+      const attempts = row.attempts + 1;
+      await tx.update(schema.loginChallenges).set({ attempts }).where(eq(schema.loginChallenges.userId, userId));
+      if (attempts > maxAttempts) return 'locked';
+      if (row.codeHash !== codeHash) return 'invalid';
+      await tx.delete(schema.loginChallenges).where(eq(schema.loginChallenges.userId, userId));
+      return 'ok';
+    });
   }
 
   async createBallotSession(tokenHash: string, session: BallotSession): Promise<void> {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PlatformService } from './platform.service';
-import { totpCode } from '../auth/credentials';
+import { signIn } from './test-signin';
 
 let svc: PlatformService;
 let orgId: string;
@@ -24,24 +24,8 @@ beforeEach(async () => {
 });
 
 describe('staff user administration', () => {
-  it('resets the authenticator: old secret stops working, new one works, sessions end', async () => {
-    const before = await svc.store.findUser(staffId);
-    const oldSecret = before!.totpSecret!;
-    // Staff signs in with the old secret and holds a live session.
-    const { token } = await svc.login('staff@a.test', PW, totpNow(oldSecret));
-    expect(await svc.principalForToken(token)).not.toBeNull();
-
-    const reset = await svc.resetUserTotp(ownerId, orgId, staffId);
-    expect(reset.totpSecret).not.toBe(oldSecret);
-    expect(reset.email).toBe('staff@a.test');
-
-    expect(await svc.principalForToken(token)).toBeNull(); // signed out everywhere
-    await expect(svc.login('staff@a.test', PW, totpNow(oldSecret))).rejects.toThrow(/invalid MFA code/);
-    await expect(svc.login('staff@a.test', PW, totpNow(reset.totpSecret))).resolves.toHaveProperty('token');
-  });
-
   it('removes a user with their sessions and roles, and frees the email', async () => {
-    const { token } = await svc.login('staff@a.test', PW, totpNow((await svc.store.findUser(staffId))!.totpSecret!));
+    const { token } = await signIn(svc, 'staff@a.test', PW);
     await svc.deleteUser(ownerId, orgId, staffId);
     expect(await svc.store.findUser(staffId)).toBeNull();
     expect(await svc.principalForToken(token)).toBeNull();
@@ -50,13 +34,11 @@ describe('staff user administration', () => {
     await expect(svc.createUser(orgId, 'staff@a.test', 'Staff Again', PW)).resolves.toHaveProperty('id');
   });
 
-  it('never lets an admin reset or remove their own account', async () => {
-    await expect(svc.resetUserTotp(ownerId, orgId, ownerId)).rejects.toThrow(/FORBIDDEN/);
+  it('never lets an admin remove their own account', async () => {
     await expect(svc.deleteUser(ownerId, orgId, ownerId)).rejects.toThrow(/FORBIDDEN/);
   });
 
   it('cannot touch another organization\'s users', async () => {
-    await expect(svc.resetUserTotp(ownerId, orgId, otherOrgUserId)).rejects.toThrow(/NOT_FOUND/);
     await expect(svc.deleteUser(ownerId, orgId, otherOrgUserId)).rejects.toThrow(/NOT_FOUND/);
     expect(await svc.store.findUser(otherOrgUserId)).not.toBeNull();
   });
@@ -68,13 +50,9 @@ describe('staff user administration', () => {
     await expect(svc.deleteUser(owner2Id, orgId, ownerId)).resolves.toBeUndefined();
   });
 
-  it('records both actions in the audit log', async () => {
-    await svc.resetUserTotp(ownerId, orgId, staffId);
+  it('records the removal in the audit log', async () => {
     await svc.deleteUser(ownerId, orgId, staffId);
     const actions = (await svc.auditEntries(orgId)).map((e) => e.action);
-    expect(actions).toContain('user.totpReset');
     expect(actions).toContain('user.delete');
   });
 });
-
-const totpNow = (secret: string) => totpCode(secret);
