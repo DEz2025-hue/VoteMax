@@ -159,7 +159,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
       if (d.includes('voting window')) return make(code, raw, 'guidance', 'One more thing first', 'Set when voting opens and closes before continuing.', 'You can do this in the Details step of Election setup.');
       if (d.includes('register must be frozen')) return make(code, raw, 'guidance', 'One more thing first', 'Lock the voter register before marking the election ready.');
       const dup = /(\d+)\s+duplicate/.exec(detail);
-      if (dup) return make(code, raw, 'guidance', 'One more thing first', `Resolve the ${dup[1]} duplicate voter ${Number(dup[1]) === 1 ? 'record' : 'records'} before locking the register.`, 'Open Voter register and choose "Eligible" or "Ineligible" for each one.');
+      if (dup) return make(code, raw, 'guidance', 'One more thing first', `Resolve the ${dup[1]} duplicate voter ${Number(dup[1]) === 1 ? 'record' : 'records'} before locking the register.`, 'Open Voter registrar and choose "Eligible" or "Ineligible" for each one.');
       if (d.startsWith('waiting for')) return make(code, raw, 'guidance', 'Waiting for sign-off', `${detail.replace(/^./, (c) => c.toUpperCase())}.`, 'They can approve under Results and reports; the form fills in once they do.');
       if (d.includes('two approvers')) return make(code, raw, 'guidance', 'One more thing first', 'Choose two different approvers to run the tally.');
       if (d.includes('must be an auditor')) return make(code, raw, 'guidance', 'One more thing first', 'At least one of the approvers must be an auditor.');

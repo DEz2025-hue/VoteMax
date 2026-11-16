@@ -73,7 +73,7 @@ const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'organization', label: 'Organization', icon: 'building' },
   { id: 'users', label: 'Users and roles', icon: 'users' },
   { id: 'setup', label: 'Election setup', icon: 'sliders' },
-  { id: 'voters', label: 'Voter register', icon: 'clipboard' },
+  { id: 'voters', label: 'Voter registrar', icon: 'clipboard' },
   { id: 'results', label: 'Results and reports', icon: 'chart' },
   { id: 'audit', label: 'Security and audit', icon: 'filetext' },
   { id: 'fraud', label: 'Fraud signals', icon: 'flag' },
@@ -1344,7 +1344,7 @@ export default function AdminPage() {
           )}
 
           {activeSection === 'voters' && (
-            <Card title="Voter register">
+            <Card title="Voter registrar">
               <div className="toolbar" style={{ marginBottom: 16 }}>
                 <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.manage')} onClick={() => void act('Refresh voters', refreshVoters)}>Refresh voters</Button>
                 <Button variant="secondary" size="sm" disabled={!electionId || !capAny(['election.configure', 'register.manage', 'participation.viewAggregate', 'audit.read'])} onClick={() => void act('Refresh register stats', async () => { await refreshElection(); })}>Refresh stats</Button>
@@ -1713,15 +1713,16 @@ export default function AdminPage() {
                 <Panel title="Quick actions">
                   <ul className="ps-list">
                     {([
-                      ['setup', 'sliders', 'Election setup', 'Guided wizard for a new vote'],
-                      ['users', 'users', 'Users and roles', 'Staff accounts and assignments'],
-                      ['voters', 'clipboard', 'Voter register', 'Import, resolve duplicates, invite'],
-                      ['audit', 'filetext', 'Audit log', 'Verify the hash chain'],
-                    ] as const).filter(([id]) => visibleSections.some((x) => x.id === id)).map(([id, icon, label, hint]) => (
-                      <li key={id}>
+                      ['setup', 'plus', 'Create new election', 'Start a new vote from scratch', true],
+                      ['setup', 'sliders', 'Election setup', 'Continue or edit an existing election', false],
+                      ['users', 'users', 'Users and roles', 'Staff accounts and assignments', false],
+                      ['voters', 'clipboard', 'Voter registrar', 'Import, resolve duplicates, invite', false],
+                      ['audit', 'filetext', 'Audit log', 'Review what has happened', false],
+                    ] as const).filter(([id]) => visibleSections.some((x) => x.id === id)).map(([id, icon, label, hint, fresh]) => (
+                      <li key={label}>
                         <span className="ps-avatar"><Icon name={icon} size={16} /></span>
                         <div className="ps-list-main"><strong>{label}</strong><span>{hint}</span></div>
-                        <button type="button" className="ps-icon-btn" aria-label={label} onClick={() => setSection(id)}><Icon name="chevron" /></button>
+                        <button type="button" className="ps-icon-btn" aria-label={label} onClick={() => { if (fresh) startNewElection(); setSection(id); }}><Icon name="chevron" /></button>
                       </li>
                     ))}
                   </ul>
