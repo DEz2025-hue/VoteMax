@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { fetchPrincipal, isPlatformOnly, signOut, type Principal } from '../lib/auth';
+import { fetchPrincipal, isPlatformOnly, signOut, SIGNOUT_EVENT, type Principal } from '../lib/auth';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -41,6 +41,13 @@ export default function SiteNav() {
     return () => { alive = false; };
   }, [pathname]);
 
+  // Signing out from anywhere (this menu, the console sidebar) clears the chip immediately.
+  useEffect(() => {
+    const onSignOut = () => { setPrincipal(null); setMenuOpen(false); setChecked(true); };
+    window.addEventListener(SIGNOUT_EVENT, onSignOut);
+    return () => window.removeEventListener(SIGNOUT_EVENT, onSignOut);
+  }, []);
+
   // Close the account menu on outside click.
   useEffect(() => {
     if (!menuOpen) return;
@@ -59,7 +66,7 @@ export default function SiteNav() {
 
   function doSignOut() {
     setMenuOpen(false);
-    void signOut().then(() => setPrincipal(null));
+    void signOut();
   }
 
   return (

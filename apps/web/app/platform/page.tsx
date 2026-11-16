@@ -11,7 +11,7 @@ import { AuthLayout, ConsoleShell, Kpi, Panel, StatusRow } from '../../component
 import { fraudHeaders } from '../../lib/fraud';
 import { apiRequest } from '../../lib/http';
 import { friendlyFromUnknown } from '../../lib/errors';
-import { API, sessionIsValid, signIn as apiSignIn, signOut as apiSignOut, storeSession } from '../../lib/auth';
+import { API, sessionIsValid, signIn as apiSignIn, signOut as apiSignOut, SIGNOUT_EVENT, storeSession } from '../../lib/auth';
 
 let sessionToken = '';
 
@@ -246,15 +246,23 @@ export default function PlatformPage() {
   }
 
   function signOut() {
-    // Revokes the bearer session server-side, then clears local state.
+    // Ends the session at once (storage cleared, every screen told); the server revokes it right after.
     void apiSignOut();
-    sessionToken = '';
-    setSignedIn(false);
-    setDirectory(null);
-    setDetail(null);
-    setHealth(null);
-    setDenied(false);
   }
+
+  // Runs for a sign-out from the sidebar OR the header menu.
+  useEffect(() => {
+    const onSignOut = () => {
+      sessionToken = '';
+      setSignedIn(false);
+      setDirectory(null);
+      setDetail(null);
+      setHealth(null);
+      setDenied(false);
+    };
+    window.addEventListener(SIGNOUT_EVENT, onSignOut);
+    return () => window.removeEventListener(SIGNOUT_EVENT, onSignOut);
+  }, []);
 
   async function openTenant(id: string, tab: DetailTab = 'overview') {
     setDetail(null);

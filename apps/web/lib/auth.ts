@@ -49,17 +49,25 @@ export function clearSession(): void {
 }
 
 /** Revoke the bearer session server-side, then clear local session state. */
+/** Fired on window the moment a sign-out happens, so every open screen can react at once. */
+export const SIGNOUT_EVENT = 'votemax:signout';
+
 export async function signOut(): Promise<void> {
   const token = sessionStorage.getItem('votemax.session');
+  // End the local session FIRST and tell every screen. Waiting for the server before doing so left
+  // the old session in place while the page moved to /login, which then sent the user straight
+  // back in until a refresh. The token is revoked on the server right after.
+  clearSession();
+  window.dispatchEvent(new Event(SIGNOUT_EVENT));
   if (token) {
     try {
       await fetch(`${API}/auth/logout`, {
         method: 'POST',
+        keepalive: true,
         headers: { authorization: `Bearer ${token}`, ...(await fraudHeaders()) },
       });
-    } catch { /* best effort - local session is cleared regardless */ }
+    } catch { /* best effort - the local session is already gone */ }
   }
-  clearSession();
 }
 
 export interface Principal {

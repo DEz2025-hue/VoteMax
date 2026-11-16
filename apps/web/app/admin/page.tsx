@@ -14,7 +14,7 @@ import { Icon } from '../../components/icons';
 import { TotpQr, totpUri } from '../../components/totp-qr';
 import { ConsoleShell, Kpi, Panel } from '../../components/saas';
 import { plainAction, plainActor, plainOutcome, plainRule, plainSignal, plainTarget } from '../../lib/plain';
-import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut } from '../../lib/auth';
+import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut, SIGNOUT_EVENT } from '../../lib/auth';
 import { hasCapability, type AssignmentInfo } from '../../lib/capabilities';
 import { downloadRegisterTemplate, previewRegisterCsv } from '../../lib/register-csv';
 
@@ -66,7 +66,7 @@ const LIFECYCLE_ORDER = [
   'CLOSED', 'TALLIED', 'VERIFIED', 'CERTIFIED', 'PUBLISHED',
 ] as const;
 
-type Section = 'overview' | 'organization' | 'users' | 'setup' | 'voters' | 'results' | 'audit' | 'fraud' | 'session';
+type Section = 'overview' | 'organization' | 'users' | 'setup' | 'voters' | 'results' | 'audit' | 'fraud';
 
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'grid' },
@@ -77,7 +77,6 @@ const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'results', label: 'Results and reports', icon: 'chart' },
   { id: 'audit', label: 'Security and audit', icon: 'filetext' },
   { id: 'fraud', label: 'Fraud signals', icon: 'flag' },
-  { id: 'session', label: 'Session', icon: 'user' },
 ];
 
 // Minimum capabilities for a section to be worth showing. Empty = always.
@@ -91,7 +90,6 @@ const SECTION_CAPS: Record<Section, string[]> = {
   results: ['participation.viewAggregate', 'tally.execute', 'tally.verify', 'results.certify', 'results.publish', 'audit.read'],
   audit: ['audit.read', 'fraud.read'],
   fraud: ['fraud.read'],
-  session: [],
 };
 
 interface AdminUser { id: string; email: string; displayName: string; mfaEnrolled: boolean }
@@ -545,12 +543,20 @@ export default function AdminPage() {
   }
 
   function signOut() {
-    // Revokes the bearer session server-side, then clears local state.
+    // Ends the session at once (storage cleared, every screen told); the server revokes it right after.
     void apiSignOut();
-    sessionToken = '';
-    setSignedIn(false); setNewUserEnrollment(null); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]);
-    setOrgId(''); setOrgSlug(''); setElectionId(''); setUserId(''); setAssignments([]);
   }
+
+  // Runs for a sign-out from the sidebar OR the header menu: forget everything this screen held.
+  useEffect(() => {
+    const onSignOut = () => {
+      sessionToken = '';
+      setSignedIn(false); setNewUserEnrollment(null); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]);
+      setOrgId(''); setOrgSlug(''); setElectionId(''); setUserId(''); setAssignments([]); setMe(null); setApprovals([]);
+    };
+    window.addEventListener(SIGNOUT_EVENT, onSignOut);
+    return () => window.removeEventListener(SIGNOUT_EVENT, onSignOut);
+  }, []);
 
   // While the stored session is being validated, show a neutral loading
   // state; signed-out visitors are redirected to /login by the effect above.
@@ -881,14 +887,6 @@ export default function AdminPage() {
             </Alert>
           );
         })()}
-          {activeSection === 'session' && (
-            <Card title="Session">
-              <p>You are signed in as <strong>{me?.displayName ?? users.find((u) => u.id === userId)?.displayName ?? 'your account'}</strong>{me?.email ? ` (${me.email})` : ''}.</p>
-              <p className="muted small">Organization: {orgId ? 'connected' : 'not set'}{orgSlug ? ` · voter code: ${orgSlug}` : ''}</p>
-              <Button variant="secondary" onClick={signOut}>Sign out</Button>
-            </Card>
-          )}
-
           {activeSection === 'organization' && (
             <Card title="Organization">
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
