@@ -46,7 +46,7 @@ export default function HelpPage() {
         <summary>Step by step</summary>
         <div className="faq-body">
           <ol>
-            <li><strong>Open your personal voting link.</strong> It is in the invitation sent to your email or phone, together with your member ID. Opening it signs you in - there is no code to enter.</li>
+            <li><strong>Open your personal voting link.</strong> It is in the invitation sent to your email or phone, together with your member ID. Opening it signs you in - there is no code to enter. If you were given a general voting link instead, open it, enter your member ID and then the one-time code sent to your registered email or phone.</li>
             <li><strong>Keep the link secret.</strong> It is personal to you, and anyone who has it can vote as you. Do not share or forward it.</li>
             <li><strong>Make your choices</strong> for each position. You can abstain by leaving a position blank where allowed.</li>
             <li><strong>Review carefully</strong> - after you submit, your ballot cannot be changed.</li>

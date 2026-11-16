@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Skeleton } from '../../components/ui';
+import { Alert, Button, Card, Field, Input, Skeleton } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
 import { apiRequest } from '../../lib/http';
 import { AppError, friendlyFromUnknown, networkError, toFriendly, type FriendlyError } from '../../lib/errors';
@@ -66,7 +66,15 @@ function VoteFlow() {
   const electionId = params.get('election') ?? '';
   const memberId = (params.get('id') ?? '').trim();
   const key = (params.get('key') ?? '').trim();
+  const orgSlug = (params.get('org') ?? '').trim();
   const hasLink = Boolean(electionId && memberId && key);
+  // The general link (election only): the voter types their member ID and confirms it with an emailed code.
+  const [typedId, setTypedId] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [devCode, setDevCode] = useState('');
+  const [openElections, setOpenElections] = useState<{ id: string; name: string; state: string }[] | null>(null);
+  const voterId = memberId || typedId.trim();
 
   const [step, setStep] = useState<Step>('enter');
   const [session, setSession] = useState('');
@@ -88,7 +96,13 @@ function VoteFlow() {
   async function enter() {
     await act(async () => {
       const r = await call(`/elections/${encodeURIComponent(electionId)}/voting/link/enter`, { memberId, key });
-      const s = String(r.ballotSession);
+      await openBallot(String(r.ballotSession));
+    });
+  }
+
+  /** Load the ballot for a signed-in session (personal link or confirmed code). */
+  async function openBallot(s: string) {
+    {
       setSession(s);
       const status = await getJson(`/elections/${encodeURIComponent(electionId)}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
       if (status.hasVoted) {
@@ -98,8 +112,31 @@ function VoteFlow() {
       const b = await call('/voting/ballot', { ballotSession: s });
       setBallot(b as unknown as BallotData);
       setStep('ballot');
+    }
+  }
+
+  async function sendCode() {
+    await act(async () => {
+      const r = await call(`/elections/${encodeURIComponent(electionId)}/voting/otp/request`, { memberId: voterId });
+      setCodeSent(true);
+      setDevCode(typeof r.devCode === 'string' ? r.devCode : '');
     });
   }
+
+  async function confirmCode() {
+    await act(async () => {
+      const r = await call(`/elections/${encodeURIComponent(electionId)}/voting/otp/verify`, { memberId: voterId, code: code.trim() });
+      await openBallot(String(r.ballotSession));
+    });
+  }
+
+  // A link with only the organization lists its elections that are open for voting.
+  useEffect(() => {
+    if (electionId || !orgSlug) return;
+    getJson(`/organizations/${encodeURIComponent(orgSlug)}/elections`)
+      .then((list) => setOpenElections((list as { id: string; name: string; state: string }[]).filter((e) => e.state === 'OPEN')))
+      .catch(() => setOpenElections([]));
+  }, [electionId, orgSlug]);
 
   useEffect(() => {
     // Opening the link signs the voter in. The ref stops a double run in development.
@@ -148,7 +185,50 @@ function VoteFlow() {
         </Alert>
       )}
 
-      {step === 'enter' && !hasLink && (
+      {step === 'enter' && !hasLink && electionId && (
+        <Card title="Confirm it's you">
+          {!codeSent ? (
+            <form onSubmit={(e) => { e.preventDefault(); void sendCode(); }}>
+              <p className="lede" style={{ marginBottom: 12 }}>
+                Enter your member ID and we will send a one-time code to the email or phone you registered with.
+              </p>
+              <Field label="Member ID" htmlFor="v-member"><Input id="v-member" value={typedId} onChange={(e) => setTypedId(e.target.value)} autoComplete="off" autoCapitalize="characters" /></Field>
+              <div className="form-actions">
+                <Button type="submit" variant="primary" size="lg" block disabled={busy || !typedId.trim()}>{busy ? 'Sending…' : 'Send my code'}</Button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); void confirmCode(); }}>
+              <p className="lede" style={{ marginBottom: 12 }}>
+                If that ID is on the register, a 6-digit code is on its way. It expires in a few minutes.
+              </p>
+              {devCode && <Alert kind="info">Test mode - your code is {devCode}</Alert>}
+              <Field label="6-digit code" htmlFor="v-code"><Input id="v-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} /></Field>
+              <div className="form-actions">
+                <Button type="button" variant="secondary" disabled={busy} onClick={() => { setCodeSent(false); setCode(''); setError(null); }}>Back</Button>
+                <Button type="submit" variant="primary" size="lg" block disabled={busy || code.trim().length < 6}>{busy ? 'Checking…' : 'Continue to ballot'}</Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      )}
+
+      {step === 'enter' && !hasLink && !electionId && orgSlug && (
+        <Card title="Choose an election">
+          {openElections === null ? <Skeleton lines={3} /> : openElections.length === 0 ? (
+            <p className="muted">No election is open for voting right now. Check back when voting opens.</p>
+          ) : (
+            openElections.map((e) => (
+              <div key={e.id} className="result-row">
+                <strong>{e.name}</strong>
+                <Button variant="primary" size="sm" onClick={() => { window.location.href = `/vote?org=${encodeURIComponent(orgSlug)}&election=${e.id}`; }}>Vote</Button>
+              </div>
+            ))
+          )}
+        </Card>
+      )}
+
+      {step === 'enter' && !hasLink && !electionId && !orgSlug && (
         <Card title="Open your personal voting link">
           <p className="lede" style={{ marginBottom: 12 }}>
             To vote, open the personal link in the invitation we sent you by email or text message.
@@ -172,9 +252,11 @@ function VoteFlow() {
 
       {step === 'ballot' && ballot && (
         <Card title={ballot.election.name}>
-          <Alert kind="info">
-            Your voting link is personal. Keep it secret and do not share it - anyone with it can vote as you.
-          </Alert>
+          {hasLink && (
+            <Alert kind="info">
+              Your voting link is personal. Keep it secret and do not share it - anyone with it can vote as you.
+            </Alert>
+          )}
           <form onSubmit={(e) => { e.preventDefault(); setStep('review'); }}>
             {ballot.positions.map((pos) => (
               <fieldset key={pos.id} className="ballot-position">
@@ -232,7 +314,7 @@ function VoteFlow() {
             <Button variant="primary" size="lg" block disabled={busy} onClick={() => void act(async () => {
               const r = await call('/voting/submit', {
                 ballotSession: session, selections,
-                idempotencyKey: `${electionId}-${memberId}-submit`,
+                idempotencyKey: `${electionId}-${voterId}-submit`,
               });
               setReceipt(String(r.receiptId));
               setStep('done');
