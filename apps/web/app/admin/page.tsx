@@ -11,6 +11,7 @@ import { prepareCandidatePhoto } from '../../lib/image';
 import { apiRequest } from '../../lib/http';
 import { friendlyFromUnknown } from '../../lib/errors';
 import { Icon } from '../../components/icons';
+import { TotpQr, totpUri } from '../../components/totp-qr';
 import { ConsoleShell, Kpi, Panel } from '../../components/saas';
 import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut } from '../../lib/auth';
 import { hasCapability, type AssignmentInfo } from '../../lib/capabilities';
@@ -745,10 +746,12 @@ export default function AdminPage() {
               {newUserEnrollment && (
                 <div style={{ marginTop: 14 }}>
                   <Alert kind="success" title="Account created - share the TOTP secret once">
-                    <p style={{ margin: '4px 0' }}><strong>{newUserEnrollment.email}</strong> must add this secret to an authenticator app (Google Authenticator, Microsoft Authenticator, Authy). It is not shown again:</p>
+                    <p style={{ margin: '4px 0' }}><strong>{newUserEnrollment.email}</strong> must scan this QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, Authy). It is not shown again:</p>
+                    <div style={{ margin: '8px 0' }}><TotpQr email={newUserEnrollment.email} secret={newUserEnrollment.totpSecret} /></div>
+                    <p className="small" style={{ margin: '4px 0' }}>Can't scan? Enter this setup key instead:</p>
                     <code style={{ wordBreak: 'break-all' }}>{newUserEnrollment.totpSecret}</code>
                     <p className="small" style={{ margin: '8px 0 0' }}>
-                      In the app choose "Enter a setup key", account <code>{newUserEnrollment.email}</code>, type "Time based". On phones, <a href={`otpauth://totp/VoteMax:${encodeURIComponent(newUserEnrollment.email)}?secret=${newUserEnrollment.totpSecret}&issuer=VoteMax`}>tap here to add it directly</a>.
+                      Choose "Enter a setup key", account <code>{newUserEnrollment.email}</code>, type "Time based". On phones, <a href={totpUri(newUserEnrollment.email, newUserEnrollment.totpSecret)}>tap here to add it directly</a>.
                       Assign a role below, then they sign in at <a href="/login">/login</a> with email, password and the 6-digit code.
                     </p>
                     <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>

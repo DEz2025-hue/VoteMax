@@ -6,6 +6,7 @@ import {
   Select, Skeleton, Table, Toast, errorToast, type ToastData,
 } from '../../components/ui';
 import { Icon } from '../../components/icons';
+import { TotpQr } from '../../components/totp-qr';
 import { AuthLayout, ConsoleShell, Kpi, Panel, StatusRow } from '../../components/saas';
 import { fraudHeaders } from '../../lib/fraud';
 import { apiRequest } from '../../lib/http';
@@ -392,7 +393,9 @@ export default function PlatformPage() {
               {orgEnrollment && (
                 <Alert kind="success" title="Organization created - share the TOTP secret once">
                   <p style={{ margin: '4px 0' }}><strong>{orgEnrollment.email}</strong> ({orgEnrollment.role}) - enroll this secret in their authenticator now; it is not shown again:</p>
-                  <code>{orgEnrollment.totpSecret}</code>
+                  <div style={{ margin: '8px 0' }}><TotpQr email={orgEnrollment.email} secret={orgEnrollment.totpSecret} /></div>
+                  <p className="small" style={{ margin: '4px 0' }}>Can't scan? Enter this setup key instead:</p>
+                  <code style={{ wordBreak: 'break-all' }}>{orgEnrollment.totpSecret}</code>
                   <p className="small" style={{ margin: '8px 0 0' }}>They sign in at <a href="/login">/login</a> with email, password and TOTP code.</p>
                 </Alert>
               )}
@@ -690,7 +693,9 @@ export default function PlatformPage() {
                     {enrolled && (
                       <Alert kind="success" title="Account provisioned - share the TOTP secret once">
                         <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> - enroll this secret in their authenticator now; it is not shown again:</p>
-                        <code>{enrolled.totpSecret}</code>
+                        <div style={{ margin: '8px 0' }}><TotpQr email={enrolled.email} secret={enrolled.totpSecret} /></div>
+                        <p className="small" style={{ margin: '4px 0' }}>Can't scan? Enter this setup key instead:</p>
+                        <code style={{ wordBreak: 'break-all' }}>{enrolled.totpSecret}</code>
                         <p className="small" style={{ margin: '8px 0 0' }}>They sign in at <a href="/login">/login</a> with email, password and TOTP code.</p>
                       </Alert>
                     )}
