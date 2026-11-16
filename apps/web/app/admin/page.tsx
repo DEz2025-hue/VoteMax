@@ -13,6 +13,7 @@ import { friendlyFromUnknown } from '../../lib/errors';
 import { Icon } from '../../components/icons';
 import { TotpQr, totpUri } from '../../components/totp-qr';
 import { ConsoleShell, Kpi, Panel } from '../../components/saas';
+import { plainAction, plainActor, plainOutcome, plainRule, plainSignal, plainTarget } from '../../lib/plain';
 import { clearSession, fetchPrincipal, isPlatformOnly, signOut as apiSignOut } from '../../lib/auth';
 import { hasCapability, type AssignmentInfo } from '../../lib/capabilities';
 import { downloadRegisterTemplate, previewRegisterCsv } from '../../lib/register-csv';
@@ -110,7 +111,8 @@ interface Report {
   election: { id: string; name: string; state: string; announcement?: string | null };
   eligibleVoters: number; ballotsCast: number; turnoutPercent: number;
   positions: { position: string; seats: number; abstentions: number; results: { candidate: string; votes: number }[] }[];
-  tallyHash: string | null; evidenceRoot: string | null;
+  tallyHash: string | null; // only used to tell whether the count has run
+  evidenceRoot?: string | null;
   certification: Record<string, unknown> | null;
 }
 interface AuditRecord { organizationId: string | null; actorId: string | null; action: string; scope: string; outcome: string; createdAt: string; hash: string }
@@ -222,6 +224,7 @@ export default function AdminPage() {
   const [signedIn, setSignedIn] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [userId, setUserId] = useState('');
+  const [me, setMe] = useState<{ displayName?: string; email?: string } | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   // One-time TOTP secret for a just-created staff account; kept on screen until dismissed.
   const [newUserEnrollment, setNewUserEnrollment] = useState<{ email: string; totpSecret: string } | null>(null);
@@ -272,6 +275,7 @@ export default function AdminPage() {
       sessionToken = t;
       setSignedIn(true);
       setUserId(principal.userId);
+      setMe({ displayName: principal.displayName, email: principal.email });
       if (principal.organizationId) setOrgId(principal.organizationId);
       setAssignments(principal.assignments);
       sessionStorage.setItem('votemax.user', principal.userId);
@@ -502,6 +506,7 @@ export default function AdminPage() {
     if (!electionId) return;
     // Stage first: each result action (tally, verify, certify, publish) moves the election on.
     await refreshElection().catch(() => undefined);
+    void refreshNotifications().catch(() => undefined);
     const [part, rep, appr] = await Promise.all([
       get(`/elections/${electionId}/participation`).catch(() => null),
       get(`/elections/${electionId}/report`).catch(() => null),
@@ -785,7 +790,7 @@ export default function AdminPage() {
           </form>
         </div>
       )}
-      <Toast message={toast?.message ?? null} kind={toast?.kind} title={toast?.title} hint={toast?.hint} technical={toast?.technical} onClose={() => setToast(null)} />
+      <Toast message={toast?.message ?? null} kind={toast?.kind} title={toast?.title} hint={toast?.hint} onClose={() => setToast(null)} />
     </>
   );
 
@@ -839,8 +844,8 @@ export default function AdminPage() {
         })()}
           {activeSection === 'session' && (
             <Card title="Session">
-              <p>You are signed in as user <code>{userId || 'unknown'}</code>.</p>
-              <p className="muted small">Organization: <code>{orgId || 'not set'}</code>{orgSlug ? ` · voter code: ${orgSlug}` : ''}</p>
+              <p>You are signed in as <strong>{me?.displayName ?? users.find((u) => u.id === userId)?.displayName ?? 'your account'}</strong>{me?.email ? ` (${me.email})` : ''}.</p>
+              <p className="muted small">Organization: {orgId ? 'connected' : 'not set'}{orgSlug ? ` · voter code: ${orgSlug}` : ''}</p>
               <Button variant="secondary" onClick={signOut}>Sign out</Button>
             </Card>
           )}
@@ -875,7 +880,7 @@ export default function AdminPage() {
                 </div>
                 <Button type="submit" variant="secondary">Set organization context</Button>
               </form>
-              {(orgId || orgSlug) && <p className="small muted" style={{ marginTop: 14 }}>Organization ID: <code>{orgId || '-'}</code> · voter code: <code>{orgSlug || '-'}</code></p>}
+              {(orgId || orgSlug) && <p className="small muted" style={{ marginTop: 14 }}>Voter code: <code>{orgSlug || '-'}</code></p>}
             </Card>
           )}
 
@@ -1447,6 +1452,33 @@ export default function AdminPage() {
                 </div>
               )}
 
+              {election && ['PUBLISHED', 'ARCHIVED'].includes(election.state) && capAny(['register.manage', 'results.publish']) && (() => {
+                const batch = [...notifyBatches].filter((b) => b.kind === 'results').sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+                const sending = !!batch && (batch.status === 'queued' || batch.status === 'running');
+                return (
+                  <div className="signoff-box">
+                    <h3 style={{ marginTop: 0 }}>Email the results to voters</h3>
+                    {!batch && <p className="muted small" style={{ marginTop: 0 }}>The results are published but have not been emailed. You can send them to every voter on the register (by email, or SMS if they have no email). It is sent once.</p>}
+                    {sending && <Alert kind="info" title="Sending the results">{batch.sent + batch.failed + batch.skipped} of {batch.total} done.</Alert>}
+                    {batch?.status === 'completed' && (
+                      <Alert kind="success" title="Results emailed">
+                        Sent to {batch.sent} voter{batch.sent === 1 ? '' : 's'}{batch.failed ? `, ${batch.failed} could not be reached` : ''}{batch.skipped ? `, ${batch.skipped} have no email or phone` : ''}.
+                      </Alert>
+                    )}
+                    {batch?.status === 'failed' && <Alert kind="error" title="The results could not be sent">Nothing was delivered. You can try again.</Alert>}
+                    {(!batch || batch.status === 'failed') && cap('register.manage') && (
+                      <div className="form-actions">
+                        <Button variant="primary" onClick={() => setConfirm({
+                          title: 'Email the results',
+                          message: 'Send the published results to every voter on the register? This can only be sent once.',
+                          action: () => void act('Email results', async () => { await call(`/elections/${electionId}/notify`, { kind: 'results' }); await refreshNotifications(); }),
+                        })}>{batch ? 'Try again' : 'Email results to voters'}</Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {election && ['TALLIED', 'VERIFIED'].includes(election.state) && cap('tally.execute') && (
                 <details style={{ margin: '14px 0' }}>
                   <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Recount (only if the result is disputed)</summary>
@@ -1515,8 +1547,6 @@ export default function AdminPage() {
                             );
                           })}
                           {counted && cert?.createdAt && <div className="result-row"><span>Certified</span><span>{fmtDate(String(cert.createdAt))}</span></div>}
-                          <div className="result-row"><span>Tally hash</span><code>{report.tallyHash ?? '-'}</code></div>
-                          <div className="result-row"><span>Evidence root</span>{report.evidenceRoot ? <code>{report.evidenceRoot}</code> : <span className="muted small">available after tally</span>}</div>
                         </div>
                       </>
                     );
@@ -1533,13 +1563,13 @@ export default function AdminPage() {
               </div>
               {audit ? (
                 <>
-                  <Alert kind={audit.verified ? 'success' : 'error'} title={audit.verified ? 'Audit chain verified' : 'Audit chain verification failed'}>
-                    {audit.verified ? 'The audit hash chain is intact.' : 'The audit hash chain could not be verified.'}
+                  <Alert kind={audit.verified ? 'success' : 'error'} title={audit.verified ? 'Activity log verified' : 'Activity log check failed'}>
+                    {audit.verified ? 'The activity log is intact and has not been altered.' : 'The activity log could not be verified. Please contact your platform administrator.'}
                   </Alert>
                   {audit.records.length ? (
-                    <Table head={['Time', 'Actor', 'Action', 'Target', 'Outcome']}>
+                    <Table head={['Time', 'Who', 'What happened', 'About', 'Result']}>
                       {audit.records.slice(0, 200).map((r) => (
-                        <tr key={r.hash}><td>{fmtDate(r.createdAt)}</td><td><code>{r.actorId ?? '-'}</code></td><td>{r.action}</td><td><code>{r.scope}</code></td><td><Badge tone={r.outcome.startsWith('success') ? 'success' : r.outcome.startsWith('denied') || r.outcome.includes('fail') ? 'error' : 'warning'}>{r.outcome}</Badge></td></tr>
+                        <tr key={r.hash}><td>{fmtDate(r.createdAt)}</td><td>{plainActor(r.actorId, (id) => users.find((u) => u.id === id)?.displayName)}</td><td>{plainAction(r.action)}</td><td>{plainTarget(r.scope)}</td><td><Badge tone={plainOutcome(r.outcome).tone}>{plainOutcome(r.outcome).label}</Badge></td></tr>
                       ))}
                     </Table>
                   ) : <EmptyState title="No audit records">Audit events appear here after administrative actions.</EmptyState>}
@@ -1551,18 +1581,18 @@ export default function AdminPage() {
           {activeSection === 'fraud' && (
             <Card title="Fraud signals" actions={<Button variant="secondary" size="sm" onClick={() => void act('Refresh fraud', refreshFraud)}>Refresh</Button>}>
               <p className="muted small" style={{ marginTop: 0 }}>
-                Abuse-detection events and active blocks (SEC-VOT-10). Only salted hashes and rule names are stored - never raw IPs, device fingerprints, or voter identifiers.
+                Suspicious activity the system has noticed, and any blocks in force. Nothing personal about voters is shown here.
               </p>
               <h3>Active blocks</h3>
               {fraudBlocks === null ? <Skeleton lines={2} /> : fraudBlocks.length === 0 ? (
                 <EmptyState title="No active blocks">No fraud blocks are currently in force.</EmptyState>
               ) : (
-                <Table head={['Kind', 'Rule', 'Scope', 'Reason', 'Score', 'Expires', 'Lifted', '']}>
+                <Table head={['Type', 'Rule', 'Applies to', 'Reason', 'Score', 'Expires', 'Lifted', '']}>
                   {fraudBlocks.map((b) => (
                     <tr key={b.id}>
-                      <td><code>{b.kind}</code></td>
-                      <td>{b.rule}</td>
-                      <td className="small muted">{b.electionId ? `election ${b.electionId.slice(0, 8)}` : 'global'}</td>
+                      <td>{plainSignal(b.kind)}</td>
+                      <td>{plainRule(b.rule)}</td>
+                      <td className="small muted">{b.electionId ? 'This election' : 'All elections'}</td>
                       <td className="small">{b.reason}</td>
                       <td>{b.score}</td>
                       <td className="small muted">{fmtDate(b.expiresAt)}</td>
@@ -1570,7 +1600,7 @@ export default function AdminPage() {
                       <td>{!b.liftedAt && capOrg('fraud.manage') && (
                         <Button size="sm" variant="secondary" onClick={() => setConfirm({
                           title: 'Lift fraud block',
-                          message: `Lift the ${b.rule} block on signal ${b.signalHash.slice(0, 12)}…? The signal will be allowed again subject to normal rate limits.`,
+                          message: `Lift this block (${plainRule(b.rule).toLowerCase()})? The ${plainSignal(b.kind).toLowerCase()} will be allowed again, subject to the normal limits.`,
                           action: () => void act('Lift fraud block', async () => { await call(`/fraud/blocks/${b.id}/lift`, {}); await refreshFraud(); }),
                         })}>Lift</Button>
                       )}</td>
@@ -1584,15 +1614,15 @@ export default function AdminPage() {
               ) : fraudEvents === null ? <Skeleton lines={3} /> : fraudEvents.length === 0 ? (
                 <EmptyState title="No fraud events">No anti-fraud signals recorded for this election.</EmptyState>
               ) : (
-                <Table head={['Time', 'Rule', 'Score', 'Action', 'Reasons', 'Signal']}>
+                <Table head={['Time', 'Rule', 'Score', 'Action', 'Reasons', 'Source']}>
                   {fraudEvents.slice(0, 100).map((ev, i) => (
                     <tr key={i}>
                       <td className="small muted">{fmtDate(ev.createdAt)}</td>
-                      <td>{ev.rule}</td>
+                      <td>{plainRule(ev.rule)}</td>
                       <td>{ev.score}</td>
                       <td><Badge tone={ev.action === 'block' ? 'error' : ev.action === 'throttle' ? 'warning' : 'success'}>{ev.action}</Badge></td>
                       <td className="small">{ev.reasons.join(', ') || '-'}</td>
-                      <td className="small muted"><code>{ev.signalHash ? `${ev.signalHash.slice(0, 10)}…` : '-'}</code></td>
+                      <td className="small muted">{plainSignal(ev.signalKind)}</td>
                     </tr>
                   ))}
                 </Table>

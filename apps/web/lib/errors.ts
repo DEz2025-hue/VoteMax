@@ -1,3 +1,4 @@
+import { isPlainMessage } from './plain';
 /**
  * Friendly errors. The API reports problems as "CODE: technical detail"
  * (e.g. "INVALID_STATE: certification requires VERIFIED, current REGISTRATION").
@@ -161,12 +162,13 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
       if (d.startsWith('waiting for')) return make(code, raw, 'guidance', 'Waiting for sign-off', `${detail.replace(/^./, (c) => c.toUpperCase())}.`, 'They can approve under Results and reports; the form fills in once they do.');
       if (d.includes('two approvers')) return make(code, raw, 'guidance', 'One more thing first', 'Choose two different approvers to run the tally.');
       if (d.includes('must be an auditor')) return make(code, raw, 'guidance', 'One more thing first', 'At least one of the approvers must be an auditor.');
-      return make(code, raw, 'guidance', 'One more thing first', detail ? `${detail.replace(/\s*\([^)]*\)\s*$/, '').replace(/^./, (c) => c.toUpperCase())}.` : 'Something needs to be completed before this step.');
+      { const clean = detail.replace(/\s*\([^)]*\)\s*$/, '').replace(/^./, (c) => c.toUpperCase());
+        return make(code, raw, 'guidance', 'One more thing first', clean && isPlainMessage(clean) ? `${clean}.` : 'Something needs to be completed before this step can go ahead.'); }
     }
     case 'RECONCILIATION':
     case 'BLOCKER':
       if (detail.toLowerCase().includes('only owner')) return make(code, raw, 'guidance', "Can't remove the only owner", 'Every organization needs at least one owner.', 'Add another owner first, then remove this one.');
-      return make(code, raw, 'guidance', "Can't continue yet", "We found a mismatch that has to be resolved before this step can go ahead, to keep the election accurate.", 'Share the technical details below with your platform administrator.');
+      return make(code, raw, 'guidance', "Can't continue yet", "We found a mismatch that has to be resolved before this step can go ahead, to keep the election accurate.", 'Please contact your platform administrator.');
 
     // ---- permissions / separation of duties ----
     case 'FORBIDDEN': {
@@ -227,13 +229,13 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
     case 'RESULTS_RESTRICTED':
       return make(code, raw, 'guidance', 'Results are hidden for now', 'Results stay private until they are published.');
     case 'NOTIFICATION_EXISTS':
-      return make(code, raw, 'guidance', 'Already sent', 'That reminder has already gone out for this election.');
+      return make(code, raw, 'guidance', 'Already sent', /results/i.test(detail) ? 'The results have already been emailed for this election.' : 'That reminder has already gone out for this election.');
 
     // ---- general ----
     case 'NOT_FOUND':
       return make(code, raw, 'guidance', "Couldn't find that", "We couldn't find what you were looking for. It may have been removed.", 'Try refreshing the page.');
     case 'INVALID_INPUT':
-      return make(code, raw, 'guidance', 'Please check the details', detail ? `${detail.replace(/^./, (c) => c.toUpperCase())}${/[.!?]$/.test(detail) ? '' : '.'}` : 'Some of the details need another look.');
+      return make(code, raw, 'guidance', 'Please check the details', detail && isPlainMessage(detail) ? `${detail.replace(/^./, (c) => c.toUpperCase())}${/[.!?]$/.test(detail) ? '' : '.'}` : 'Some of the details need another look.');
     case 'FRAUD_BLOCKED':
       return make(code, raw, 'guidance', 'Paused for security', "For security, we've paused requests from this device for a while.", "If you're a genuine voter, try again later or contact your election officer.");
     case 'FRAUD_THROTTLED':

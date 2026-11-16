@@ -105,18 +105,20 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
   );
 }
 
-export interface ToastData { message: string; kind: 'info' | 'error' | 'warning'; title?: string; hint?: string; technical?: string }
+export interface ToastData { message: string; kind: 'info' | 'error' | 'warning'; title?: string; hint?: string }
 
 /** Build a toast from anything thrown - friendly text, never raw codes. */
 export function errorToast(err: unknown, title?: string): ToastData {
   const f = friendlyFromUnknown(err);
+  // The original text stays off the screen; support can find it in the browser console.
+  if (typeof console !== 'undefined') console.debug('[votemax]', f.code, f.technical);
   return {
     kind: f.severity === 'guidance' ? 'warning' : 'error',
-    title: title ?? f.title, message: f.message, hint: f.hint, technical: f.technical,
+    title: title ?? f.title, message: f.message, hint: f.hint,
   };
 }
 
-export function Toast({ message, kind = 'info', title, hint, technical, onClose }: { message: string | null; kind?: 'info' | 'error' | 'warning'; title?: string; hint?: string; technical?: string; onClose: () => void }) {
+export function Toast({ message, kind = 'info', title, hint, onClose }: { message: string | null; kind?: 'info' | 'error' | 'warning'; title?: string; hint?: string; onClose: () => void }) {
   useEffect(() => {
     if (!message) return;
     // Longer messages need longer to read; guidance with a hint stays up a bit more.
@@ -136,12 +138,6 @@ export function Toast({ message, kind = 'info', title, hint, technical, onClose 
           {title && <strong className="toast-title">{title}</strong>}
           <div>{message}</div>
           {hint && <div className="toast-hint">{hint}</div>}
-          {technical && (
-            <details className="toast-tech">
-              <summary>Details for support</summary>
-              <code>{technical}</code>
-            </details>
-          )}
         </div>
         <button type="button" className="chip-remove toast-close" aria-label="Dismiss" onClick={onClose}>×</button>
       </div>

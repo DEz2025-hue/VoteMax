@@ -152,6 +152,33 @@ describe('Phase 3 voting and results (mock election)', () => {
     await expect(svc.publish(executorId, electionId, { emailResults: true })).rejects.toThrow(/INVALID_TRANSITION/);
   });
 
+  it('results can be emailed after publishing announce-only, but only once and never before publishing', async () => {
+    await certifyAll();
+    // Not published yet: refused.
+    await expect(svc.notifyVoters(executorId, electionId, 'results')).rejects.toThrow(/INVALID_STATE/);
+    await svc.publish(executorId, electionId, { announcement: 'Certified.' });
+    expect(outbox().filter((m) => m.subject.startsWith('Results'))).toHaveLength(0);
+    // Later, the owner decides to email them.
+    await svc.notifyVoters(executorId, electionId, 'results');
+    const batch = await waitForResultsBatch();
+    expect(batch.status).toBe('completed');
+    expect(batch.sent).toBe(6);
+    // A completed send is never repeated.
+    await expect(svc.notifyVoters(executorId, electionId, 'results')).rejects.toThrow(/NOTIFICATION_EXISTS/);
+  });
+
+  it('a results send that failed outright can be tried again', async () => {
+    await certifyAll();
+    await svc.publish(executorId, electionId);
+    await store.insertNotificationBatch({
+      id: 'failed-1', electionId, organizationId: orgId, kind: 'results', status: 'failed',
+      total: 6, sent: 0, failed: 6, skipped: 0, createdAt: new Date(Date.now() - 60_000).toISOString(), completedAt: new Date().toISOString(),
+    });
+    await expect(svc.notifyVoters(executorId, electionId, 'results')).resolves.toMatchObject({ kind: 'results' });
+    const latest = await store.findNotificationBatch(electionId, 'results');
+    expect(latest?.id).not.toBe('failed-1');
+  });
+
   it('prevents duplicate ballots under concurrent submissions (FR-VTG-005)', async () => {
     const sessions: string[] = [];
     // One voter, several ballot sessions (e.g. multiple tabs/retries).

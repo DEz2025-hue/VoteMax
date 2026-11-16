@@ -726,9 +726,16 @@ export class PlatformService {
   /** Queue a bulk email (invite to every eligible voter; reminders only to those yet to vote). */
   async notifyVoters(actorId: string, electionId: string, kind: NotificationKind = 'invite'): Promise<NotificationBatch> {
     const election = await this.electionOrThrow(electionId);
+    // Results go out only once they are public, whenever the owner chooses to send them.
+    if (kind === 'results' && !['PUBLISHED', 'ARCHIVED'].includes(election.state)) {
+      throw new Error(`INVALID_STATE: results can be emailed only after they are published, current ${election.state}`);
+    }
     if (kind !== 'invite') {
       const existing = await this.store.findNotificationBatch(electionId, kind);
-      if (existing) throw new Error(`NOTIFICATION_EXISTS: ${kind} already sent for this election`);
+      // A send that failed outright may be tried again; anything else was already sent.
+      if (existing && !(kind === 'results' && existing.status === 'failed')) {
+        throw new Error(`NOTIFICATION_EXISTS: ${kind} already sent for this election`);
+      }
     }
     const org = await this.store.getOrganization(election.organizationId);
     if (!org) throw new Error('NOT_FOUND: organization');

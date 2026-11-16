@@ -258,7 +258,7 @@ export class PlatformController {
   @Post('elections/:id/notify')
   @RequireCapability('register.manage')
   notifyVoters(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { kind?: string }) {
-    const kind = body?.kind === 'reminder_open' || body?.kind === 'reminder_close' ? body.kind : 'invite';
+    const kind = body?.kind === 'reminder_open' || body?.kind === 'reminder_close' || body?.kind === 'results' ? body.kind : 'invite';
     return guard(() => this.platform.notifyVoters(actor(req), id, kind));
   }
 

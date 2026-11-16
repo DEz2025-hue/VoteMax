@@ -423,7 +423,7 @@ export default function PlatformPage() {
         </>
       )}
 
-      <Toast message={toast?.message ?? null} kind={toast?.kind} title={toast?.title} hint={toast?.hint} technical={toast?.technical} onClose={() => setToast(null)} />
+      <Toast message={toast?.message ?? null} kind={toast?.kind} title={toast?.title} hint={toast?.hint} onClose={() => setToast(null)} />
       <ConfirmDialog
         open={confirm !== null}
         title={confirm?.title ?? ''}
