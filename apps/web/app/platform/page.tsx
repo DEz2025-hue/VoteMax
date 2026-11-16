@@ -324,7 +324,24 @@ export default function PlatformPage() {
     });
   }
 
-  const totalElections = directory?.reduce((n, t) => n + t.electionCount, 0) ?? 0;
+  async function resetUserTotp(orgId: string, userId: string) {
+    await act('Reset authenticator', async () => {
+      const res = await call(`/platform/organizations/${orgId}/users/${userId}/totp-reset`, {});
+      const secret = { email: String(res.email ?? ''), totpSecret: String(res.totpSecret ?? '') };
+      setDetail(await get(`/platform/organizations/${orgId}`) as unknown as TenantDetail);
+      setEnrolled(secret);
+    });
+  }
+
+  async function deleteUser(orgId: string, userId: string) {
+    await act('Delete user', async () => {
+      await call(`/platform/organizations/${orgId}/users/${userId}`, undefined, 'DELETE');
+      setDetail(await get(`/platform/organizations/${orgId}`) as unknown as TenantDetail);
+      await refreshAll();
+    });
+  }
+
+  const totalElections =directory?.reduce((n, t) => n + t.electionCount, 0) ?? 0;
   const unstaffedTenants = (directory ?? []).filter((t) => !t.staffed);
   const recentTenants = [...(directory ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
 
@@ -645,23 +662,50 @@ export default function PlatformPage() {
                 )}
 
                 {detailTab === 'users' && (
-                  <Panel flush>
-                    {detail.users.length === 0 ? <div className="ps-panel-body"><EmptyState title="No users yet">Provision a staff account to get started.</EmptyState></div> : (
-                      <div className="ps-table-wrap">
-                        <table className="ps-table">
-                          <thead><tr><th>User</th><th>MFA</th></tr></thead>
-                          <tbody>
-                            {detail.users.map((u) => (
-                              <tr key={u.id}>
-                                <td><div className="ps-org-cell"><span className="ps-avatar">{initials(u.displayName)}</span><div><strong>{u.displayName}</strong><span>{u.email}</span></div></div></td>
-                                <td>{u.mfaEnrolled ? <Badge tone="success">enrolled</Badge> : <Badge tone="warning">none</Badge>}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                  <>
+                    {enrolled && (
+                      <Alert kind="success" title="Authenticator setup - share this once">
+                        <p style={{ margin: '4px 0' }}><strong>{enrolled.email}</strong> - add this to their authenticator app now; it is not shown again:</p>
+                        <div style={{ margin: '8px 0' }}><TotpQr email={enrolled.email} secret={enrolled.totpSecret} /></div>
+                        <p className="small" style={{ margin: '4px 0' }}>Can&apos;t scan? Enter this setup key instead:</p>
+                        <code style={{ wordBreak: 'break-all' }}>{enrolled.totpSecret}</code>
+                        <p className="small" style={{ margin: '8px 0 0' }}>
+                          <Button size="sm" variant="ghost" onClick={() => setEnrolled(null)}>Done</Button>
+                        </p>
+                      </Alert>
                     )}
-                  </Panel>
+                    <Panel flush>
+                      {detail.users.length === 0 ? <div className="ps-panel-body"><EmptyState title="No users yet">Provision a staff account to get started.</EmptyState></div> : (
+                        <div className="ps-table-wrap">
+                          <table className="ps-table">
+                            <thead><tr><th>User</th><th>MFA</th><th>Actions</th></tr></thead>
+                            <tbody>
+                              {detail.users.map((u) => (
+                                <tr key={u.id}>
+                                  <td><div className="ps-org-cell"><span className="ps-avatar">{initials(u.displayName)}</span><div><strong>{u.displayName}</strong><span>{u.email}</span></div></div></td>
+                                  <td>{u.mfaEnrolled ? <Badge tone="success">enrolled</Badge> : <Badge tone="warning">none</Badge>}</td>
+                                  <td>
+                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                      <Button size="sm" variant="secondary" disabled={loading} onClick={() => setConfirm({
+                                        title: 'Reset authenticator',
+                                        message: <>Issue a new authenticator code for <strong>{u.email}</strong>? Their old code stops working and they are signed out.</>,
+                                        action: () => void resetUserTotp(detail.id, u.id),
+                                      })}>Reset authenticator</Button>
+                                      <Button size="sm" variant="secondary" disabled={loading} onClick={() => setConfirm({
+                                        title: 'Delete user',
+                                        message: <>Remove <strong>{u.email}</strong> from <strong>{detail.name}</strong>? They lose access immediately. This cannot be undone.</>,
+                                        action: () => void deleteUser(detail.id, u.id),
+                                      })}>Delete</Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </Panel>
+                  </>
                 )}
 
                 {detailTab === 'elections' && (
