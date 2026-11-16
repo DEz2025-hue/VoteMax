@@ -154,6 +154,32 @@ export class PostgresStore implements PlatformStore {
     });
   }
 
+  async deleteElection(id: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      // Children first: every table below points at the election, directly or through voters.
+      const entitlementIds = tx.select({ id: schema.entitlements.id }).from(schema.entitlements).where(eq(schema.entitlements.electionId, id));
+      await tx.delete(schema.ballotIdempotencyKeys).where(inArray(schema.ballotIdempotencyKeys.entitlementId, entitlementIds));
+      await tx.delete(schema.ballotSessions).where(eq(schema.ballotSessions.electionId, id));
+      await tx.delete(schema.otpChallenges).where(eq(schema.otpChallenges.electionId, id));
+      await tx.delete(schema.ballots).where(eq(schema.ballots.electionId, id));
+      await tx.delete(schema.entitlements).where(eq(schema.entitlements.electionId, id));
+      await tx.delete(schema.voterRecords).where(eq(schema.voterRecords.electionId, id));
+      await tx.delete(schema.certifications).where(eq(schema.certifications.electionId, id));
+      await tx.delete(schema.tallyRuns).where(eq(schema.tallyRuns.electionId, id));
+      await tx.delete(schema.electionKeys).where(eq(schema.electionKeys.electionId, id));
+      await tx.delete(schema.notificationBatches).where(eq(schema.notificationBatches.electionId, id));
+      await tx.delete(schema.electionApprovals).where(eq(schema.electionApprovals.electionId, id));
+      const positionIds = tx.select({ id: schema.positions.id }).from(schema.positions).where(eq(schema.positions.electionId, id));
+      await tx.delete(schema.candidates).where(inArray(schema.candidates.positionId, positionIds)); // photos cascade
+      await tx.delete(schema.positions).where(eq(schema.positions.electionId, id));
+      await tx.delete(schema.roleAssignments).where(eq(schema.roleAssignments.electionId, id));
+      await tx.delete(schema.fraudSignals).where(eq(schema.fraudSignals.electionId, id));
+      await tx.delete(schema.fraudEvents).where(eq(schema.fraudEvents.electionId, id));
+      await tx.delete(schema.fraudBlocks).where(eq(schema.fraudBlocks.electionId, id));
+      await tx.delete(schema.elections).where(eq(schema.elections.id, id));
+    });
+  }
+
   async listApprovals(electionId: string): Promise<ElectionApproval[]> {
     const rows = await this.database.select().from(schema.electionApprovals)
       .where(eq(schema.electionApprovals.electionId, electionId))

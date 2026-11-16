@@ -247,6 +247,8 @@ export default function AdminPage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [editVoter, setEditVoter] = useState<VoterRow | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteName, setDeleteName] = useState('');
   const csvFileRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoTargetRef = useRef('');
@@ -751,6 +753,39 @@ export default function AdminPage() {
           </form>
         </div>
       )}
+      {deleteOpen && election && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setDeleteOpen(false); }}>
+          <form
+            className="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (deleteName.trim().toLowerCase() !== election.name.trim().toLowerCase()) return;
+              const id = electionId;
+              const name = election.name;
+              setDeleteOpen(false);
+              void act('Delete election', async () => {
+                await call(`/elections/${id}`, {}, 'DELETE');
+                startNewElection();
+                setParticipation(null); setReport(null); setApprovals([]); setVoters([]); setNotifyBatches([]);
+                await refreshElections();
+                setToast({ message: `"${name}" was deleted.`, kind: 'info' });
+              });
+            }}
+          >
+            <h2 id="delete-title">Delete this election?</h2>
+            <p className="muted small">
+              This permanently deletes <strong>{election.name}</strong> and everything in it: the ballot, the voter list ({election.register.total} on the register), any votes cast, the results and the sign-offs. It cannot be undone. A short note that it was deleted stays in the activity log.
+            </p>
+            <Field label={`Type "${election.name}" to confirm`} htmlFor="delete-confirm">
+              <Input id="delete-confirm" value={deleteName} onChange={(e) => setDeleteName(e.target.value)} autoComplete="off" />
+            </Field>
+            <div className="form-actions">
+              <Button type="button" variant="secondary" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+              <Button type="submit" variant="danger" disabled={loading || deleteName.trim().toLowerCase() !== election.name.trim().toLowerCase()}>Delete election</Button>
+            </div>
+          </form>
+        </div>
+      )}
       {publishOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setPublishOpen(false); }}>
           <form
@@ -995,6 +1030,11 @@ export default function AdminPage() {
                 </Field>
                 <Button type="button" variant="secondary" onClick={() => void act('Refresh elections', refreshElections)}>Refresh</Button>
                 {electionId && <Button type="button" variant="ghost" onClick={startNewElection}>Start new</Button>}
+                {election && cap('election.configure') && (
+                  <Button type="button" variant="danger" size="sm" disabled={['OPEN', 'SUSPENDED'].includes(election.state)}
+                    title={['OPEN', 'SUSPENDED'].includes(election.state) ? 'Voting is running. Close it before deleting.' : undefined}
+                    onClick={() => { setDeleteName(''); setDeleteOpen(true); }}>Delete election</Button>
+                )}
               </div>
 
               <div className="wizard-steps">

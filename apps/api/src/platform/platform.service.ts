@@ -1479,6 +1479,23 @@ export class PlatformService {
     return summarizeResults(await this.report(electionId));
   }
 
+  /**
+   * Remove an election that is old or was never finished. Voting that is running
+   * right now cannot be deleted: close or cancel it first. Everything belonging
+   * to the election goes; the activity log keeps a record that it happened.
+   */
+  async deleteElection(actorId: string, organizationId: string, electionId: string): Promise<void> {
+    const election = await this.store.getElection(electionId);
+    // Same answer for "missing" and "someone else's", so other organizations' elections can't be probed.
+    if (!election || election.organizationId !== organizationId) throw new Error('NOT_FOUND: election');
+    if (['OPEN', 'SUSPENDED'].includes(election.state)) {
+      throw new Error(`INVALID_STATE: voting is running; close it before deleting, current ${election.state}`);
+    }
+    const ballots = await this.store.countBallots(electionId);
+    await this.store.deleteElection(electionId);
+    await this.log(organizationId, actorId, 'election.delete', `election:${electionId}`, `success:state=${election.state},ballots=${ballots}`);
+  }
+
   /** Structured election report (FR-RES-007/009). */
   async report(electionId: string, actorId: string | null = null) {
     const election = await this.electionOrThrow(electionId);

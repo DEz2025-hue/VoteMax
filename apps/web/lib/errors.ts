@@ -126,6 +126,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
   switch (code) {
     // ---- lifecycle / state ----
     case 'INVALID_STATE': {
+      if (/voting is running/i.test(detail)) return make(code, raw, 'guidance', 'Voting is still running', 'An election can only be deleted once voting has closed.', 'Close voting first, then delete it.');
       const current = /current\s+([A-Z_]+)/.exec(detail)?.[1];
       const need = requiredStates(detail);
       const where = current ? `The election is currently ${stateLabel(current)}.` : 'The election is not at the right stage yet.';

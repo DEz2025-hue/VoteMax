@@ -193,6 +193,13 @@ export interface PlatformStore {
    */
   deleteUser(id: string): Promise<void>;
 
+  /**
+   * Permanently remove an election with everything that belongs to it: ballot,
+   * voter register, entitlements, cast ballots, results, keys, notifications and
+   * sign-offs. The audit log is kept as history.
+   */
+  deleteElection(id: string): Promise<void>;
+
   // ---- sign-offs required before a count or certification ----
   listApprovals(electionId: string): Promise<ElectionApproval[]>;
   /** Record (or refresh) one person's approval for a step; one row per election, user and kind. */

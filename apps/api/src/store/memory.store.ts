@@ -121,6 +121,34 @@ export class InMemoryStore implements PlatformStore {
     this.users.delete(id);
   }
 
+  async deleteElection(id: string): Promise<void> {
+    const positionIds = new Set([...this.positions.values()].filter((p) => p.electionId === id).map((p) => p.id));
+    const candidateIds = [...this.candidates.values()].filter((c) => positionIds.has(c.positionId)).map((c) => c.id);
+    const entitlementIds = new Set(this.entitlements.filter((e) => e.electionId === id).map((e) => e.id));
+    for (const cid of candidateIds) { this.candidatePhotos.delete(cid); this.candidates.delete(cid); }
+    for (const pid of positionIds) this.positions.delete(pid);
+    for (const key of [...this.idempotency.keys()]) if (entitlementIds.has(key.split(':')[0])) this.idempotency.delete(key);
+    for (const [k, b] of this.ballotSessions) if (b.electionId === id) this.ballotSessions.delete(k);
+    for (const [k, o] of this.otpChallenges) if (o.electionId === id) this.otpChallenges.delete(k);
+    this.removeWhere(this.ballots, (b) => b.electionId === id);
+    this.removeWhere(this.entitlements, (e) => e.electionId === id);
+    this.removeWhere(this.voters, (v) => v.electionId === id);
+    this.removeWhere(this.tallyRuns, (t) => t.electionId === id);
+    this.certifications.delete(id);
+    this.electionKeys.delete(id);
+    this.removeWhere(this.notificationBatches, (b) => b.electionId === id);
+    this.removeWhere(this.fraudSignals, (f) => f.electionId === id);
+    this.removeWhere(this.fraudEvents, (f) => f.electionId === id);
+    this.removeWhere(this.fraudBlocks, (f) => f.electionId === id);
+    this.removeWhere(this.assignments, (a) => a.electionId === id);
+    this.approvals = this.approvals.filter((a) => a.electionId !== id);
+    this.elections.delete(id);
+  }
+
+  private removeWhere<T>(list: T[], pred: (item: T) => boolean): void {
+    for (let i = list.length - 1; i >= 0; i--) if (pred(list[i])) list.splice(i, 1);
+  }
+
   async listApprovals(electionId: string): Promise<ElectionApproval[]> {
     return this.approvals.filter((a) => a.electionId === electionId).map((a) => ({ ...a }));
   }

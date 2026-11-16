@@ -349,6 +349,14 @@ export class PlatformController {
     return guard(async () => { await this.platform.withdrawApproval(actor(req), id, kind); return { withdrawn: true }; });
   }
 
+  @Delete('elections/:id')
+  @RequireCapability('election.configure')
+  deleteElection(@Req() req: { principal?: Principal }, @Param('id') id: string) {
+    const orgId = req.principal?.organizationId;
+    if (!orgId) throw new ForbiddenException('TENANT_REQUIRED: no organization on principal');
+    return guard(async () => { await this.platform.deleteElection(actor(req), orgId, id); return { deleted: true }; });
+  }
+
   @Post('elections/:id/close')
   @RequireCapability('election.openClose')
   close(@Req() req: { principal?: Principal }, @Param('id') id: string) {
