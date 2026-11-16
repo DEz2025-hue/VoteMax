@@ -390,7 +390,7 @@ export const notificationBatches = adminSchema.table('notification_batches', {
   organizationId: uuid('organization_id')
     .notNull()
     .references(() => organizations.id),
-  kind: text('kind', { enum: ['invite', 'reminder_open', 'reminder_close'] }).notNull(),
+  kind: text('kind', { enum: ['invite', 'reminder_open', 'reminder_close', 'results'] }).notNull(),
   status: text('status', { enum: ['queued', 'running', 'completed', 'failed'] }).notNull().default('queued'),
   total: integer('total').notNull().default(0),
   sent: integer('sent').notNull().default(0),

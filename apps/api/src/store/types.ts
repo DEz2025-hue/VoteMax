@@ -65,7 +65,7 @@ export interface OtpChallenge { voterId: string; electionId: string; codeHash: s
 export type OtpVerifyResult = 'ok' | 'invalid' | 'locked' | 'expired' | 'missing';
 export interface BallotSession { voterId: string; electionId: string; entitlementId: string; expiresAt: number; channel: 'online' }
 
-export type NotificationKind = 'invite' | 'reminder_open' | 'reminder_close';
+export type NotificationKind = 'invite' | 'reminder_open' | 'reminder_close' | 'results';
 export type NotificationStatus = 'queued' | 'running' | 'completed' | 'failed';
 export interface NotificationBatch {
   id: string; electionId: string; organizationId: string; kind: NotificationKind;

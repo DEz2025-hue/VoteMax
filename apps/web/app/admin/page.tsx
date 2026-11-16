@@ -185,6 +185,7 @@ export default function AdminPage() {
   const [notifyBatches, setNotifyBatches] = useState<NotificationBatch[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [editVoter, setEditVoter] = useState<VoterRow | null>(null);
+  const [publishOpen, setPublishOpen] = useState(false);
   const csvFileRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoTargetRef = useRef('');
@@ -629,6 +630,45 @@ export default function AdminPage() {
             <div className="form-actions">
               <Button type="button" variant="secondary" onClick={() => setEditVoter(null)}>Cancel</Button>
               <Button type="submit" variant="primary" disabled={loading}>Save changes</Button>
+            </div>
+          </form>
+        </div>
+      )}
+      {publishOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setPublishOpen(false); }}>
+          <form
+            className="modal" role="dialog" aria-modal="true" aria-labelledby="publish-title"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              const emailResults = f.get('release') === 'email';
+              const announcement = String(f.get('announcement') ?? '').trim();
+              setPublishOpen(false);
+              void act('Publish results', async () => {
+                await call(`/elections/${electionId}/publish`, { emailResults, ...(announcement ? { announcement } : {}) }, 'POST');
+                await refreshResults();
+                if (emailResults) setToast({ message: 'Results published. Emailing them to voters now - progress shows under Voters.', kind: 'info' });
+              });
+            }}
+          >
+            <h2 id="publish-title">Publish results</h2>
+            <p className="muted small">The certified report becomes final. Choose how voters hear about it. Publishing cannot be undone.</p>
+            <fieldset style={{ border: 0, padding: 0, margin: '8px 0' }}>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '8px 0' }}>
+                <input type="radio" name="release" value="announce" defaultChecked style={{ marginTop: 4 }} />
+                <span><strong>Publish and announce</strong><br /><span className="small muted">Results are published with your announcement. No emails are sent.</span></span>
+              </label>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '8px 0' }}>
+                <input type="radio" name="release" value="email" style={{ marginTop: 4 }} />
+                <span><strong>Publish and email the results to voters</strong><br /><span className="small muted">Also sends the results summary to every voter on the register (email, or SMS if they have no email). Sent once.</span></span>
+              </label>
+            </fieldset>
+            <Field label="Announcement (optional)" hint="Shown with the report, and included at the top of the email" htmlFor="pub-announcement">
+              <Textarea id="pub-announcement" name="announcement" rows={3} defaultValue={election?.announcement ?? ''} placeholder="e.g. Results certified by the election committee on …" />
+            </Field>
+            <div className="form-actions">
+              <Button type="button" variant="secondary" onClick={() => setPublishOpen(false)}>Cancel</Button>
+              <Button type="submit" variant="primary" disabled={loading}>Publish</Button>
             </div>
           </form>
         </div>
@@ -1084,7 +1124,7 @@ export default function AdminPage() {
                       <Table head={['Type', 'Status', 'Sent', 'Failed', 'No contact', 'When']}>
                         {notifyBatches.slice(0, 6).map((b) => (
                           <tr key={b.id}>
-                            <td className="small">{b.kind === 'invite' ? 'Invitation' : b.kind === 'reminder_open' ? 'Opens soon' : 'Closes soon'}</td>
+                            <td className="small">{b.kind === 'invite' ? 'Invitation' : b.kind === 'reminder_open' ? 'Opens soon' : b.kind === 'results' ? 'Results' : 'Closes soon'}</td>
                             <td><Badge tone={b.status === 'completed' ? 'success' : b.status === 'failed' ? 'error' : 'warning'}>{b.status}</Badge></td>
                             <td>{b.sent}/{b.total}</td>
                             <td>{b.failed}</td>
@@ -1207,7 +1247,7 @@ export default function AdminPage() {
                 </div>
                 <div className="form-actions">
                   <Button type="submit" variant="primary" disabled={!electionId || !userId || users.length < 2 || !cap('results.certify')}>Certify results</Button>
-                  <Button variant="secondary" disabled={!electionId || !cap('results.publish')} onClick={() => setConfirm({ title: 'Publish results', message: 'Publish the certified report?', action: () => void act('Publish results', async () => { await call(`/elections/${electionId}/publish`, {}, 'POST'); await refreshResults(); }) })}>Publish results</Button>
+                  <Button variant="secondary" disabled={!electionId || !cap('results.publish')} onClick={() => setPublishOpen(true)}>Publish results</Button>
                   <Button variant="ghost" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('View report', async () => { const r = await get(`/elections/${electionId}/report`); setReport(r as unknown as Report); })}>View report</Button>
                 </div>
               </form>

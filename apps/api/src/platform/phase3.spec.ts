@@ -97,6 +97,53 @@ describe('Phase 3 voting and results (mock election)', () => {
     expect(report.certification?.tallyHash).toBe(run.tallyHash);
   });
 
+  async function certifyAll() {
+    await vote('S001', adaId);
+    await vote('S002', adaId);
+    await vote('S003', benId);
+    await svc.closeElection(executorId, electionId);
+    await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    await svc.verifyTally(electionId);
+    await svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: approver1 });
+  }
+  const outbox = () => (svc as unknown as { voterNotifier: { outbox: { to: string; channel: string; subject: string; text: string }[] } }).voterNotifier.outbox;
+  async function waitForResultsBatch() {
+    for (let i = 0; i < 100; i++) {
+      const b = (await store.listNotificationBatches(electionId)).find((x) => x.kind === 'results');
+      if (b && (b.status === 'completed' || b.status === 'failed')) return b;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error('results batch did not finish');
+  }
+
+  it('announce only: publishes with an announcement and emails nobody', async () => {
+    await certifyAll();
+    const report = await svc.publish(executorId, electionId, { announcement: 'Certified by the committee.' });
+    expect(report.election.state).toBe('PUBLISHED');
+    expect(report.election.announcement).toBe('Certified by the committee.');
+    expect((await store.listNotificationBatches(electionId)).filter((b) => b.kind === 'results')).toHaveLength(0);
+    expect(outbox().filter((m) => m.subject.startsWith('Results'))).toHaveLength(0);
+  });
+
+  it('email results: sends the results to every voter on the register, once', async () => {
+    await certifyAll();
+    await svc.publish(executorId, electionId, { emailResults: true, announcement: 'Congratulations to all.' });
+    const batch = await waitForResultsBatch();
+    expect(batch.status).toBe('completed');
+    expect(batch.total).toBe(6); // all eligible voters, whether or not they voted
+    expect(batch.sent).toBe(6);
+    const mails = outbox().filter((m) => m.subject === 'Results - Organization Election 2026');
+    expect(mails).toHaveLength(6);
+    const body = mails[0].text;
+    expect(body).toContain('Congratulations to all.');
+    expect(body).toContain('Turnout: 3 of 6 eligible voters (50%).');
+    expect(body).toContain('Ada Kamara: 2 votes  - elected');
+    expect(body).toContain('Ben Kollie: 1 vote');
+    expect(body).not.toContain('/vote?'); // no personal voting link in a results email
+    // Publishing is one-way, so a second publish cannot trigger a second email.
+    await expect(svc.publish(executorId, electionId, { emailResults: true })).rejects.toThrow(/INVALID_TRANSITION/);
+  });
+
   it('prevents duplicate ballots under concurrent submissions (FR-VTG-005)', async () => {
     const sessions: string[] = [];
     // One voter, several ballot sessions (e.g. multiple tabs/retries).

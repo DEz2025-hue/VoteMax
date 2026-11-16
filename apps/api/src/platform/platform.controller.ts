@@ -342,8 +342,11 @@ export class PlatformController {
 
   @Post('elections/:id/publish')
   @RequireCapability('results.publish')
-  publish(@Req() req: { principal?: Principal }, @Param('id') id: string) {
-    return guard(() => this.platform.publish(actor(req), id));
+  publish(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body?: { emailResults?: boolean; announcement?: string }) {
+    return guard(() => this.platform.publish(actor(req), id, {
+      emailResults: body?.emailResults === true,
+      announcement: typeof body?.announcement === 'string' ? body.announcement : undefined,
+    }));
   }
 
   @Get('elections/:id/report')

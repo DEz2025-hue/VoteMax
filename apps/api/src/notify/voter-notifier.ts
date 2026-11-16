@@ -44,6 +44,11 @@ export interface NotificationContext {
   link: string;
   votingOpensAt: string | null;
   votingClosesAt: string | null;
+  /** Plain-text results summary (results notifications only). */
+  resultsText?: string;
+  /** Short one-line results summary for SMS (results notifications only). */
+  resultsSms?: string;
+  announcement?: string | null;
 }
 
 /** Sent from a no-reply address, so say so and point voters to a real contact. */
@@ -81,11 +86,23 @@ export function renderVoterMessage(kind: NotificationKind, ctx: NotificationCont
           `Hello,\n\nVoting for "${ctx.electionName}" (${ctx.organizationName}) closes soon.${window}\n\n` +
           `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nThis is your final reminder - ballots cannot be cast after closing.` + NO_REPLY_NOTE,
       };
+    case 'results':
+      // No personal link or member ID: results are the same for everyone.
+      return {
+        subject: `Results - ${ctx.electionName}`,
+        text:
+          `Hello,\n\nThe results of "${ctx.electionName}" (${ctx.organizationName}) have been published.\n\n` +
+          (ctx.announcement ? `${ctx.announcement}\n\n` : '') +
+          `${ctx.resultsText ?? ''}` + NO_REPLY_NOTE,
+      };
   }
 }
 
 /** Short SMS version: who, which election, the member ID and the link. */
 export function renderVoterSms(kind: NotificationKind, ctx: NotificationContext): string {
+  if (kind === 'results') {
+    return `${ctx.organizationName}: results of "${ctx.electionName}" are published. ${ctx.resultsSms ?? ''}`.trim();
+  }
   const lead =
     kind === 'invite' ? `${ctx.organizationName}: you can vote in "${ctx.electionName}".`
     : kind === 'reminder_open' ? `${ctx.organizationName}: voting in "${ctx.electionName}" opens soon.`

@@ -675,7 +675,8 @@ export class PlatformService {
    */
   private async recipientsFor(electionId: string, kind: NotificationKind): Promise<VoterRecord[]> {
     const eligible = (await this.store.listVoters(electionId)).filter((v) => v.status === 'eligible');
-    if (kind === 'invite') return eligible;
+    // Results are for everyone on the register, voted or not.
+    if (kind === 'invite' || kind === 'results') return eligible;
     const voted = new Set(
       (await this.store.listEntitlements(electionId)).filter((e) => e.consumedAt).map((e) => e.voterRecordId),
     );
@@ -709,6 +710,8 @@ export class PlatformService {
   private async runNotificationBatch(batch: NotificationBatch, election: Election, org: Organization): Promise<void> {
     await this.store.updateNotificationBatch(batch.id, { status: 'running' });
     const voters = await this.recipientsFor(election.id, batch.kind);
+    // Same summary for every recipient, so build it once.
+    const resultsSummary = batch.kind === 'results' ? await this.resultsSummary(election.id) : null;
     let sent = 0, failed = 0, skipped = 0;
     const CONCURRENCY = 8;
     for (let i = 0; i < voters.length; i += CONCURRENCY) {
@@ -719,6 +722,7 @@ export class PlatformService {
           organizationName: org.name, electionName: election.name, memberId: voter.memberId,
           link: this.voterLink(org.slug, election.id, voter),
           votingOpensAt: election.votingOpensAt, votingClosesAt: election.votingClosesAt,
+          ...(resultsSummary ? { resultsText: resultsSummary.text, resultsSms: resultsSummary.sms, announcement: election.announcement } : {}),
         };
         const { subject, text } = renderVoterMessage(batch.kind, ctx);
         try {
@@ -1341,13 +1345,55 @@ export class PlatformService {
     return record;
   }
 
-  async publish(actorId: string, electionId: string) {
+  /**
+   * Publish certified results. Two ways to release them:
+   *  - announce only (default): results become visible in the console with the
+   *    optional announcement message;
+   *  - emailResults: additionally email (or SMS) the results to every voter on
+   *    the register who can be reached. Sent once per election.
+   */
+  async publish(actorId: string, electionId: string, opts: { emailResults?: boolean; announcement?: string } = {}) {
     const election = await this.electionOrThrow(electionId);
     assertTransition(election.state, 'PUBLISHED');
-    await this.store.updateElection(electionId, { state: 'PUBLISHED' });
+    const announcement = opts.announcement?.trim();
+    if (announcement && announcement.length > 2000) throw new Error('INVALID_INPUT: announcement is too long (2000 characters max)');
+    await this.store.updateElection(electionId, {
+      state: 'PUBLISHED',
+      ...(announcement ? { announcement } : {}),
+    });
     election.state = 'PUBLISHED';
-    await this.log(election.organizationId, actorId, 'results.publish', `election:${electionId}`, 'success');
+    if (announcement) election.announcement = announcement;
+    await this.log(election.organizationId, actorId, 'results.publish', `election:${electionId}`,
+      opts.emailResults ? 'success:emailed' : 'success:announced');
+    if (opts.emailResults) {
+      await this.notifyVoters(actorId, electionId, 'results').catch(async (err) => {
+        // Publishing already succeeded; a failure to queue the email must not undo it.
+        await this.log(election.organizationId, actorId, 'notify.failed', `election:${electionId}`,
+          `error:${err instanceof Error ? err.message : 'unknown'}`);
+      });
+    }
     return this.report(electionId);
+  }
+
+  /** Plain-text results (email) and a one-line version (SMS) built from the published report. */
+  private async resultsSummary(electionId: string): Promise<{ text: string; sms: string }> {
+    const r = await this.report(electionId);
+    const lines: string[] = [
+      `Turnout: ${r.ballotsCast} of ${r.eligibleVoters} eligible voters (${r.turnoutPercent}%).`,
+    ];
+    const winners: string[] = [];
+    for (const p of r.positions) {
+      lines.push('', `${p.position} (${p.seats} seat${p.seats === 1 ? '' : 's'})`);
+      p.results.forEach((c, i) => {
+        const elected = i < p.seats && c.votes > 0;
+        lines.push(`  ${c.candidate}: ${c.votes} vote${c.votes === 1 ? '' : 's'}${elected ? '  - elected' : ''}`);
+      });
+      if (p.abstentions) lines.push(`  Abstentions: ${p.abstentions}`);
+      const names = p.results.slice(0, p.seats).filter((c) => c.votes > 0).map((c) => c.candidate);
+      if (names.length) winners.push(`${p.position}: ${names.join(', ')}`);
+    }
+    const sms = winners.length ? `Elected - ${winners.join('; ')}`.slice(0, 280) : '';
+    return { text: lines.join('\n'), sms };
   }
 
   /** Structured election report (FR-RES-007/009). */
