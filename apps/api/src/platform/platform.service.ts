@@ -3,9 +3,11 @@ import {
   createCipheriv,
   createDecipheriv,
   createHash,
+  createHmac,
   randomBytes,
   randomInt,
   randomUUID,
+  timingSafeEqual,
 } from 'node:crypto';
 import { verifyChain, type AuditEntry, type AuditEntryInput } from '../audit/audit-chain';
 import { checkSeparationOfDuties } from '../auth/sod';
@@ -612,14 +614,57 @@ export class PlatformService {
   // ---- Voter notifications ----------------------------------------------------
 
   /**
-   * Voting link. With a member ID it is personal: the ID arrives pre-filled so
-   * the voter only has to ask for their one-time code. The ID is an identifier,
-   * not a secret - the one-time code is what proves it is the voter.
+   * The voter's secret key for one election: an HMAC of (election, voter) under a
+   * server secret. Unguessable without the secret, stable (re-sent invitations and
+   * reminders carry the same key), and needs no extra storage. It is the voter's
+   * credential, so it lives only in their personal link.
    */
-  private voterLink(orgSlug: string, electionId: string, memberId?: string): string {
+  private voterKey(electionId: string, voterId: string): string {
+    const secret = process.env.VOTER_LINK_SECRET ?? process.env.FRAUD_HASH_SALT ?? 'votemax-dev-voter-link-secret';
+    return createHmac('sha256', secret).update(`voter-link:${electionId}:${voterId}`).digest('base64url').slice(0, 32);
+  }
+
+  /**
+   * Personal voting link: carries the member ID and the voter's secret key, so
+   * opening it signs the voter in. Anyone holding the link can vote as that
+   * voter, which is why every message tells them not to share it.
+   */
+  private voterLink(orgSlug: string, electionId: string, voter?: { id: string; memberId: string }): string {
     const base = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').replace(/\/$/, '');
-    const id = memberId ? `&id=${encodeURIComponent(memberId)}` : '';
-    return `${base}/vote?org=${encodeURIComponent(orgSlug)}&election=${electionId}${id}`;
+    const personal = voter ? `&id=${encodeURIComponent(voter.memberId)}&key=${this.voterKey(electionId, voter.id)}` : '';
+    return `${base}/vote?org=${encodeURIComponent(orgSlug)}&election=${electionId}${personal}`;
+  }
+
+  /**
+   * Sign a voter in from their personal link (member ID + secret key) and open a
+   * ballot session. Replaces the emailed one-time code. Bad keys and unknown IDs
+   * get the same error, and repeated failures are throttled per election and ID.
+   */
+  async enterWithLink(electionId: string, memberId: string, key: string): Promise<{ ballotSession: string }> {
+    const election = await this.electionOrThrow(electionId);
+    this.assertVotingWindow(election);
+    const verifyKey = `link:${electionId}:${memberId.toLowerCase()}`;
+    const now = Date.now();
+    const failures = (otpVerifyFailures.get(verifyKey) ?? []).filter((t) => now - t < 10 * 60_000);
+    if (failures.length >= 10) throw new Error('OTP_RATE_LIMITED: too many failed attempts; wait before trying again');
+    const voter = await this.store.findVoterByMemberId(electionId, memberId);
+    const expected = voter ? Buffer.from(this.voterKey(electionId, voter.id)) : null;
+    const given = Buffer.from(String(key ?? ''));
+    const ok = expected !== null && expected.length === given.length && timingSafeEqual(expected, given);
+    if (!voter || voter.status !== 'eligible' || !ok) {
+      failures.push(now);
+      otpVerifyFailures.set(verifyKey, failures);
+      await this.log(election.organizationId, null, 'voting.linkEnter', `election:${electionId}`, 'denied:invalid_link');
+      throw new Error('LINK_INVALID: this voting link is not valid; use the link from your invitation');
+    }
+    const entitlement = await this.store.findEntitlement(electionId, voter.id);
+    if (entitlement?.consumedAt) {
+      await this.log(election.organizationId, null, 'voting.linkEnter', `election:${electionId}`, 'denied:already_voted');
+      throw new Error('ALREADY_VOTED: a ballot has already been submitted for this voter');
+    }
+    otpVerifyFailures.delete(verifyKey);
+    await this.log(election.organizationId, null, 'voting.linkEnter', `election:${electionId}`, 'success');
+    return { ballotSession: await this.openBallotSession(voter, electionId, 'online') };
   }
 
   /**
@@ -672,7 +717,7 @@ export class PlatformService {
         if (!voter.email && !voter.phone) { skipped += 1; return; }
         const ctx = {
           organizationName: org.name, electionName: election.name, memberId: voter.memberId,
-          link: this.voterLink(org.slug, election.id, voter.memberId),
+          link: this.voterLink(org.slug, election.id, voter),
           votingOpensAt: election.votingOpensAt, votingClosesAt: election.votingClosesAt,
         };
         const { subject, text } = renderVoterMessage(batch.kind, ctx);

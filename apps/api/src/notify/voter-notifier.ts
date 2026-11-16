@@ -64,7 +64,8 @@ export function renderVoterMessage(kind: NotificationKind, ctx: NotificationCont
           `Your member ID: ${ctx.memberId}\n` +
           `Vote here: ${ctx.link}\n` +
           window +
-          `\n\nYou will receive a one-time verification code when you vote. Never share it with anyone.` + NO_REPLY_NOTE,
+          `\n\nThis link is personal to you and is all you need to vote - there is no code to enter. ` +
+          `Keep it secret: do not share or forward this message, because anyone with the link can vote as you.` + NO_REPLY_NOTE,
       };
     case 'reminder_open':
       return {
@@ -89,7 +90,7 @@ export function renderVoterSms(kind: NotificationKind, ctx: NotificationContext)
     kind === 'invite' ? `${ctx.organizationName}: you can vote in "${ctx.electionName}".`
     : kind === 'reminder_open' ? `${ctx.organizationName}: voting in "${ctx.electionName}" opens soon.`
     : `${ctx.organizationName}: last chance to vote in "${ctx.electionName}".`;
-  return `${lead} Your member ID: ${ctx.memberId}. Vote: ${ctx.link} You'll get a one-time code when you vote - never share it.`;
+  return `${lead} Your member ID: ${ctx.memberId}. Vote: ${ctx.link} This link is personal to you - never share it.`;
 }
 
 interface SmsSender { readonly configured: boolean; sendText(to: string, text: string): Promise<void> }

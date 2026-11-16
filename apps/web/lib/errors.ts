@@ -205,6 +205,8 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
       return make(code, raw, 'guidance', 'Too many attempts', 'That code can no longer be used.', 'Go back and ask for a new one.');
     case 'OTP_RATE_LIMITED':
       return make(code, raw, 'guidance', 'Please wait a little', "There have been a lot of attempts in a short time.", 'Wait a few minutes, then try again.');
+    case 'LINK_INVALID':
+      return make(code, raw, 'guidance', "This voting link isn't valid", "We couldn't match this link to a voter on the list. It may be incomplete or copied wrongly.", 'Open the link from your invitation message again, or contact your election officer.');
     case 'OTP_DELIVERY_UNAVAILABLE':
       return make(code, raw, 'error', "We couldn't send your code", "Something stopped your code from being delivered.", 'Please try again shortly, or contact your election officer.');
     case 'ELECTION_NOT_OPEN': {

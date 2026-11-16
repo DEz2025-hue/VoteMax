@@ -3,7 +3,7 @@ import ElectionAccess from '../components/election-access';
 import { Icon } from '../components/icons';
 
 const FEATURES = [
-  { icon: 'users', title: 'Voter eligibility verification', text: 'Only voters on the approved register can request a ballot, confirmed with a one-time code.' },
+  { icon: 'users', title: 'Voter eligibility verification', text: 'Only voters on the approved register can request a ballot, confirmed through their personal voting link.' },
   { icon: 'lock', title: 'Ballot secrecy', text: 'Ballots are encrypted and stored with no link back to the voter who cast them.' },
   { icon: 'check', title: 'Duplicate-vote prevention', text: 'Each eligible voter can cast exactly one ballot per election - enforced atomically.' },
   { icon: 'sliders', title: 'Controlled lifecycle', text: 'Tally, verification, certification and publication follow dedicated multi-party workflows.' },

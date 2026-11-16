@@ -46,9 +46,8 @@ export default function HelpPage() {
         <summary>Step by step</summary>
         <div className="faq-body">
           <ol>
-            <li><strong>Find your election.</strong> Go to the Vote page and enter the organization code your election officer gave you, then pick your election.</li>
-            <li><strong>Enter your member ID</strong> and ask for a verification code. It is sent to your registered email or phone and expires in 10 minutes.</li>
-            <li><strong>Enter the code.</strong> This proves it is you and unlocks your ballot.</li>
+            <li><strong>Open your personal voting link.</strong> It is in the invitation sent to your email or phone, together with your member ID. Opening it signs you in - there is no code to enter.</li>
+            <li><strong>Keep the link secret.</strong> It is personal to you, and anyone who has it can vote as you. Do not share or forward it.</li>
             <li><strong>Make your choices</strong> for each position. You can abstain by leaving a position blank where allowed.</li>
             <li><strong>Review carefully</strong> - after you submit, your ballot cannot be changed.</li>
             <li><strong>Submit.</strong> You will receive a confirmation reference. It proves your ballot was accepted; it does not show how you voted.</li>

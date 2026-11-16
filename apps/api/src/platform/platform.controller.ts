@@ -274,6 +274,13 @@ export class PlatformController {
     return guard(() => this.platform.verifyOtp(id, body.memberId, body.code));
   }
 
+  /** Sign in with the personal voting link (member ID + secret key); no emailed code. */
+  @Post('elections/:id/voting/link/enter')
+  @Public()
+  enterWithLink(@Param('id') id: string, @Body() body: { memberId: string; key: string }) {
+    return guard(() => this.platform.enterWithLink(id, String(body.memberId ?? ''), String(body.key ?? '')));
+  }
+
   @Post('voting/ballot')
   @Public()
   ballot(@Body() body: { ballotSession: string }) {

@@ -1048,7 +1048,7 @@ export default function AdminPage() {
                         <Button variant="secondary" size="sm" onClick={() => void copyVoterLink()}>{copiedLink ? 'Copied!' : 'Copy link'}</Button>
                       </div>
                     )}
-                    <p className="muted small">Share this link with voters - they&apos;ll enter their member ID and receive a one-time code. Or send every eligible voter their own member ID and a personal link by email, or by text message when they have no email.</p>
+                    <p className="muted small">Voters sign in with their own personal link, which carries a secret key - this general link cannot sign anyone in. Send every eligible voter their member ID and personal link by email, or by text message when they have no email.</p>
                     <div className="form-actions">
                       <Button variant="primary" size="sm" disabled={!electionId || !cap('register.manage')}
                         title={cap('register.manage') ? 'Send every eligible voter their member ID and personal voting link' : 'Requires register.manage - assigned to organization_owner'}

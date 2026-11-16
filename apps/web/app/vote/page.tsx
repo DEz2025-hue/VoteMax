@@ -1,8 +1,8 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Field, Input, Skeleton } from '../../components/ui';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { Alert, Button, Card, Skeleton } from '../../components/ui';
 import { fraudHeaders } from '../../lib/fraud';
 import { apiRequest } from '../../lib/http';
 import { AppError, friendlyFromUnknown, networkError, toFriendly, type FriendlyError } from '../../lib/errors';
@@ -18,11 +18,6 @@ interface BallotData {
   }[];
 }
 
-interface PublicElection {
-  id: string; name: string; state: string;
-  votingOpensAt: string | null; votingClosesAt: string | null;
-}
-
 async function call(path: string, body: unknown): Promise<Record<string, unknown>> {
   return apiRequest(`${API}${path}`, {
     method: 'POST',
@@ -32,7 +27,6 @@ async function call(path: string, body: unknown): Promise<Record<string, unknown
 }
 
 async function getJson(path: string): Promise<unknown> {
-  // List endpoints return JSON arrays, which apiRequest's object type can't express.
   let res: Response;
   try { res = await fetch(`${API}${path}`, { headers: await fraudHeaders() }); } catch (err) {
     throw new AppError(networkError(err instanceof Error ? err.message : undefined));
@@ -45,27 +39,14 @@ async function getJson(path: string): Promise<unknown> {
   return data;
 }
 
-type Step = 'identify' | 'code' | 'ballot' | 'review' | 'done';
-const STEP_ORDER: Step[] = ['identify', 'code', 'ballot', 'review', 'done'];
-const STEP_LABELS = ['Find election', 'Verify', 'Ballot', 'Review', 'Done'];
-
-/** Elections a voter can still act on. Everything after voting closes is hidden from this list. */
-const VOTABLE = new Set(['READY', 'OPEN', 'SUSPENDED']);
-
-function pillLabel(state: string): string {
-  return state === 'OPEN' ? 'Voting open' : state === 'READY' ? 'Opens soon' : state === 'SUSPENDED' ? 'Paused' : state.toLowerCase();
-}
-
-function fmtWhen(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-function statePill(state: string): 'success' | 'warning' | 'error' | 'accent' | 'neutral' {
-  if (state === 'OPEN') return 'success';
-  if (state === 'CLOSED' || state === 'ARCHIVED') return 'neutral';
-  if (state === 'SUSPENDED' || state === 'RECOUNT') return 'warning';
-  return 'accent';
-}
+/**
+ * Voters sign in with the personal link from their invitation (member ID + secret
+ * key in the address). There is no code to fetch from an email, so a phone user
+ * never has to leave the page to vote.
+ */
+type Step = 'enter' | 'ballot' | 'review' | 'done';
+const STEP_ORDER: Step[] = ['enter', 'ballot', 'review', 'done'];
+const STEP_LABELS = ['Sign in', 'Ballot', 'Review', 'Done'];
 
 function initialsOf(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
@@ -82,63 +63,51 @@ function CandidatePhoto({ name, url }: { name: string; url: string | null }) {
 
 function VoteFlow() {
   const params = useSearchParams();
-  const [step, setStep] = useState<Step>('identify');
-  const [orgSlug, setOrgSlug] = useState('');
-  const [elections, setElections] = useState<PublicElection[]>([]);
-  const [electionId, setElectionId] = useState('');
-  const [memberId, setMemberId] = useState('');
-  const [code, setCode] = useState('');
-  const [devHint, setDevHint] = useState('');
+  const electionId = params.get('election') ?? '';
+  const memberId = (params.get('id') ?? '').trim();
+  const key = (params.get('key') ?? '').trim();
+  const hasLink = Boolean(electionId && memberId && key);
+
+  const [step, setStep] = useState<Step>('enter');
   const [session, setSession] = useState('');
   const [ballot, setBallot] = useState<BallotData | null>(null);
   const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [receipt, setReceipt] = useState('');
   const [error, setError] = useState<FriendlyError | null>(null);
-  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [endedCount, setEndedCount] = useState(0);
-  const [endedName, setEndedName] = useState('');
-
-  useEffect(() => {
-    const org = params.get('org');
-    const election = params.get('election');
-    // Personal links from invitation emails/SMS carry the voter's member ID.
-    const id = params.get('id');
-    if (id) setMemberId(id.trim());
-    if (org) {
-      setOrgSlug(org);
-      void findElections(org, election ?? undefined);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  const started = useRef(false);
 
   async function act(fn: () => Promise<void>) {
     setError(null);
-    setNotice('');
     setBusy(true);
     try { await fn(); } catch (err) { setError(friendlyFromUnknown(err)); }
     finally { setBusy(false); }
   }
 
-  async function findElections(slug = orgSlug, electionParam?: string) {
-    const clean = slug.trim();
-    if (!clean) return;
-    setSearched(true);
-    const list = (await getJson(`/organizations/${encodeURIComponent(clean)}/elections`)) as PublicElection[];
-    const all = Array.isArray(list) ? list : [];
-    // Voters only need elections they can act on. Finished ones (closed, being counted,
-    // published, archived) are hidden so the list is not cluttered with past elections.
-    const arr = all.filter((el) => VOTABLE.has(el.state));
-    const ended = all.filter((el) => !VOTABLE.has(el.state));
-    setElections(arr);
-    setEndedCount(ended.length);
-    // If this person opened a link to an election that has since ended, say so by name.
-    setEndedName(electionParam ? (ended.find((el) => el.id === electionParam)?.name ?? '') : '');
-    const preselect = electionParam && arr.find((el) => el.id === electionParam);
-    if (preselect) setElectionId(preselect.id);
-    else if (arr.length === 1) setElectionId(arr[0].id);
+  /** Sign in with the personal link, then load the ballot. */
+  async function enter() {
+    await act(async () => {
+      const r = await call(`/elections/${encodeURIComponent(electionId)}/voting/link/enter`, { memberId, key });
+      const s = String(r.ballotSession);
+      setSession(s);
+      const status = await getJson(`/elections/${encodeURIComponent(electionId)}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
+      if (status.hasVoted) {
+        setError(toFriendly('ALREADY_VOTED: entitlement already consumed'));
+        return;
+      }
+      const b = await call('/voting/ballot', { ballotSession: s });
+      setBallot(b as unknown as BallotData);
+      setStep('ballot');
+    });
   }
+
+  useEffect(() => {
+    // Opening the link signs the voter in. The ref stops a double run in development.
+    if (!hasLink || started.current) return;
+    started.current = true;
+    void enter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasLink]);
 
   function choose(candidateId: string, position: BallotData['positions'][number], checked: boolean) {
     const current = selections[position.id] ?? [];
@@ -178,102 +147,34 @@ function VoteFlow() {
           {error.hint && <div className="alert-hint">{error.hint}</div>}
         </Alert>
       )}
-      {notice && <Alert kind="success">{notice}</Alert>}
 
-      {step === 'identify' && (
-        <Card title="Find your election">
-          <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await findElections(); }); }}>
-            <Field label="Organization code" htmlFor="org-slug" hint="The code your election officer gave you - it is not a secret.">
-              <Input id="org-slug" value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} required autoComplete="organization" placeholder="e.g. acme" />
-            </Field>
-            <Button type="submit" variant="secondary" block disabled={busy || !orgSlug.trim()}>
-              {busy ? 'Searching…' : 'Find my election'}
-            </Button>
-          </form>
-
-          {elections.length > 0 && (
-            <fieldset style={{ border: 0, padding: 0, margin: '20px 0 0' }}>
-              <legend className="field-label">Choose your election</legend>
-              {elections.map((el) => (
-                <label key={el.id} className="choice">
-                  <input type="radio" name="election" checked={electionId === el.id} onChange={() => setElectionId(el.id)} />
-                  <span className="choice-body">
-                    <span className="choice-name">{el.name}</span>
-                    <span className="choice-note" style={{ display: 'block' }}>
-                      <Badge tone={statePill(el.state)}>{pillLabel(el.state)}</Badge>{' '}
-                      {el.state === 'READY' && el.votingOpensAt
-                        ? `opens ${fmtWhen(el.votingOpensAt)}`
-                        : el.votingClosesAt ? `closes ${fmtWhen(el.votingClosesAt)}` : ''}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-          )}
-          {searched && elections.length === 0 && endedCount > 0 && !busy && (
-            <Alert kind="info" title="Voting has ended">
-              {endedName ? `Voting for "${endedName}" has ended.` : 'Voting for this organization\'s elections has ended.'}{' '}
-              Nothing more is needed from you. If you think this is a mistake, ask your election officer.
-            </Alert>
-          )}
-          {searched && elections.length === 0 && endedCount === 0 && !busy && (
-            <Alert kind="warning" title="Voting isn't open yet">
-              We found this organization, but no election is open for voting right now. If you were invited to vote,
-              voting may not have started - check the dates in your invitation, or ask your election officer.
-            </Alert>
-          )}
-
-          <hr className="divider" />
-          <form onSubmit={(e) => { e.preventDefault(); if (!electionId) return; void act(async () => {
-            const r = await call(`/elections/${electionId}/voting/otp/request`, { memberId: memberId.trim() });
-            if (typeof r.devCode === 'string') setDevHint(`Local test code: ${r.devCode} (shown only outside production)`);
-            setStep('code');
-          }); }}>
-            <Field label="Member ID" htmlFor="member-id" hint="Sent to you with your voting link by email or text message.">
-              <Input id="member-id" value={memberId} onChange={(e) => setMemberId(e.target.value)} required autoComplete="username" />
-            </Field>
-            <Button type="submit" variant="primary" size="lg" block disabled={busy || !electionId}>
-              {busy ? 'Sending…' : 'Send my code'}
-            </Button>
-          </form>
+      {step === 'enter' && !hasLink && (
+        <Card title="Open your personal voting link">
+          <p className="lede" style={{ marginBottom: 12 }}>
+            To vote, open the personal link in the invitation we sent you by email or text message.
+            It signs you in - there is no code to enter.
+          </p>
+          <p className="muted small" style={{ lineHeight: 1.6 }}>
+            Can&apos;t find it? Look for a message with your member ID and a &quot;Vote here&quot; link,
+            or ask your election officer to send it again.
+          </p>
         </Card>
       )}
 
-      {step === 'code' && (
-        <Card title="Verify your identity">
-          <p className="lede" style={{ marginBottom: 18 }}>
-            Enter the 6-digit code sent to your registered email or phone. It expires in 10 minutes.
-          </p>
-          {devHint && <Alert kind="info">{devHint}</Alert>}
-          <form onSubmit={(e) => { e.preventDefault(); void act(async () => {
-            const r = await call(`/elections/${electionId}/voting/otp/verify`, { memberId: memberId.trim(), code: code.trim() });
-            const s = String(r.ballotSession);
-            setSession(s);
-            const status = await getJson(`/elections/${electionId}/voting/status?ballotSession=${encodeURIComponent(s)}`) as { hasVoted?: boolean };
-            if (status.hasVoted) {
-              setError(toFriendly('ALREADY_VOTED: entitlement already consumed'));
-              return;
-            }
-            const b = await call('/voting/ballot', { ballotSession: s });
-            setBallot(b as unknown as BallotData);
-            setStep('ballot');
-          }); }}>
-            <Field label="Verification code" htmlFor="otp-code">
-              <Input id="otp-code" value={code} onChange={(e) => setCode(e.target.value)} required inputMode="numeric" autoComplete="one-time-code"
-                style={{ fontSize: 22, letterSpacing: '0.3em', textAlign: 'center', fontFamily: 'var(--mono)' }} />
-            </Field>
-            <div className="form-actions">
-              <Button type="button" variant="ghost" onClick={() => setStep('identify')}>Back</Button>
-              <Button type="submit" variant="primary" size="lg" block disabled={busy}>
-                {busy ? 'Checking…' : 'Continue to ballot'}
-              </Button>
-            </div>
-          </form>
+      {step === 'enter' && hasLink && (
+        <Card title="Signing you in">
+          {busy && <Skeleton lines={3} />}
+          {!busy && error && (
+            <Button variant="secondary" block onClick={() => void enter()}>Try again</Button>
+          )}
         </Card>
       )}
 
       {step === 'ballot' && ballot && (
         <Card title={ballot.election.name}>
+          <Alert kind="info">
+            Your voting link is personal. Keep it secret and do not share it - anyone with it can vote as you.
+          </Alert>
           <form onSubmit={(e) => { e.preventDefault(); setStep('review'); }}>
             {ballot.positions.map((pos) => (
               <fieldset key={pos.id} className="ballot-position">
@@ -297,7 +198,6 @@ function VoteFlow() {
               </fieldset>
             ))}
             <div className="form-actions">
-              <Button type="button" variant="ghost" onClick={() => setStep('code')}>Back</Button>
               <Button type="submit" variant="primary" size="lg" block disabled={busy}>
                 {busy ? 'Loading…' : 'Review ballot'}
               </Button>
@@ -332,7 +232,7 @@ function VoteFlow() {
             <Button variant="primary" size="lg" block disabled={busy} onClick={() => void act(async () => {
               const r = await call('/voting/submit', {
                 ballotSession: session, selections,
-                idempotencyKey: `${electionId}-${memberId.trim()}-submit`,
+                idempotencyKey: `${electionId}-${memberId}-submit`,
               });
               setReceipt(String(r.receiptId));
               setStep('done');
