@@ -165,6 +165,8 @@ export default function AdminPage() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [userId, setUserId] = useState('');
   const [users, setUsers] = useState<AdminUser[]>([]);
+  // One-time TOTP secret for a just-created staff account; kept on screen until dismissed.
+  const [newUserEnrollment, setNewUserEnrollment] = useState<{ email: string; totpSecret: string } | null>(null);
   const [voters, setVoters] = useState<VoterRow[]>([]);
   const [elections, setElections] = useState<ElectionSummary[]>([]);
   const [election, setElection] = useState<ElectionDetail | null>(null);
@@ -467,7 +469,7 @@ export default function AdminPage() {
     // Revokes the bearer session server-side, then clears local state.
     void apiSignOut();
     sessionToken = '';
-    setSignedIn(false); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]);
+    setSignedIn(false); setNewUserEnrollment(null); setUsers([]); setVoters([]); setElection(null); setParticipation(null); setReport(null); setAudit(null); setElections([]);
     setOrgId(''); setOrgSlug(''); setElectionId(''); setUserId(''); setAssignments([]);
   }
 
@@ -730,7 +732,7 @@ export default function AdminPage() {
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 void act('Create user', async () => {
                   const u = await call('/users', { organizationId: orgId, email: f.get('email'), displayName: f.get('name'), password: f.get('password') }) as { id: string; totpSecret?: string };
-                  setStatus(`Create user: done. TOTP secret for ${f.get('email')}: ${u.totpSecret ?? '(none)'} - shown once, store it now.`);
+                  setNewUserEnrollment(u.totpSecret ? { email: String(f.get('email')), totpSecret: u.totpSecret } : null);
                   await refreshUsers();
                 }); }}>
                 <div className="form-grid">
@@ -740,6 +742,22 @@ export default function AdminPage() {
                 </div>
                 <Button type="submit" variant="primary" disabled={!orgId || !capOrg('roles.assign')}>Create user</Button>
               </form>
+              {newUserEnrollment && (
+                <div style={{ marginTop: 14 }}>
+                  <Alert kind="success" title="Account created - share the TOTP secret once">
+                    <p style={{ margin: '4px 0' }}><strong>{newUserEnrollment.email}</strong> must add this secret to an authenticator app (Google Authenticator, Microsoft Authenticator, Authy). It is not shown again:</p>
+                    <code style={{ wordBreak: 'break-all' }}>{newUserEnrollment.totpSecret}</code>
+                    <p className="small" style={{ margin: '8px 0 0' }}>
+                      In the app choose "Enter a setup key", account <code>{newUserEnrollment.email}</code>, type "Time based". On phones, <a href={`otpauth://totp/VoteMax:${encodeURIComponent(newUserEnrollment.email)}?secret=${newUserEnrollment.totpSecret}&issuer=VoteMax`}>tap here to add it directly</a>.
+                      Assign a role below, then they sign in at <a href="/login">/login</a> with email, password and the 6-digit code.
+                    </p>
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                      <Button type="button" variant="secondary" onClick={() => { void navigator.clipboard?.writeText(newUserEnrollment.totpSecret).catch(() => undefined); }}>Copy secret</Button>
+                      <Button type="button" variant="secondary" onClick={() => setNewUserEnrollment(null)}>Done</Button>
+                    </div>
+                  </Alert>
+                </div>
+              )}
               <hr className="divider" />
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
                 void act('Assign role', async () => {
