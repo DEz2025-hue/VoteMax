@@ -87,8 +87,8 @@ describe('Phase 3 voting and results (mock election)', () => {
     const close = await svc.closeElection(executorId, electionId);
     expect(close).toMatchObject({ reconciled: true, ballotsCast: 4, consumedEntitlements: 4 });
 
-    await signTally(chairId, approver1, approver2);
-    const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    await signTally(approver1, approver2);
+    const run = await svc.tally(executorId, electionId, { approvers: [approver1, approver2] });
     expect(run.ballotCount).toBe(4);
     expect(run.counts[adaId]).toBe(2);
     expect(run.counts[benId]).toBe(1);
@@ -108,8 +108,8 @@ describe('Phase 3 voting and results (mock election)', () => {
     await vote('S002', adaId);
     await vote('S003', benId);
     await svc.closeElection(executorId, electionId);
-    await signTally(chairId, approver1, approver2);
-    await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    await signTally(approver1, approver2);
+    await svc.tally(executorId, electionId, { approvers: [approver1, approver2] });
     await svc.verifyTally(electionId);
     await signCertify(approver1);
     await svc.certify(chairId, electionId, { certifiedBy: chairId, secondApprover: approver1 });
@@ -215,42 +215,43 @@ describe('Phase 3 voting and results (mock election)', () => {
     await expect(svc.requestOtp(electionId, 'S002')).rejects.toThrow(/ELECTION_NOT_OPEN/);
   });
 
-  it('tally enforces SoD: owner authorizes, executor separate, two approvers incl. an auditor', async () => {
+  it('tally rules: an owner runs it, with two auditors who approved, none of them the runner', async () => {
     await vote('S001', adaId);
     await svc.closeElection(executorId, electionId);
-    await expect(svc.tally(chairId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] }))
-      .rejects.toThrow(/SOD_VIOLATION/);
-    await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1] }))
-      .rejects.toThrow(/PRECONDITION/);
-    // Two owner approvers are not enough - at least one must be an auditor.
-    await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [owner2Id, owner3Id] }))
-      .rejects.toThrow(/auditor/);
+    // Only an owner can run the count.
+    await expect(svc.tally(approver1, electionId, { approvers: [approver1, approver2] })).rejects.toThrow(/FORBIDDEN/);
+    await expect(svc.tally(executorId, electionId, { approvers: [approver1] })).rejects.toThrow(/PRECONDITION/);
+    // Approvers must be auditors; owners do not qualify.
+    await expect(svc.tally(executorId, electionId, { approvers: [owner2Id, owner3Id] })).rejects.toThrow(/oversight role/);
+    // The person running the count cannot also be an approver.
+    await expect(svc.tally(executorId, electionId, { approvers: [executorId, approver1] })).rejects.toThrow(/SOD_VIOLATION/);
     // Properly composed, but nobody has signed off yet.
-    await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] }))
+    await expect(svc.tally(executorId, electionId, { approvers: [approver1, approver2] }))
       .rejects.toThrow(/waiting for .* to approve/);
-    await signTally(chairId, approver1, approver2);
-    const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    await signTally(approver1, approver2);
+    const run = await svc.tally(executorId, electionId, { approvers: [approver1, approver2] });
     expect(run.ballotCount).toBe(1);
+    expect(run.authorizedBy).toBe(executorId); // the owner who ran it is the authorizer
   });
 
   it('recount reproduces the same tally hash', async () => {
     await vote('S001', adaId);
     await vote('S002', benId);
     await svc.closeElection(executorId, electionId);
-    await signTally(chairId, approver1, approver2);
-    const first = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    await signTally(approver1, approver2);
+    const first = await svc.tally(executorId, electionId, { approvers: [approver1, approver2] });
     expect((await svc.verifyTally(electionId)).verified).toBe(true);
-    await signTally(chairId, approver1, approver2); // the first round's sign-offs were spent
-    const recount = await svc.recount(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    await signTally(approver1, approver2); // the first round's sign-offs were spent
+    const recount = await svc.recount(executorId, electionId, { approvers: [approver1, approver2] });
     expect(recount.tallyHash).toBe(first.tallyHash);
   });
 
   it('a rejected recount leaves the election in TALLIED, not RECOUNT', async () => {
     await vote('S001', adaId);
     await svc.closeElection(executorId, electionId);
-    await signTally(chairId, approver1, approver2);
-    await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
-    await expect(svc.recount(executorId, electionId, { authorizedBy: chairId, approvers: [approver1] }))
+    await signTally(approver1, approver2);
+    await svc.tally(executorId, electionId, { approvers: [approver1, approver2] });
+    await expect(svc.recount(executorId, electionId, { approvers: [approver1] }))
       .rejects.toThrow(/PRECONDITION/);
     expect((await store.getElection(electionId))!.state).toBe('TALLIED');
   });
@@ -286,10 +287,10 @@ describe('Phase 3 voting and results (mock election)', () => {
     await svc.closeElection(executorId, electionId);
     const nobody = await svc.createUser(orgId, 'nop@example.org', 'No Role', 'pw-long-enough');
 
-    await expect(svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, nobody.id] }))
+    await expect(svc.tally(executorId, electionId, { approvers: [approver1, nobody.id] }))
       .rejects.toThrow(/oversight role/);
-    await signTally(chairId, approver1, approver2);
-    const run = await svc.tally(executorId, electionId, { authorizedBy: chairId, approvers: [approver1, approver2] });
+    await signTally(approver1, approver2);
+    const run = await svc.tally(executorId, electionId, { approvers: [approver1, approver2] });
     expect(run.ballotCount).toBe(1);
     expect((await svc.verifyTally(electionId)).verified).toBe(true);
 

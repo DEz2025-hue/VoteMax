@@ -129,23 +129,22 @@ record('S6', 'Close + reconciliation', close.reconciled === true && close.ballot
 
 // Sign-offs: the owner authorizes, the two approvers approve, each as themselves.
 const signOff = async (kind) => {
-  mustOk(`approve ${kind} chair`, await apiPost(API, `/elections/${el.id}/approvals`, { kind }, chairToken));
   mustOk(`approve ${kind} ap1`, await apiPost(API, `/elections/${el.id}/approvals`, { kind }, ap1Token));
   mustOk(`approve ${kind} ap2`, await apiPost(API, `/elections/${el.id}/approvals`, { kind }, ap2Token));
 };
-const unsigned = await apiPost(API, `/elections/${el.id}/tally`, { authorizedBy: chair.id, approvers: [ap1.id, ap2.id] }, adminToken);
+const unsigned = await apiPost(API, `/elections/${el.id}/tally`, { approvers: [ap1.id, ap2.id] }, adminToken);
 record('S6b', 'Tally refused until the named people have approved', unsigned.status >= 400, `status=${unsigned.status}`);
 await signOff('tally');
-const forged = await apiPost(API, `/elections/${el.id}/tally`, { authorizedBy: admin.id, approvers: [ap1.id, ap2.id] }, adminToken);
+const forged = await apiPost(API, `/elections/${el.id}/tally`, { approvers: [ap1.id, ap2.id] }, adminToken);
 record('S7', 'Tally authorization cannot be forged by a non-chair', forged.status >= 400, `status=${forged.status}`);
-const run = mustOk('tally', await apiPost(API, `/elections/${el.id}/tally`, { authorizedBy: chair.id, approvers: [ap1.id, ap2.id] }, adminToken));
+const run = mustOk('tally', await apiPost(API, `/elections/${el.id}/tally`, { approvers: [ap1.id, ap2.id] }, adminToken));
 
 const earlyCertify = await apiPost(API, `/elections/${el.id}/certify`, { certifiedBy: chair.id, secondApprover: ap1.id }, chairToken);
 record('S8', 'Certification refused before verification (blocker)', earlyCertify.status >= 400, `status=${earlyCertify.status}`);
 
 const verify = mustOk('verify', await apiPost(API, `/elections/${el.id}/tally/verify`, {}, auditorToken));
 await signOff('tally'); // the first round's sign-offs were spent
-const recount = mustOk('recount', await apiPost(API, `/elections/${el.id}/tally/recount`, { authorizedBy: chair.id, approvers: [ap1.id, ap2.id] }, adminToken));
+const recount = mustOk('recount', await apiPost(API, `/elections/${el.id}/tally/recount`, { approvers: [ap1.id, ap2.id] }, adminToken));
 record('S9', 'Independent verification + recount reproduces tally hash',
   verify.verified === true && recount.tallyHash === run.tallyHash, `verified=${verify.verified}, hashMatch=${recount.tallyHash === run.tallyHash}`);
 

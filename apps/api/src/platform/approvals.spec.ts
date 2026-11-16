@@ -47,15 +47,20 @@ describe('approvals before a count', () => {
     await expect(svc.recordApproval(aud1, electionId, 'tally')).rejects.toThrow(/INVALID_STATE/);
   });
 
-  it('records owners as authorizers and auditors as approvers, with names', async () => {
+  it('records auditors with their names; pressing twice changes nothing', async () => {
     await svc.closeElection(executor, electionId);
-    await svc.recordApproval(authorizer, electionId, 'tally');
     await svc.recordApproval(aud1, electionId, 'tally');
-    await svc.recordApproval(aud1, electionId, 'tally'); // pressing twice changes nothing
+    await svc.recordApproval(aud1, electionId, 'tally');
+    await svc.recordApproval(aud2, electionId, 'tally');
     const list = await svc.listApprovals(electionId);
     expect(list).toHaveLength(2);
-    expect(list.find((a) => a.userId === authorizer)).toMatchObject({ role: 'organization_owner', displayName: 'Authorizer', kind: 'tally' });
-    expect(list.find((a) => a.userId === aud1)).toMatchObject({ role: 'auditor', displayName: 'Alice Auditor' });
+    expect(list.find((a) => a.userId === aud1)).toMatchObject({ role: 'auditor', displayName: 'Alice Auditor', kind: 'tally' });
+  });
+
+  it('owners do not sign off: they run the count', async () => {
+    await svc.closeElection(executor, electionId);
+    await expect(svc.recordApproval(authorizer, electionId, 'tally')).rejects.toThrow(/FORBIDDEN/);
+    await expect(svc.recordApproval(executor, electionId, 'tally')).rejects.toThrow(/FORBIDDEN/);
   });
 
   it('refuses people with no oversight role', async () => {
@@ -63,22 +68,21 @@ describe('approvals before a count', () => {
     await expect(svc.recordApproval(outsider, electionId, 'tally')).rejects.toThrow(/FORBIDDEN/);
   });
 
-  it('lets the count run only once everyone named has approved, then spends the approvals', async () => {
+  it('lets the count run only once both auditors have approved, then spends the approvals', async () => {
     await svc.closeElection(executor, electionId);
-    const input = { authorizedBy: authorizer, approvers: [aud1, aud2] };
-    await svc.recordApproval(authorizer, electionId, 'tally');
+    const input = { approvers: [aud1, aud2] };
     await svc.recordApproval(aud1, electionId, 'tally');
     await expect(svc.tally(executor, electionId, input)).rejects.toThrow(/waiting for Aaron Auditor to approve the tally/);
     await svc.recordApproval(aud2, electionId, 'tally');
-    await expect(svc.tally(executor, electionId, input)).resolves.toMatchObject({ electionId });
+    await expect(svc.tally(executor, electionId, input)).resolves.toMatchObject({ electionId, authorizedBy: executor });
     expect(await svc.listApprovals(electionId)).toHaveLength(0); // spent
   });
 
   it('a withdrawn approval blocks the count again', async () => {
     await svc.closeElection(executor, electionId);
-    for (const id of [authorizer, aud1, aud2]) await svc.recordApproval(id, electionId, 'tally');
+    for (const id of [aud1, aud2]) await svc.recordApproval(id, electionId, 'tally');
     await svc.withdrawApproval(aud2, electionId, 'tally');
-    await expect(svc.tally(executor, electionId, { authorizedBy: authorizer, approvers: [aud1, aud2] }))
+    await expect(svc.tally(executor, electionId, { approvers: [aud1, aud2] }))
       .rejects.toThrow(/waiting for Aaron Auditor/);
   });
 
@@ -93,16 +97,16 @@ describe('approvals before a count', () => {
 describe('approvals before certification', () => {
   async function toVerified() {
     await svc.closeElection(executor, electionId);
-    for (const id of [authorizer, aud1, aud2]) await svc.recordApproval(id, electionId, 'tally');
-    await svc.tally(executor, electionId, { authorizedBy: authorizer, approvers: [aud1, aud2] });
+    for (const id of [aud1, aud2]) await svc.recordApproval(id, electionId, 'tally');
+    await svc.tally(executor, electionId, { approvers: [aud1, aud2] });
     await svc.verifyTally(electionId);
   }
 
   it('only an auditor can approve certification, and only once verified', async () => {
     await svc.closeElection(executor, electionId);
     await expect(svc.recordApproval(aud1, electionId, 'certify')).rejects.toThrow(/INVALID_STATE/); // not verified yet
-    for (const id of [authorizer, aud1, aud2]) await svc.recordApproval(id, electionId, 'tally');
-    await svc.tally(executor, electionId, { authorizedBy: authorizer, approvers: [aud1, aud2] });
+    for (const id of [aud1, aud2]) await svc.recordApproval(id, electionId, 'tally');
+    await svc.tally(executor, electionId, { approvers: [aud1, aud2] });
     await expect(svc.recordApproval(aud1, electionId, 'certify')).rejects.toThrow(/INVALID_STATE/); // counted, still not verified
     await svc.verifyTally(electionId);
     await expect(svc.recordApproval(aud1, electionId, 'certify')).resolves.toMatchObject({ kind: 'certify', role: 'auditor' });

@@ -92,8 +92,8 @@ d('PostgresStore (F-01 durability)', () => {
     await expect(svc2.store.verifyAuditChain()).resolves.toBe(true);
 
     await svc2.closeElection(chair.id, el.id);
-    for (const id of [chair.id, ap1.id, ap2.id]) await svc2.recordApproval(id, el.id, 'tally');
-    const run = await svc2.tally(admin.id, el.id, { authorizedBy: chair.id, approvers: [ap1.id, ap2.id] });
+    for (const id of [ap1.id, ap2.id]) await svc2.recordApproval(id, el.id, 'tally');
+    const run = await svc2.tally(admin.id, el.id, { approvers: [ap1.id, ap2.id] });
     expect(run.ballotCount).toBe(2);
     expect(run.counts[cand.id]).toBe(2);
     expect((await svc2.verifyTally(el.id)).verified).toBe(true);

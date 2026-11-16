@@ -72,8 +72,9 @@ const DEDICATED_TRANSITIONS = new Set<ElectionState>([
 
 // Oversight roles allowed to witness/approve tally and certification. The
 // owner executes; auditors provide the independent check.
+// Two auditors sign off on a count; the organization owner who runs it is the authorizer.
 const TALLY_APPROVER_ROLES = new Set<Role>([
-  'organization_owner', 'auditor',
+  'auditor',
 ]);
 const CERTIFICATION_APPROVER_ROLES = new Set<Role>([
   'auditor',
@@ -1290,10 +1291,8 @@ export class PlatformService {
     const roles = kind === 'tally' ? TALLY_APPROVER_ROLES : CERTIFICATION_APPROVER_ROLES;
     const assignments = await this.store.listAssignments();
     await this.assertElectionParticipant(actorId, election, roles, kind === 'tally' ? 'approver' : 'certification approver', assignments);
-    const isOwner = assignments.some((a) => a.userId === actorId && a.role === 'organization_owner' &&
-      a.organizationId === election.organizationId && isAssignmentActive(a) && (!a.electionId || a.electionId === election.id));
     const approval: ElectionApproval = {
-      electionId, userId: actorId, kind, role: kind === 'tally' && isOwner ? 'organization_owner' : 'auditor',
+      electionId, userId: actorId, kind, role: 'auditor',
       createdAt: new Date().toISOString(),
     };
     await this.store.upsertApproval(approval);
@@ -1319,8 +1318,12 @@ export class PlatformService {
     return out;
   }
 
-  /** Multi-party tally (SoD-4/5): owner authorizes, executor differs, 2+ approvers incl. an auditor. */
-  async tally(actorId: string, electionId: string, input: { authorizedBy: string; approvers: string[] }): Promise<TallyRun> {
+  /**
+   * The count: run by an organization owner (who thereby authorizes it) once two
+   * auditors have signed off. `authorizedBy` is accepted for older callers but
+   * the authorizer is always the owner who runs the count.
+   */
+  async tally(actorId: string, electionId: string, input: { authorizedBy?: string; approvers: string[] }): Promise<TallyRun> {
     const election = await this.electionOrThrow(electionId);
     if (election.state !== 'CLOSED' && election.state !== 'RECOUNT') {
       throw new Error(`INVALID_STATE: tally requires CLOSED or RECOUNT, current ${election.state}`);
@@ -1328,7 +1331,7 @@ export class PlatformService {
     await this.assertTallyAuthorization(actorId, election, input);
     const computed = await this.computeTally(election);
     const run: TallyRun = {
-      ...computed, id: randomUUID(), authorizedBy: input.authorizedBy,
+      ...computed, id: randomUUID(), authorizedBy: actorId,
       executedBy: actorId, approvers: [...new Set(input.approvers)], createdAt: new Date().toISOString(),
     };
     // Tally run + state transition commit atomically (Postgres transaction).
@@ -1339,38 +1342,28 @@ export class PlatformService {
     return run;
   }
 
-  /** SoD-4/5 checks for a tally or recount; throws before any state change. */
+  /** Checks for a tally or recount; throws before any state change. */
   private async assertTallyAuthorization(
-    actorId: string, election: Election, input: { authorizedBy: string; approvers: string[] },
+    actorId: string, election: Election, input: { authorizedBy?: string; approvers: string[] },
   ): Promise<void> {
     const assignments = await this.store.listAssignments();
+    // The person running the count is the organization owner who authorizes it.
     const ownerOk = assignments.some(
-      (a) => a.userId === input.authorizedBy &&
+      (a) => a.userId === actorId &&
         a.role === 'organization_owner' &&
         a.organizationId === election.organizationId &&
         isAssignmentActive(a) &&
         (!a.electionId || a.electionId === election.id),
     );
-    if (!ownerOk) throw new Error('FORBIDDEN: tally must be authorized by the organization owner (T9)');
-    if (input.authorizedBy === actorId) throw new Error('SOD_VIOLATION: tally authorizer cannot execute the tally (SoD-5)');
+    if (!ownerOk) throw new Error('FORBIDDEN: only an organization owner can run the count (T9)');
     const approvers = [...new Set(input.approvers)];
     if (approvers.length < 2) throw new Error('PRECONDITION: tally requires at least two approvers (SoD-4)');
-    if (approvers.includes(actorId) || approvers.includes(input.authorizedBy)) {
-      throw new Error('SOD_VIOLATION: approvers must be separate from authorizer and executor (SoD-5)');
-    }
+    if (approvers.includes(actorId)) throw new Error('SOD_VIOLATION: approvers must be separate from the person running the count (SoD-5)');
     for (const approver of approvers) {
       await this.assertElectionParticipant(approver, election, TALLY_APPROVER_ROLES, 'tally approver', assignments);
     }
-    // Independent check: at least one approver must be an auditor so the
-    // owner-run tally is always co-signed by read-only oversight.
-    const auditorApproved = approvers.some((id) => assignments.some(
-      (a) => a.userId === id && a.role === 'auditor' &&
-        a.organizationId === election.organizationId && isAssignmentActive(a) &&
-        (!a.electionId || a.electionId === election.id),
-    ));
-    if (!auditorApproved) throw new Error('PRECONDITION: at least one tally approver must be an auditor');
-    // Naming someone is not consent: each must have signed off themselves (recordApproval).
-    await this.assertApproved(election.id, 'tally', [input.authorizedBy, ...approvers], 'tally');
+    // Naming someone is not consent: each auditor must have signed off themselves (recordApproval).
+    await this.assertApproved(election.id, 'tally', approvers, 'tally');
   }
 
   /** Throws a PRECONDITION naming anyone who has not yet recorded an approval of this kind. */
@@ -1399,7 +1392,7 @@ export class PlatformService {
     return { verified: matches, tallyHash: run.tallyHash, ballotCount: run.ballotCount, evidenceRoot: run.evidenceRoot };
   }
 
-  async recount(actorId: string, electionId: string, input: { authorizedBy: string; approvers: string[] }): Promise<TallyRun> {
+  async recount(actorId: string, electionId: string, input: { authorizedBy?: string; approvers: string[] }): Promise<TallyRun> {
     const election = await this.electionOrThrow(electionId);
     if (election.state !== 'TALLIED' && election.state !== 'VERIFIED') {
       throw new Error(`INVALID_STATE: recount requires TALLIED or VERIFIED, current ${election.state}`);

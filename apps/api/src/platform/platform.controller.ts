@@ -336,14 +336,14 @@ export class PlatformController {
   }
 
   @Post('elections/:id/approvals')
-  @RequireCapability('tally.verify', 'tally.authorize')
+  @RequireCapability('tally.verify')
   recordApproval(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { kind?: string }) {
     const kind = approvalKind(body?.kind);
     return guard(() => this.platform.recordApproval(actor(req), id, kind));
   }
 
   @Delete('elections/:id/approvals/:kind')
-  @RequireCapability('tally.verify', 'tally.authorize')
+  @RequireCapability('tally.verify')
   withdrawApproval(@Req() req: { principal?: Principal }, @Param('id') id: string, @Param('kind') kindParam: string) {
     const kind = approvalKind(kindParam);
     return guard(async () => { await this.platform.withdrawApproval(actor(req), id, kind); return { withdrawn: true }; });
@@ -357,7 +357,7 @@ export class PlatformController {
 
   @Post('elections/:id/tally')
   @RequireCapability('tally.execute')
-  tally(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { authorizedBy: string; approvers: string[] }) {
+  tally(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { authorizedBy?: string; approvers: string[] }) {
     return guard(() => this.platform.tally(actor(req), id, body));
   }
 
@@ -369,7 +369,7 @@ export class PlatformController {
 
   @Post('elections/:id/tally/recount')
   @RequireCapability('tally.execute')
-  recount(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { authorizedBy: string; approvers: string[] }) {
+  recount(@Req() req: { principal?: Principal }, @Param('id') id: string, @Body() body: { authorizedBy?: string; approvers: string[] }) {
     return guard(() => this.platform.recount(actor(req), id, body));
   }
 
