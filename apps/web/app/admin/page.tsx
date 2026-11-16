@@ -106,7 +106,7 @@ interface ElectionDetail {
 }
 interface Participation { eligible: number; ballotsCast: number; turnoutPercent: number }
 interface Report {
-  election: { id: string; name: string; state: string };
+  election: { id: string; name: string; state: string; announcement?: string | null };
   eligibleVoters: number; ballotsCast: number; turnoutPercent: number;
   positions: { position: string; seats: number; abstentions: number; results: { candidate: string; votes: number }[] }[];
   tallyHash: string | null; evidenceRoot: string | null;
@@ -132,6 +132,62 @@ function electionPill(state: string): 'success' | 'warning' | 'error' | 'accent'
   if (state === 'SUSPENDED' || state === 'RECOUNT') return 'warning';
   if (state === 'CANCELLED' || state === 'ARCHIVED') return 'neutral';
   return 'accent';
+}
+
+// ---- Results flow: close -> count -> verify -> certify -> publish ----
+const RESULT_STEPS = ['Voting closed', 'Counted', 'Verified', 'Certified', 'Published'] as const;
+
+/** How many result steps are finished for an election state (0 = voting still running or not started). */
+function resultsProgress(state: string): number {
+  switch (state) {
+    case 'CLOSED': return 1;
+    case 'TALLIED': case 'RECOUNT': return 2;
+    case 'VERIFIED': return 3;
+    case 'CERTIFIED': return 4;
+    case 'PUBLISHED': case 'ARCHIVED': return 5;
+    default: return 0;
+  }
+}
+
+const RESULT_NEXT: Record<number, { title: string; text: string }> = {
+  0: { title: 'Voting has not closed yet', text: 'Results can be counted once voting is closed. Close voting when the window ends (or let it close automatically on schedule).' },
+  1: { title: 'Next: count the votes', text: 'Run the tally. It needs four different people: you run it, a different organization owner authorizes it, and two approvers sign it off (at least one an auditor).' },
+  2: { title: 'Next: an auditor verifies the count', text: 'Only an auditor can verify, so sign in with an auditor account and press Verify tally. It recounts every stored ballot independently and checks it matches. If the totals look wrong, use Recount instead.' },
+  3: { title: 'Next: an owner certifies the results', text: 'Certification must be done by an owner other than the person who ran the tally, naming an auditor as second approver. This locks the official result.' },
+  4: { title: 'Next: publish the results', text: 'An owner publishes. Choose to publish with an announcement, or also email the results to every voter on the register.' },
+  5: { title: 'Results are published', text: 'The official result is final. Download a copy below for your records.' },
+};
+
+/** Who is elected for a position: top `seats` with votes, with ties at the cut-off flagged instead of guessed. */
+function placeResults(p: { seats: number; results: { candidate: string; votes: number }[] }): ('elected' | 'tie' | null)[] {
+  const cut = p.seats;
+  const rows = p.results;
+  const tieVotes = rows.length > cut && cut > 0 && rows[cut - 1].votes > 0 && rows[cut - 1].votes === rows[cut].votes ? rows[cut].votes : null;
+  return rows.map((r, i) => {
+    if (r.votes <= 0) return null;
+    if (tieVotes !== null && r.votes === tieVotes) return 'tie';
+    return i < cut ? 'elected' : null;
+  });
+}
+
+function downloadResultsCsv(report: { election: { name: string }; positions: { position: string; seats: number; abstentions: number; results: { candidate: string; votes: number }[] }[]; ballotsCast: number }) {
+  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const lines = [['Position', 'Candidate', 'Votes', 'Percent of ballots', 'Result'].map(esc).join(',')];
+  for (const p of report.positions) {
+    const placed = placeResults(p);
+    p.results.forEach((r, i) => {
+      const pct = report.ballotsCast ? ((r.votes / report.ballotsCast) * 100).toFixed(1) : '0.0';
+      lines.push([p.position, r.candidate, r.votes, pct, placed[i] === 'elected' ? 'Elected' : placed[i] === 'tie' ? 'Tie' : ''].map(esc).join(','));
+    });
+    if (p.abstentions) lines.push([p.position, 'Abstentions', p.abstentions, '', ''].map(esc).join(','));
+  }
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${report.election.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'results'}-results.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function initialsOf(name: string) {
@@ -250,6 +306,13 @@ export default function AdminPage() {
     if (signedIn && section === 'fraud') void refreshFraud().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn, section, electionId]);
+
+  // Load the numbers and report as soon as the Results page opens (and again
+  // whenever the election moves to a new stage), instead of waiting for a click.
+  useEffect(() => {
+    if (signedIn && section === 'results' && electionId) void refreshResults().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedIn, section, electionId, election?.state]);
 
   // Resumed wizard sessions may land on step 3 while the election is still
   // DRAFT/CONFIGURED - walk it forward to REGISTRATION so imports work.
@@ -435,6 +498,8 @@ export default function AdminPage() {
 
   async function refreshResults() {
     if (!electionId) return;
+    // Stage first: each result action (tally, verify, certify, publish) moves the election on.
+    await refreshElection().catch(() => undefined);
     const [part, rep] = await Promise.all([
       get(`/elections/${electionId}/participation`).catch(() => null),
       get(`/elections/${electionId}/report`).catch(() => null),
@@ -1199,7 +1264,26 @@ export default function AdminPage() {
 
           {activeSection === 'results' && (
             <Card title="Results and reports">
-              <p className="muted small" style={{ marginTop: 0 }}>Tally requires an owner authorization and two approvers (at least one auditor). Certification requires the session user and an auditor as second approver. All identifiers must be real organization members.</p>
+              {!electionId && <Alert kind="info" title="Choose an election">Pick an election from the Overview to see its results.</Alert>}
+              {election && (() => {
+                const progress = resultsProgress(election.state);
+                const next = RESULT_NEXT[progress];
+                return (
+                  <div style={{ marginBottom: 16 }}>
+                    <ol className="lifecycle" aria-label="Results progress">
+                      {RESULT_STEPS.map((label, i) => <li key={label} className={i < progress ? 'done' : i === progress ? 'current' : ''}>{i < progress ? '✓ ' : `${i + 1}. `}{label}</li>)}
+                    </ol>
+                    <div style={{ marginTop: 12 }}>
+                      <Alert kind={progress === 5 ? 'success' : 'info'} title={next.title}>
+                        {next.text}
+                        {progress === 0 && election.state === 'OPEN' && (
+                          <div style={{ marginTop: 8 }}><Button variant="danger" size="sm" disabled={!cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); await refreshResults(); }) })}>Close voting now</Button></div>
+                        )}
+                      </Alert>
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="stat-grid" style={{ marginBottom: 16 }}>
                 <Stat label="Eligible voters" value={participation?.eligible ?? '-'} />
                 <Stat label="Ballots cast" value={participation?.ballotsCast ?? '-'} />
@@ -1212,13 +1296,13 @@ export default function AdminPage() {
                   await refreshResults();
                 }); }}>
                 <div className="form-grid">
-                  <Field label="Authorized by (owner)" htmlFor="tally-chair"><Select id="tally-chair" name="authorizedBy" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
-                  <Field label="Approver 1" htmlFor="tally-a1"><Select id="tally-a1" name="approver1" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
-                  <Field label="Approver 2" htmlFor="tally-a2"><Select id="tally-a2" name="approver2" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
+                  <Field label="Authorized by (owner)" htmlFor="tally-chair"><Select id="tally-chair" name="authorizedBy" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
+                  <Field label="Approver 1" htmlFor="tally-a1"><Select id="tally-a1" name="approver1" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
+                  <Field label="Approver 2" htmlFor="tally-a2"><Select id="tally-a2" name="approver2" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
                 </div>
                 <div className="form-actions">
-                  <Button type="submit" variant="primary" disabled={!electionId || users.length < 3 || !cap('tally.execute')}>Run tally</Button>
-                  <Button variant="secondary" disabled={!electionId || !cap('tally.verify')} onClick={() => void act('Verify tally', async () => { await call(`/elections/${electionId}/tally/verify`, {}, 'POST'); await refreshResults(); })}>Verify tally</Button>
+                  <Button type="submit" variant="primary" disabled={!electionId || users.length < 4 || !cap('tally.execute') || !['CLOSED', 'RECOUNT'].includes(election?.state ?? '')}>Run tally</Button>
+                  <Button variant="secondary" disabled={!electionId || !cap('tally.verify') || election?.state !== 'TALLIED'} onClick={() => void act('Verify tally', async () => { await call(`/elections/${electionId}/tally/verify`, {}, 'POST'); await refreshResults(); })}>Verify tally</Button>
                   <Button variant="secondary" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('Refresh results', refreshResults)}>Refresh</Button>
                 </div>
               </form>
@@ -1229,11 +1313,11 @@ export default function AdminPage() {
                   await refreshResults();
                 }); }}>
                 <div className="form-grid">
-                  <Field label="Recount authorized by (owner)" htmlFor="recount-chair"><Select id="recount-chair" name="authorizedBy" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
-                  <Field label="Approver 1" htmlFor="recount-a1"><Select id="recount-a1" name="approver1" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
-                  <Field label="Approver 2" htmlFor="recount-a2"><Select id="recount-a2" name="approver2" required disabled={users.length < 3}><option value="">Select…</option>{userOptions}</Select></Field>
+                  <Field label="Recount authorized by (owner)" htmlFor="recount-chair"><Select id="recount-chair" name="authorizedBy" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
+                  <Field label="Approver 1" htmlFor="recount-a1"><Select id="recount-a1" name="approver1" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
+                  <Field label="Approver 2" htmlFor="recount-a2"><Select id="recount-a2" name="approver2" required disabled={users.length < 4}><option value="">Select…</option>{userOptions}</Select></Field>
                 </div>
-                <Button type="submit" variant="secondary" disabled={!electionId || users.length < 3 || !cap('tally.execute')}>Recount</Button>
+                <Button type="submit" variant="secondary" disabled={!electionId || users.length < 4 || !cap('tally.execute') || !['TALLIED', 'VERIFIED'].includes(election?.state ?? '')}>Recount</Button>
               </form>
               <hr className="divider" />
               <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget);
@@ -1246,28 +1330,65 @@ export default function AdminPage() {
                   <Field label="Second approver" htmlFor="certify-second"><Select id="certify-second" name="secondApprover" required disabled={users.length < 2}><option value="">Select…</option>{userOptions}</Select></Field>
                 </div>
                 <div className="form-actions">
-                  <Button type="submit" variant="primary" disabled={!electionId || !userId || users.length < 2 || !cap('results.certify')}>Certify results</Button>
-                  <Button variant="secondary" disabled={!electionId || !cap('results.publish')} onClick={() => setPublishOpen(true)}>Publish results</Button>
+                  <Button type="submit" variant="primary" disabled={!electionId || !userId || users.length < 2 || !cap('results.certify') || election?.state !== 'VERIFIED'}>Certify results</Button>
+                  <Button variant="secondary" disabled={!electionId || !cap('results.publish') || election?.state !== 'CERTIFIED'} onClick={() => setPublishOpen(true)}>Publish results</Button>
                   <Button variant="ghost" disabled={!electionId || !capAny(['participation.viewAggregate', 'results.publish', 'results.certify', 'audit.read'])} onClick={() => void act('View report', async () => { const r = await get(`/elections/${electionId}/report`); setReport(r as unknown as Report); })}>View report</Button>
                 </div>
               </form>
               {report && (
                 <div style={{ marginTop: 18 }}>
-                  <h3>Published report</h3>
-                  <div className="result-block">
-                    <div className="result-row"><div><strong>{report.election.name}</strong><div className="small muted">{report.election.state}</div></div><Badge tone={electionPill(report.election.state)}>{report.election.state}</Badge></div>
-                    <div className="result-row"><span>Eligible voters</span><strong>{report.eligibleVoters}</strong></div>
-                    <div className="result-row"><span>Ballots cast</span><strong>{report.ballotsCast}</strong></div>
-                    <div className="result-row"><span>Turnout</span><strong>{report.turnoutPercent}%</strong></div>
-                    {report.positions.map((p, i) => (
-                      <div key={i} className="result-row" style={{ display: 'block' }}>
-                        <strong>{p.position}</strong> <span className="small muted">({p.seats} seat{p.seats === 1 ? '' : 's'}, {p.abstentions} abstain)</span>
-                        <div style={{ marginTop: 8 }}>{p.results.map((r, j) => <div key={j} className="small">{r.candidate}: {r.votes}</div>)}</div>
-                      </div>
-                    ))}
-                    <div className="result-row"><span>Tally hash</span><code>{report.tallyHash ?? '-'}</code></div>
-                    <div className="result-row"><span>Evidence root</span>{report.evidenceRoot ? <code>{report.evidenceRoot}</code> : <span className="muted small">available after tally</span>}</div>
-                  </div>
+                  {(() => {
+                    const counted = !!report.tallyHash;
+                    const published = report.election.state === 'PUBLISHED' || report.election.state === 'ARCHIVED';
+                    const cert = report.certification as { createdAt?: string } | null;
+                    return (
+                      <>
+                        <div className="toolbar" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+                          <h3 style={{ margin: 0 }}>{published ? 'Official results' : counted ? 'Results (not yet published)' : 'Results'}</h3>
+                          {counted && <Button variant="secondary" size="sm" onClick={() => downloadResultsCsv(report)}>Download CSV</Button>}
+                        </div>
+                        <div className="result-block">
+                          <div className="result-row"><div><strong>{report.election.name}</strong><div className="small muted">{published ? 'Published' : counted ? (cert ? 'Certified, awaiting publication' : 'Counted, not yet certified') : 'Votes not counted yet'}</div></div><Badge tone={electionPill(report.election.state)}>{report.election.state}</Badge></div>
+                          {report.election.announcement && <div className="result-row" style={{ display: 'block' }}><span className="small muted">Announcement</span><div>{report.election.announcement}</div></div>}
+                          <div className="result-row"><span>Eligible voters</span><strong>{report.eligibleVoters}</strong></div>
+                          <div className="result-row"><span>Ballots cast</span><strong>{report.ballotsCast}</strong></div>
+                          <div className="result-row"><span>Turnout</span><strong>{report.turnoutPercent}%</strong></div>
+                          {!counted && (
+                            <div className="result-row" style={{ display: 'block' }}>
+                              <Alert kind="info" title="No vote counts yet">Candidate totals appear here once the tally has been run. Until then every candidate would show 0, which is not a result.</Alert>
+                            </div>
+                          )}
+                          {counted && report.positions.map((p, i) => {
+                            const placed = placeResults(p);
+                            const total = report.ballotsCast;
+                            return (
+                              <div key={i} className="result-row" style={{ display: 'block' }}>
+                                <strong>{p.position}</strong> <span className="small muted">({p.seats} seat{p.seats === 1 ? '' : 's'}{p.abstentions ? `, ${p.abstentions} abstained` : ''})</span>
+                                <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+                                  {p.results.map((r, j) => {
+                                    const pct = total ? (r.votes / total) * 100 : 0;
+                                    return (
+                                      <div key={j} className="cand-result">
+                                        <div className="cand-result-head">
+                                          <span>{r.candidate}</span>
+                                          <span>{placed[j] === 'elected' && <Badge tone="success">Elected</Badge>}{placed[j] === 'tie' && <Badge tone="warning">Tie</Badge>} <strong>{r.votes}</strong> <span className="small muted">({pct.toFixed(1)}%)</span></span>
+                                        </div>
+                                        <div className="cand-bar" aria-hidden="true"><span style={{ width: `${Math.min(100, pct)}%` }} className={placed[j] === 'elected' ? 'win' : ''} /></div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                {placed.includes('tie') && <p className="small muted" style={{ margin: '8px 0 0' }}>Candidates are tied for the last seat. The tally does not break ties; follow your organization&apos;s rules.</p>}
+                              </div>
+                            );
+                          })}
+                          {counted && cert?.createdAt && <div className="result-row"><span>Certified</span><span>{fmtDate(String(cert.createdAt))}</span></div>}
+                          <div className="result-row"><span>Tally hash</span><code>{report.tallyHash ?? '-'}</code></div>
+                          <div className="result-row"><span>Evidence root</span>{report.evidenceRoot ? <code>{report.evidenceRoot}</code> : <span className="muted small">available after tally</span>}</div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </Card>

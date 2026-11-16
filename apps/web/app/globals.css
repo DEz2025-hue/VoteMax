@@ -759,3 +759,9 @@ body:has(.vote-shell) .site-footer { display: none; }
 .check-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; line-height: 1.45; }
 .check-row input { margin-top: 4px; width: 17px; height: 17px; accent-color: var(--blue-600); flex-shrink: 0; }
 .check-row input:disabled + span { opacity: .6; }
+
+/* Results report: candidate rows with share bars */
+.cand-result-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.cand-bar { height: 8px; border-radius: 999px; background: #eef2f7; overflow: hidden; margin-top: 4px; }
+.cand-bar span { display: block; height: 100%; border-radius: 999px; background: #94a3b8; }
+.cand-bar span.win { background: var(--blue-600); }
