@@ -16,7 +16,7 @@ async function buildElection(name: string, upTo: 'draft' | 'open' | 'published')
   const el = await svc.createElection(ownerId, orgId, { name, votingOpensAt: soon(-1), votingClosesAt: soon(1) });
   const pos = await svc.addPosition(ownerId, el.id, 'President', 1, 1);
   const cand = await svc.addCandidate(ownerId, el.id, pos.id, 'Ada Kamara');
-  await store.setCandidatePhoto(cand.id, 'image/png', Buffer.from('x').toString('base64'));
+  await store.setCandidatePhoto(cand.id, { mime: 'image/png', data: Buffer.from('x').toString('base64'), url: `/candidates/${cand.id}/photo` });
   if (upTo === 'draft') return { el, pos, cand };
   await svc.transition(ownerId, el.id, 'CONFIGURED');
   await svc.transition(ownerId, el.id, 'REGISTRATION');

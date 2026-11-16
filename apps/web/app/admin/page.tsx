@@ -249,6 +249,7 @@ export default function AdminPage() {
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteName, setDeleteName] = useState('');
+  const [deleteVotes, setDeleteVotes] = useState<number | null>(null);
   const csvFileRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoTargetRef = useRef('');
@@ -776,6 +777,9 @@ export default function AdminPage() {
             <p className="muted small">
               This permanently deletes <strong>{election.name}</strong> and everything in it: the ballot, the voter list ({election.register.total} on the register), any votes cast, the results and the sign-offs. It cannot be undone. A short note that it was deleted stays in the activity log.
             </p>
+            {deleteVotes !== null && deleteVotes > 0 && (
+              <Alert kind="warning" title={`${deleteVotes} vote${deleteVotes === 1 ? '' : 's'} already cast`}>These votes will be permanently destroyed along with the election.</Alert>
+            )}
             <Field label={`Type "${election.name}" to confirm`} htmlFor="delete-confirm">
               <Input id="delete-confirm" value={deleteName} onChange={(e) => setDeleteName(e.target.value)} autoComplete="off" />
             </Field>
@@ -1033,7 +1037,10 @@ export default function AdminPage() {
                 {election && cap('election.configure') && (
                   <Button type="button" variant="danger" size="sm" disabled={['OPEN', 'SUSPENDED'].includes(election.state)}
                     title={['OPEN', 'SUSPENDED'].includes(election.state) ? 'Voting is running. Close it before deleting.' : undefined}
-                    onClick={() => { setDeleteName(''); setDeleteOpen(true); }}>Delete election</Button>
+                    onClick={() => {
+                      setDeleteName(''); setDeleteVotes(null); setDeleteOpen(true);
+                      void get(`/elections/${electionId}/participation`).then((p) => setDeleteVotes(Number((p as { ballotsCast?: number }).ballotsCast ?? 0))).catch(() => setDeleteVotes(null));
+                    }}>Delete election</Button>
                 )}
               </div>
 

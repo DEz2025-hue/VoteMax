@@ -156,6 +156,9 @@ export class PostgresStore implements PlatformStore {
 
   async deleteElection(id: string): Promise<void> {
     await this.database.transaction(async (tx) => {
+      // Sealed ballots are append-only at the database level (migration 0002). This switches on the
+      // sanctioned delete for THIS transaction only (is_local = true): it lapses at commit/rollback.
+      await tx.execute(sql`select set_config('votemax.allow_election_delete', 'on', true)`);
       // Children first: every table below points at the election, directly or through voters.
       const entitlementIds = tx.select({ id: schema.entitlements.id }).from(schema.entitlements).where(eq(schema.entitlements.electionId, id));
       await tx.delete(schema.ballotIdempotencyKeys).where(inArray(schema.ballotIdempotencyKeys.entitlementId, entitlementIds));

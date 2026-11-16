@@ -27,12 +27,17 @@ import {
   type Principal,
 } from '../auth/session.guard';
 import { UseGuards } from '@nestjs/common';
+import { logEvent } from '../common/logger';
 
 export function guard<T>(fn: () => T | Promise<T>): Promise<T> {
   return Promise.resolve()
     .then(fn)
     .catch((err: unknown) => {
-      throw new BadRequestException(err instanceof Error ? err.message : 'Request failed');
+      const message = err instanceof Error ? err.message : 'Request failed';
+      // Errors the platform raises on purpose start with a CODE:. Anything else (a database error,
+      // a bug) is unexpected, so leave a trace for whoever has to diagnose it.
+      if (!/^[A-Z][A-Z0-9_]+:/.test(message)) logEvent('warn', 'request.unexpected_error', { message: message.slice(0, 300) });
+      throw new BadRequestException(message);
     });
 }
 
