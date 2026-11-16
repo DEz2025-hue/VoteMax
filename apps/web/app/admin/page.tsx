@@ -850,7 +850,7 @@ export default function AdminPage() {
               </form>
               {newUserEnrollment && (
                 <div style={{ marginTop: 14 }}>
-                  <Alert kind="success" title="Account created - share the TOTP secret once">
+                  <Alert kind="success" title="Authenticator secret - share it once">
                     <p style={{ margin: '4px 0' }}><strong>{newUserEnrollment.email}</strong> must scan this QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, Authy). It is not shown again:</p>
                     <div style={{ margin: '8px 0' }}><TotpQr email={newUserEnrollment.email} secret={newUserEnrollment.totpSecret} /></div>
                     <p className="small" style={{ margin: '4px 0' }}>Can't scan? Enter this setup key instead:</p>
@@ -885,8 +885,40 @@ export default function AdminPage() {
               </form>
               <div style={{ marginTop: 18 }}>
                 {users.length ? (
-                  <Table head={['Name', 'Email', 'MFA']}>
-                    {users.map((u) => <tr key={u.id}><td>{u.displayName}</td><td>{u.email}</td><td><Badge tone={u.mfaEnrolled ? 'success' : 'warning'}>{u.mfaEnrolled ? 'enrolled' : 'no'}</Badge></td></tr>)}
+                  <Table head={['Name', 'Email', 'MFA', 'Actions']}>
+                    {users.map((u) => {
+                      const self = u.id === userId;
+                      return (
+                        <tr key={u.id}>
+                          <td>{u.displayName}{self && <span className="small muted"> (you)</span>}</td>
+                          <td>{u.email}</td>
+                          <td><Badge tone={u.mfaEnrolled ? 'success' : 'warning'}>{u.mfaEnrolled ? 'enrolled' : 'no'}</Badge></td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <Button size="sm" variant="ghost" disabled={self || !capOrg('roles.assign')} title={self ? 'Ask another administrator to reset your authenticator' : undefined}
+                                onClick={() => setConfirm({
+                                  title: 'Reset authenticator',
+                                  message: `Issue a new authenticator secret for ${u.email}? Their current one stops working and they are signed out. You will see the new secret once.`,
+                                  action: () => void act('Reset authenticator', async () => {
+                                    const r = await call(`/users/${u.id}/totp-reset`, {}) as { totpSecret?: string };
+                                    setNewUserEnrollment(r.totpSecret ? { email: u.email, totpSecret: r.totpSecret } : null);
+                                  }),
+                                })}>Reset authenticator</Button>
+                              <Button size="sm" variant="ghost" disabled={self || !capOrg('roles.assign')} title={self ? 'You cannot remove your own account' : undefined}
+                                onClick={() => setConfirm({
+                                  title: 'Remove user',
+                                  message: `Permanently remove ${u.displayName} (${u.email})? They lose all access and cannot sign in again. Past audit records are kept. This cannot be undone.`,
+                                  action: () => void act('Remove user', async () => {
+                                    await call(`/users/${u.id}`, {}, 'DELETE');
+                                    setNewUserEnrollment((cur) => (cur && cur.email === u.email ? null : cur));
+                                    await refreshUsers();
+                                  }),
+                                })}>Remove</Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </Table>
                 ) : <EmptyState title="No users loaded">Sign in and set an organization to list staff accounts.</EmptyState>}
               </div>

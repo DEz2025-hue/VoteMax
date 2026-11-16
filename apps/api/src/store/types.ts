@@ -176,6 +176,15 @@ export interface PlatformStore {
   findUser(id: string): Promise<User | null>;
   listUsers(organizationId: string): Promise<User[]>;
   countUsers(): Promise<number>;
+  /** Replace a user's authenticator secret (TOTP reset). */
+  setUserTotpSecret(id: string, totpSecret: string): Promise<void>;
+  /** Revoke every live session for a user (after a reset or removal). */
+  revokeUserSessions(userId: string): Promise<void>;
+  /**
+   * Permanently remove a user with their sessions and role assignments.
+   * Audit entries and past tally/certification records keep the user's id as history.
+   */
+  deleteUser(id: string): Promise<void>;
   createSession(userId: string, tokenHash: string, expiresAt: number): Promise<void>;
   findSession(tokenHash: string): Promise<Session | null>;
   /** Revoke a session by token hash; subsequent findSession returns null. */

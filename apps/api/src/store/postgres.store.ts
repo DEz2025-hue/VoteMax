@@ -131,6 +131,26 @@ export class PostgresStore implements PlatformStore {
     return row.n;
   }
 
+  async setUserTotpSecret(id: string, totpSecret: string): Promise<void> {
+    await this.database.update(schema.users).set({ totpSecret, mfaEnrolled: true }).where(eq(schema.users.id, id));
+  }
+
+  async revokeUserSessions(userId: string): Promise<void> {
+    await this.database.update(schema.sessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(schema.sessions.userId, userId), isNull(schema.sessions.revokedAt)));
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+      // Assignments this user granted to others stay; only the pointer to the deleted user is cleared.
+      await tx.update(schema.roleAssignments).set({ grantedBy: null }).where(eq(schema.roleAssignments.grantedBy, id));
+      await tx.delete(schema.roleAssignments).where(eq(schema.roleAssignments.userId, id));
+      await tx.delete(schema.users).where(eq(schema.users.id, id));
+    });
+  }
+
   async createSession(userId: string, tokenHash: string, expiresAt: number): Promise<void> {
     await this.database.insert(schema.sessions).values({
       userId, tokenHash, expiresAt: new Date(expiresAt),

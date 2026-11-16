@@ -151,6 +151,43 @@ export class PlatformService {
     return { id: user.id, organizationId, email, displayName, mfaEnrolled: true, totpSecret };
   }
 
+  /** A user the caller may manage: same organization, never the caller themself. */
+  private async managedUser(actorId: string, organizationId: string, userId: string): Promise<User> {
+    const user = await this.store.findUser(userId);
+    // Same answer for "missing" and "someone else's" so other tenants' users can't be probed.
+    if (!user || user.organizationId !== organizationId) throw new Error('NOT_FOUND: user');
+    if (user.id === actorId) throw new Error('FORBIDDEN: you cannot do this to your own account; ask another administrator');
+    return user;
+  }
+
+  /**
+   * Issue a fresh authenticator secret for a staff user who lost theirs (or never
+   * saw it). The old secret stops working and their live sessions end. The new
+   * secret is returned once, like at creation.
+   */
+  async resetUserTotp(actorId: string, organizationId: string, userId: string): Promise<{ id: string; email: string; totpSecret: string }> {
+    const user = await this.managedUser(actorId, organizationId, userId);
+    const totpSecret = generateTotpSecret();
+    await this.store.setUserTotpSecret(user.id, totpSecret);
+    await this.store.revokeUserSessions(user.id);
+    await this.log(organizationId, actorId, 'user.totpReset', `user:${user.id}`, 'success');
+    return { id: user.id, email: user.email, totpSecret };
+  }
+
+  /** Remove a staff user. Their sessions and roles go with them; audit history stays. */
+  async deleteUser(actorId: string, organizationId: string, userId: string): Promise<void> {
+    const user = await this.managedUser(actorId, organizationId, userId);
+    const assignments = await this.store.listAssignments();
+    const isOwner = (id: string) => assignments.some((a) => a.userId === id && a.role === 'organization_owner' && a.organizationId === organizationId && isAssignmentActive(a));
+    if (isOwner(user.id)) {
+      const otherOwners = (await this.store.listUsers(organizationId)).filter((u) => u.id !== user.id && isOwner(u.id));
+      if (otherOwners.length === 0) throw new Error('BLOCKER: this is the organization\'s only owner; add another owner before removing them');
+    }
+    await this.store.revokeUserSessions(user.id);
+    await this.store.deleteUser(user.id);
+    await this.log(organizationId, actorId, 'user.delete', `user:${user.id}`, 'success');
+  }
+
   async login(email: string, password: string, totp?: string): Promise<{
     token: string; userId: string; organizationId: string | null;
     assignments: { role: Role; organizationId: string; electionId: string | null }[];
