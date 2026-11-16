@@ -112,6 +112,12 @@ describe('approvals before certification', () => {
     await expect(svc.recordApproval(aud1, electionId, 'certify')).resolves.toMatchObject({ kind: 'certify', role: 'auditor' });
   });
 
+  it('the owner who ran the count can also certify once an auditor has approved', async () => {
+    await toVerified();
+    await svc.recordApproval(aud1, electionId, 'certify');
+    await expect(svc.certify(executor, electionId, { certifiedBy: executor, secondApprover: aud1 })).resolves.toMatchObject({ electionId, certifiedBy: executor });
+  });
+
   it('certification waits for the second approver, then spends the approval', async () => {
     await toVerified();
     await expect(svc.recordApproval(authorizer, electionId, 'certify')).rejects.toThrow(/FORBIDDEN/); // owners cannot be the second approver

@@ -156,7 +156,7 @@ const RESULT_NEXT: Record<number, { title: string; text: string }> = {
   0: { title: 'Voting has not closed yet', text: 'Results can be counted once voting is closed. Close voting when the window ends (or let it close automatically on schedule).' },
   1: { title: 'Next: count the votes', text: "Two auditors approve the count first. Then an organization owner runs it: running it is the owner's authorization." },
   2: { title: 'Next: an auditor verifies the count', text: 'Only an auditor can verify, so sign in with an auditor account and press Verify tally. It recounts every stored ballot independently and checks it matches. If the totals look wrong, use Recount instead.' },
-  3: { title: 'Next: an owner certifies the results', text: 'Certification must be done by an owner other than the person who ran the tally, naming an auditor as second approver. This locks the official result.' },
+  3: { title: 'Next: an owner certifies the results', text: 'Once an auditor has approved certification, an owner certifies the results. This locks the official result.' },
   4: { title: 'Next: publish the results', text: 'An owner publishes. Choose to publish with an announcement, or also email the results to every voter on the register.' },
   5: { title: 'Results are published', text: 'The official result is final. Download a copy below for your records.' },
 };

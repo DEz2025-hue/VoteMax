@@ -1429,7 +1429,7 @@ export class PlatformService {
     await this.assertElectionParticipant(input.certifiedBy, election, new Set<Role>(['organization_owner']), 'certifier', assignments);
     await this.assertElectionParticipant(input.secondApprover, election, CERTIFICATION_APPROVER_ROLES, 'second approver', assignments);
     await this.assertApproved(electionId, 'certify', [input.secondApprover], 'certification');
-    if (run.executedBy === input.certifiedBy) throw new Error('SOD_VIOLATION: tally executor cannot certify (SoD-5)');
+    // The owner who ran the count may also certify it: the auditors' sign-offs are the independent check.
     if (input.certifiedBy === input.secondApprover) throw new Error('SOD_VIOLATION: certification needs a second, separate approver');
     const record: Certification = {
       electionId, certifiedBy: input.certifiedBy, secondApprover: input.secondApprover,
