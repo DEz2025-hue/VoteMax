@@ -130,7 +130,7 @@ describe('Phase 3 voting and results (mock election)', () => {
     expect(report.election.state).toBe('PUBLISHED');
     expect(report.election.announcement).toBe('Certified by the committee.');
     expect((await store.listNotificationBatches(electionId)).filter((b) => b.kind === 'results')).toHaveLength(0);
-    expect(outbox().filter((m) => m.subject.startsWith('Results'))).toHaveLength(0);
+    expect(outbox().filter((m) => m.subject.startsWith('Official results'))).toHaveLength(0);
   });
 
   it('email results: sends the results to every voter on the register, once', async () => {
@@ -140,13 +140,14 @@ describe('Phase 3 voting and results (mock election)', () => {
     expect(batch.status).toBe('completed');
     expect(batch.total).toBe(6); // all eligible voters, whether or not they voted
     expect(batch.sent).toBe(6);
-    const mails = outbox().filter((m) => m.subject === 'Results - Organization Election 2026');
+    const mails = outbox().filter((m) => m.subject === 'Official results: Organization Election 2026');
     expect(mails).toHaveLength(6);
     const body = mails[0].text;
     expect(body).toContain('Congratulations to all.');
-    expect(body).toContain('Turnout: 3 of 6 eligible voters (50%).');
-    expect(body).toContain('Ada Kamara: 2 votes  - elected');
-    expect(body).toContain('Ben Kollie: 1 vote');
+    expect(body).toContain('Dear Voters,');
+    expect(body).toContain('we are delighted to announce that Ada Kamara has been elected as President.');
+    expect(body).toContain('* Total Votes Cast: 3');
+    expect(body).toContain('Best regards,\nElection Administration Team\nExample Organization');
     expect(body).not.toContain('/vote?'); // no personal voting link in a results email
     // Publishing is one-way, so a second publish cannot trigger a second email.
     await expect(svc.publish(executorId, electionId, { emailResults: true })).rejects.toThrow(/INVALID_TRANSITION/);
@@ -157,7 +158,7 @@ describe('Phase 3 voting and results (mock election)', () => {
     // Not published yet: refused.
     await expect(svc.notifyVoters(executorId, electionId, 'results')).rejects.toThrow(/INVALID_STATE/);
     await svc.publish(executorId, electionId, { announcement: 'Certified.' });
-    expect(outbox().filter((m) => m.subject.startsWith('Results'))).toHaveLength(0);
+    expect(outbox().filter((m) => m.subject.startsWith('Official results'))).toHaveLength(0);
     // Later, the owner decides to email them.
     await svc.notifyVoters(executorId, electionId, 'results');
     const batch = await waitForResultsBatch();

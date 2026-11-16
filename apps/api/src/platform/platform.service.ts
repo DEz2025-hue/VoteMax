@@ -34,6 +34,7 @@ import {
 } from '../register/csv-import';
 import { OtpDelivery } from '../otp/otp-delivery';
 import { renderVoterMessage, renderVoterSms, VoterNotifier } from '../notify/voter-notifier';
+import { summarizeResults, type ResultsSummary } from '../notify/results-email';
 import { InMemoryStore } from '../store/memory.store';
 import { StoreError, StoreErrorCode } from '../store/types';
 import type {
@@ -769,7 +770,7 @@ export class PlatformService {
           organizationName: org.name, electionName: election.name, memberId: voter.memberId,
           link: this.voterLink(org.slug, election.id, voter),
           votingOpensAt: election.votingOpensAt, votingClosesAt: election.votingClosesAt,
-          ...(resultsSummary ? { resultsText: resultsSummary.text, resultsSms: resultsSummary.sms, announcement: election.announcement } : {}),
+          ...(resultsSummary ? { results: resultsSummary, announcement: election.announcement } : {}),
         };
         const { subject, text } = renderVoterMessage(batch.kind, ctx);
         try {
@@ -1473,25 +1474,9 @@ export class PlatformService {
     return this.report(electionId);
   }
 
-  /** Plain-text results (email) and a one-line version (SMS) built from the published report. */
-  private async resultsSummary(electionId: string): Promise<{ text: string; sms: string }> {
-    const r = await this.report(electionId);
-    const lines: string[] = [
-      `Turnout: ${r.ballotsCast} of ${r.eligibleVoters} eligible voters (${r.turnoutPercent}%).`,
-    ];
-    const winners: string[] = [];
-    for (const p of r.positions) {
-      lines.push('', `${p.position} (${p.seats} seat${p.seats === 1 ? '' : 's'})`);
-      p.results.forEach((c, i) => {
-        const elected = i < p.seats && c.votes > 0;
-        lines.push(`  ${c.candidate}: ${c.votes} vote${c.votes === 1 ? '' : 's'}${elected ? '  - elected' : ''}`);
-      });
-      if (p.abstentions) lines.push(`  Abstentions: ${p.abstentions}`);
-      const names = p.results.slice(0, p.seats).filter((c) => c.votes > 0).map((c) => c.candidate);
-      if (names.length) winners.push(`${p.position}: ${names.join(', ')}`);
-    }
-    const sms = winners.length ? `Elected - ${winners.join('; ')}`.slice(0, 280) : '';
-    return { text: lines.join('\n'), sms };
+  /** Who won each position, from the published report, for the results announcement. */
+  private async resultsSummary(electionId: string): Promise<ResultsSummary> {
+    return summarizeResults(await this.report(electionId));
   }
 
   /** Structured election report (FR-RES-007/009). */

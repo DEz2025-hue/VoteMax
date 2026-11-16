@@ -3,6 +3,7 @@ import { logEvent } from '../common/logger';
 import { AfricaTalkingSmsSender, WebhookSmsSender } from '../otp/otp-delivery';
 import { HttpEmailSender } from '../mail/email-api';
 import type { NotificationKind } from '../store/types';
+import { renderResultsEmail, renderResultsSms, type ResultsSummary } from './results-email';
 
 /**
  * Bulk voter notifications (invitations + scheduled reminders). Each message
@@ -44,10 +45,8 @@ export interface NotificationContext {
   link: string;
   votingOpensAt: string | null;
   votingClosesAt: string | null;
-  /** Plain-text results summary (results notifications only). */
-  resultsText?: string;
-  /** Short one-line results summary for SMS (results notifications only). */
-  resultsSms?: string;
+  /** Who won what (results notifications only). */
+  results?: ResultsSummary;
   announcement?: string | null;
 }
 
@@ -86,22 +85,18 @@ export function renderVoterMessage(kind: NotificationKind, ctx: NotificationCont
           `Hello,\n\nVoting for "${ctx.electionName}" (${ctx.organizationName}) closes soon.${window}\n\n` +
           `Your member ID: ${ctx.memberId}\nVote here: ${ctx.link}\n\nThis is your final reminder - ballots cannot be cast after closing.` + NO_REPLY_NOTE,
       };
-    case 'results':
-      // No personal link or member ID: results are the same for everyone.
-      return {
-        subject: `Results - ${ctx.electionName}`,
-        text:
-          `Hello,\n\nThe results of "${ctx.electionName}" (${ctx.organizationName}) have been published.\n\n` +
-          (ctx.announcement ? `${ctx.announcement}\n\n` : '') +
-          `${ctx.resultsText ?? ''}` + NO_REPLY_NOTE,
-      };
+    case 'results': {
+      // The official announcement: same for everyone, no personal link or member ID.
+      const email = renderResultsEmail(ctx, ctx.results ?? { totalVotes: 0, positions: [] });
+      return { subject: email.subject, text: email.text + NO_REPLY_NOTE };
+    }
   }
 }
 
 /** Short SMS version: who, which election, the member ID and the link. */
 export function renderVoterSms(kind: NotificationKind, ctx: NotificationContext): string {
   if (kind === 'results') {
-    return `${ctx.organizationName}: results of "${ctx.electionName}" are published. ${ctx.resultsSms ?? ''}`.trim();
+    return renderResultsSms(ctx, ctx.results ?? { totalVotes: 0, positions: [] });
   }
   const lead =
     kind === 'invite' ? `${ctx.organizationName}: you can vote in "${ctx.electionName}".`
