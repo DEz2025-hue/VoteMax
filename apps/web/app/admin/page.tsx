@@ -42,11 +42,10 @@ const ROLES = [
 const LIFECYCLE_STEPS = [
   ['CONFIGURED', 'Mark configured'],
   ['REGISTRATION', 'Open registration'],
-  ['READY', 'Mark ready'],
-  ['OPEN', 'Open voting'],
 ] as const;
 
 // Mirrors TRANSITION_CAPABILITIES in apps/api/src/auth/session.guard.ts.
+// An election becomes Ready when its register is frozen, and opens by itself at its start time.
 const TRANSITION_CAPS: Record<string, string> = {
   CONFIGURED: 'election.configure',
   REGISTRATION: 'election.configure',
@@ -867,8 +866,8 @@ export default function AdminPage() {
       <>
         {statusKind === 'error' && <Alert kind="error" title="Console status">{status}</Alert>}
         {(() => {
-          // An election opens by itself (and sends its reminder) only once it is READY. Warn
-          // when the opening time is near or past and it has not got that far.
+          // An election becomes READY when its register is frozen, then opens by itself. Warn
+          // when the opening time is near or past and the register is still open.
           if (!election?.votingOpensAt || !['DRAFT', 'CONFIGURED', 'REGISTRATION', 'REGISTER_FROZEN'].includes(election.state)) return null;
           const mins = Math.round((new Date(election.votingOpensAt).getTime() - Date.now()) / 60_000);
           if (mins > 60) return null;
@@ -876,13 +875,12 @@ export default function AdminPage() {
           const closed = election.votingClosesAt && new Date(election.votingClosesAt).getTime() <= Date.now();
           return mins <= 0 ? (
             <Alert kind="warning" title={`"${election.name}" should have opened by now`}>
-              It is still in the <strong>{stage}</strong> stage, so it will not open on its own. Automatic start and the opening reminder only work once the election is marked <strong>Ready</strong>.
-              Go to Election setup, Review &amp; launch: freeze the register, then click Mark ready.{closed ? ' Its closing time has also passed, so after marking it Ready, extend the closing time in the Schedule panel.' : ''}
+              It is still in the <strong>{stage}</strong> stage, so it will not open on its own. Freeze the voter register (Election setup, Review &amp; launch) and it opens by itself.{closed ? ' Its closing time has also passed, so afterwards extend the closing time in the Schedule panel.' : ''}
             </Alert>
           ) : (
-            <Alert kind="warning" title={`"${election.name}" opens in ${mins} minute${mins === 1 ? '' : 's'} but is not Ready yet`}>
-              It is still in the <strong>{stage}</strong> stage. It will only open automatically, and send its reminder, if it is marked <strong>Ready</strong> before then
-              (Election setup, Review &amp; launch: freeze the register, then Mark ready).
+            <Alert kind="warning" title={`"${election.name}" opens in ${mins} minute${mins === 1 ? '' : 's'} but its register is not frozen yet`}>
+              It is still in the <strong>{stage}</strong> stage. It will only open automatically, and send its reminder, if the voter register is frozen before then
+              (Election setup, Review &amp; launch: Freeze register).
             </Alert>
           );
         })()}
@@ -1058,7 +1056,7 @@ export default function AdminPage() {
                   <div className="schedule-switches">
                     <label className="check-row">
                       <input type="checkbox" name="autoOpen" defaultChecked={election?.autoOpen ?? true} disabled={!!election && election.state !== 'DRAFT'} />
-                      <span><strong>Start voting automatically</strong><span className="muted small"> - a ready election opens by itself at the opening time.</span></span>
+                      <span><strong>Start voting automatically</strong><span className="muted small"> - once the register is frozen, the election opens by itself at the opening time.</span></span>
                     </label>
                     <label className="check-row">
                       <input type="checkbox" name="autoClose" defaultChecked={election?.autoClose ?? true} disabled={!!election && election.state !== 'DRAFT'} />
@@ -1245,7 +1243,7 @@ export default function AdminPage() {
                         <div className="schedule-switches">
                           <label className="check-row">
                             <input type="checkbox" name="autoOpen" defaultChecked={election.autoOpen} disabled={!editable || !preOpen} />
-                            <span><strong>Start automatically</strong><span className="muted small"> at the opening time (once the election is ready).</span></span>
+                            <span><strong>Start automatically</strong><span className="muted small"> at the opening time (once the register is frozen).</span></span>
                           </label>
                           <label className="check-row">
                             <input type="checkbox" name="autoClose" defaultChecked={election.autoClose} disabled={!editable} />
@@ -1270,6 +1268,9 @@ export default function AdminPage() {
                         {label}
                       </Button>
                     ))}
+                    {election?.state === 'READY' && election.autoOpen === false && (
+                      <Button variant="primary" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Open voting', message: 'Open voting now? Automatic start is switched off for this election.', action: () => void act('Open voting', async () => { await call(`/elections/${electionId}/transition`, { to: 'OPEN' }); await refreshElection(); await refreshElections(); }) })}>Open voting</Button>
+                    )}
                     <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
                     <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.freeze')}
                       title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze - assigned to organization_owner'}
@@ -1309,7 +1310,7 @@ export default function AdminPage() {
                         ))}
                       </Table>
                     )}
-                    {notifyBatches.length === 0 && <p className="small muted">No invitations sent yet. Reminders are sent automatically 10 minutes before voting opens and closes, to voters who have not voted yet (the opening reminder needs the election to be Ready).</p>}
+                    {notifyBatches.length === 0 && <p className="small muted">No invitations sent yet. Reminders are sent automatically 10 minutes before voting opens and closes, to voters who have not voted yet (the opening reminder needs the register to be frozen).</p>}
                   </div>
 
                   <div className="form-actions">
@@ -1347,7 +1348,10 @@ export default function AdminPage() {
                 <Button variant="secondary" size="sm" disabled={!electionId || !cap('register.freeze')}
                   title={cap('register.freeze') ? 'Seal the imported register for voting (organization_owner)' : 'Requires register.freeze - assigned to organization_owner'}
                   onClick={() => setConfirm({ title: 'Freeze register', message: 'Freeze the voter register? This seals it for voting - imports and configuration changes stop.', action: () => void act('Freeze register', async () => { await call(`/elections/${electionId}/register/freeze`, {}); await refreshElection(); }) })}>Freeze register</Button>
-                <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
+                {election?.state === 'READY' && election.autoOpen === false && (
+                      <Button variant="primary" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Open voting', message: 'Open voting now? Automatic start is switched off for this election.', action: () => void act('Open voting', async () => { await call(`/elections/${electionId}/transition`, { to: 'OPEN' }); await refreshElection(); await refreshElections(); }) })}>Open voting</Button>
+                    )}
+                    <Button variant="danger" size="sm" disabled={!electionId || !cap('election.openClose')} onClick={() => setConfirm({ title: 'Close voting', message: 'Close voting for this election?', action: () => void act('Close voting', async () => { await call(`/elections/${electionId}/close`, {}); await refreshElection(); }) })}>Close voting</Button>
               </div>
               {registerImportBox}
               <div style={{ marginTop: 18 }}>

@@ -47,7 +47,7 @@ const STATE_LABEL: Record<string, string> = {
   DRAFT: 'a draft',
   CONFIGURED: 'configured',
   REGISTRATION: 'in voter registration',
-  REGISTER_FROZEN: 'waiting to be marked ready',
+  REGISTER_FROZEN: 'ready to open',
   READY: 'ready to open',
   OPEN: 'open for voting',
   SUSPENDED: 'paused',
@@ -64,9 +64,9 @@ const STATE_LABEL: Record<string, string> = {
 const STATE_NEXT_STEP: Record<string, string> = {
   DRAFT: 'Finish the election details and ballot in Election setup.',
   CONFIGURED: 'Open voter registration, import your voters, then lock the register.',
-  REGISTRATION: 'Import your voters, resolve any duplicates, lock the register, then mark the election ready and open voting.',
-  REGISTER_FROZEN: 'Mark the election ready, then open voting.',
-  READY: 'Open voting when you are ready to start.',
+  REGISTRATION: 'Import your voters, resolve any duplicates, lock the register, and the election opens by itself at its start time.',
+  REGISTER_FROZEN: 'Voting opens by itself at the start time.',
+  READY: 'Voting opens by itself at the start time.',
   OPEN: 'Close voting once the voting window has ended.',
   SUSPENDED: 'Resume voting, or close it if the election is over.',
   CLOSED: 'Run the tally next.',
@@ -157,7 +157,7 @@ export function toFriendly(raw: string, status = 0): FriendlyError {
       if (d.includes('at least one position')) return make(code, raw, 'guidance', 'One more thing first', 'Add at least one position to the ballot before continuing.');
       if (d.includes('at least one candidate')) return make(code, raw, 'guidance', 'One more thing first', 'Add at least one candidate before continuing.');
       if (d.includes('voting window')) return make(code, raw, 'guidance', 'One more thing first', 'Set when voting opens and closes before continuing.', 'You can do this in the Details step of Election setup.');
-      if (d.includes('register must be frozen')) return make(code, raw, 'guidance', 'One more thing first', 'Lock the voter register before marking the election ready.');
+      if (d.includes('register must be frozen')) return make(code, raw, 'guidance', 'One more thing first', 'Lock the voter register first.');
       const dup = /(\d+)\s+duplicate/.exec(detail);
       if (dup) return make(code, raw, 'guidance', 'One more thing first', `Resolve the ${dup[1]} duplicate voter ${Number(dup[1]) === 1 ? 'record' : 'records'} before locking the register.`, 'Open Voter registrar and choose "Eligible" or "Ineligible" for each one.');
       if (d.startsWith('waiting for')) return make(code, raw, 'guidance', 'Waiting for sign-off', `${detail.replace(/^./, (c) => c.toUpperCase())}.`, 'They can approve under Results and reports; the form fills in once they do.');

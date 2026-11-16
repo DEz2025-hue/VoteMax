@@ -41,7 +41,7 @@ describe('Phase 2 core workflows', () => {
     ].join('\n');
     await expect(svc.importRegister(registrarId, election.id, csv)).resolves.toMatchObject({ eligible: 2, duplicates: 0 });
     const frozen = await svc.freezeRegister(registrarId, election.id);
-    expect(frozen.state).toBe('REGISTER_FROZEN');
+    expect(frozen.state).toBe('READY'); // sealing the register is what makes it ready
     expect(frozen.registerHash).toBeTruthy();
     expect((await svc.transition(adminId, election.id, 'READY')).state).toBe('READY');
   });

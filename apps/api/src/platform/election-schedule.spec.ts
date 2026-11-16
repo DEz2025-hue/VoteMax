@@ -33,6 +33,27 @@ beforeEach(async () => {
   ownerId = (await svc.createUser(orgId, 'owner@sched.org', 'Owner', 'pw-long-enough')).id;
 });
 
+describe('ready without a separate step', () => {
+  it('freezing the register makes the election Ready, with no extra "mark ready"', async () => {
+    const e = await svc.createElection(ownerId, orgId, { name: 'Auto', votingOpensAt: iso(T0 + H), votingClosesAt: iso(T0 + 2 * H) });
+    const pos = await svc.addPosition(ownerId, e.id, 'President', 1, 1);
+    await svc.addCandidate(ownerId, e.id, pos.id, 'Ada Kamara');
+    await svc.transition(ownerId, e.id, 'CONFIGURED');
+    await svc.transition(ownerId, e.id, 'REGISTRATION');
+    await svc.importRegister(ownerId, e.id, 'memberId,fullName,email\nM1,One,one@example.org');
+    await svc.freezeRegister(ownerId, e.id);
+    expect(await stateOf(e.id)).toBe('READY');
+    expect(await svc.runElectionSchedule(e.id, T0 + H)).toBe('opened');
+  });
+
+  it('picks up an election frozen before this change and opens it on time', async () => {
+    const e = await readyElection(T0 - H, T0 + H);
+    await store.updateElection(e.id, { state: 'REGISTER_FROZEN' });
+    expect(await svc.runElectionSchedule(e.id, T0)).toBe('opened');
+    expect(await stateOf(e.id)).toBe('OPEN');
+  });
+});
+
 describe('automatic start', () => {
   it('opens a READY election only once its opening time has come', async () => {
     const e = await readyElection(T0 + H, T0 + 2 * H);

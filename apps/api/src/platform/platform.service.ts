@@ -578,6 +578,8 @@ export class PlatformService {
 
   async transition(actorId: string, electionId: string, to: ElectionState): Promise<Election> {
     const election = await this.electionOrThrow(electionId);
+    // Freezing the register already makes an election Ready, so asking again is a harmless no-op.
+    if (to === 'READY' && election.state === 'READY') return election;
     assertTransition(election.state, to);
     if (DEDICATED_TRANSITIONS.has(to)) {
       throw new Error(`INVALID_TRANSITION: ${to} must be reached through its dedicated workflow`);
@@ -657,11 +659,13 @@ export class PlatformService {
       throw new Error(`RECONCILIATION: entitlements (${entitlements.length}) != eligible voters (${eligible.length})`);
     }
     const hash = registerHash(records);
-    await this.store.updateElection(electionId, { registerHash: hash, state: 'REGISTER_FROZEN' });
+    // A sealed register is what makes an election Ready, so there is no separate "mark ready" step.
+    await this.store.updateElection(electionId, { registerHash: hash, state: 'READY' });
     election.registerHash = hash;
-    election.state = 'REGISTER_FROZEN';
+    election.state = 'READY';
     await this.log(election.organizationId, actorId, 'register.freeze', `election:${electionId}`,
       `success:eligible=${eligible.length},hash=${hash}`);
+    await this.log(election.organizationId, actorId, 'election.transition', `election:${electionId}`, 'success:READY');
     return election;
   }
 
@@ -1225,6 +1229,12 @@ export class PlatformService {
     if (!election || !election.votingOpensAt || !election.votingClosesAt) return null;
     const opens = new Date(election.votingOpensAt).getTime();
     const closes = new Date(election.votingClosesAt).getTime();
+
+    // Elections whose register was sealed before freezing implied Ready: promote them now.
+    if (election.state === 'REGISTER_FROZEN' && (await this.store.updateElectionStateIf(election.id, 'REGISTER_FROZEN', 'READY'))) {
+      election.state = 'READY';
+      await this.log(election.organizationId, SCHEDULER_ACTOR, 'election.transition', `election:${election.id}`, 'success:READY');
+    }
 
     if (election.autoOpen && election.state === 'READY' && now >= opens && now < closes) {
       await this.prepareKeys(election);
