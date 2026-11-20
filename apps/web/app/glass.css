@@ -1,0 +1,182 @@
+/*
+ * VoteMax "Liquid Glass" layer.
+ *
+ * Follows Apple's Liquid Glass guidance: glass is a functional layer for chrome and
+ * navigation (header, sidebar, tabs, sheets, dialogs, toasts) floating above content; the
+ * content itself (tables, forms, ballots, results) stays on near-solid surfaces so text keeps
+ * its contrast. Shapes are rounder and concentric, motion is soft, and the material falls
+ * back to solid surfaces when the browser lacks backdrop-filter or the person asks for
+ * reduced transparency / more contrast.
+ *
+ * Loaded after globals.css; everything here overrides tokens and surfaces only.
+ */
+
+:root {
+  /* rounder, concentric corners: inner radius = outer radius - padding */
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+
+  /* the material */
+  --glass-fill: rgb(255 255 255 / 0.62);
+  --glass-fill-strong: rgb(255 255 255 / 0.80);
+  --glass-fill-dark: rgb(15 37 71 / 0.80);
+  --glass-edge: rgb(255 255 255 / 0.70);
+  --glass-edge-dark: rgb(255 255 255 / 0.16);
+  --glass-shadow: 0 10px 34px rgb(15 37 71 / 0.12), 0 2px 6px rgb(15 37 71 / 0.06);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.85), inset 0 -1px 0 rgb(255 255 255 / 0.25);
+  --glass-solid: #ffffff;
+
+  --shadow-sm: 0 1px 2px rgb(15 37 71 / 0.05), 0 4px 14px rgb(15 37 71 / 0.05);
+  --shadow-md: 0 14px 44px rgb(15 37 71 / 0.16);
+  --ease-glass: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Something for the glass to refract: a soft, fixed colour wash behind everything. */
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(60rem 40rem at 8% -6%, rgb(96 165 250 / 0.30), transparent 60%),
+    radial-gradient(52rem 38rem at 96% 4%, rgb(167 139 250 / 0.22), transparent 58%),
+    radial-gradient(60rem 44rem at 70% 108%, rgb(45 212 191 / 0.20), transparent 60%);
+  background-attachment: fixed;
+}
+.ps-shell { background: transparent; }
+
+/* ---------- glass chrome (navigation, sheets, dialogs, toasts) ---------- */
+.site-header,
+.ps-drawer,
+.modal,
+.toast-card,
+.auth-card .card,
+.ps-topbar .ps-icon-btn,
+.stepper {
+  background: var(--glass-solid);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  @media (prefers-reduced-transparency: no-preference) {
+    .site-header {
+      background: var(--glass-fill);
+      -webkit-backdrop-filter: blur(22px) saturate(180%);
+      backdrop-filter: blur(22px) saturate(180%);
+      border-bottom: 1px solid var(--glass-edge);
+      box-shadow: 0 1px 0 rgb(15 37 71 / 0.05), var(--glass-highlight);
+    }
+    .ps-sidebar {
+      background: var(--glass-fill-dark);
+      -webkit-backdrop-filter: blur(24px) saturate(170%);
+      backdrop-filter: blur(24px) saturate(170%);
+      border-right: 1px solid var(--glass-edge-dark);
+      box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.06);
+    }
+    .modal,
+    .toast-card,
+    .ps-drawer,
+    .auth-card .card {
+      background: var(--glass-fill-strong);
+      -webkit-backdrop-filter: blur(26px) saturate(180%);
+      backdrop-filter: blur(26px) saturate(180%);
+      border: 1px solid var(--glass-edge);
+      box-shadow: var(--shadow-md), var(--glass-highlight);
+    }
+    .modal-backdrop,
+    .toast-overlay,
+    .ps-drawer-backdrop {
+      background: rgb(15 37 71 / 0.28);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+    }
+    .stepper {
+      background: var(--glass-fill);
+      -webkit-backdrop-filter: blur(18px) saturate(170%);
+      backdrop-filter: blur(18px) saturate(170%);
+    }
+  }
+}
+
+.modal, .toast-card, .ps-drawer { border-radius: var(--radius-lg); }
+.ps-drawer { border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
+.toast-card { border-left-width: 1px; }
+.toast-card.error { border-left-color: var(--glass-edge); box-shadow: var(--shadow-md), var(--glass-highlight), inset 4px 0 0 var(--danger); }
+.toast-card:not(.error) { box-shadow: var(--shadow-md), var(--glass-highlight), inset 4px 0 0 var(--success); }
+
+/* ---------- content surfaces: soft, rounded, still readable ---------- */
+.card, .ps-panel, .ps-kpi {
+  background: rgb(255 255 255 / 0.86);
+  border: 1px solid rgb(255 255 255 / 0.9);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm), var(--glass-highlight);
+}
+.ps-panel { border-radius: var(--radius-md); }
+.ps-kpi { border-radius: var(--radius-md); }
+.table-wrap { border-radius: var(--radius-sm); background: #fff; }
+.alert { border-radius: var(--radius-sm); }
+.ps-panel-head { border-bottom-color: rgb(15 37 71 / 0.07); }
+
+/* ---------- controls: pill-shaped, light-catching ---------- */
+.btn {
+  border-radius: 999px;
+  transition: background .2s var(--ease-glass), border-color .2s var(--ease-glass), box-shadow .2s var(--ease-glass), transform .18s var(--ease-glass);
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn-primary {
+  background: linear-gradient(180deg, #4f8cff 0%, var(--blue-600) 100%);
+  box-shadow: 0 6px 18px rgb(37 99 235 / 0.32), inset 0 1px 0 rgb(255 255 255 / 0.38);
+}
+.btn-primary:hover:not(:disabled) { background: linear-gradient(180deg, #5b95ff 0%, var(--blue-700) 100%); box-shadow: 0 8px 22px rgb(37 99 235 / 0.38), inset 0 1px 0 rgb(255 255 255 / 0.42); }
+.btn-secondary {
+  background: rgb(255 255 255 / 0.72);
+  border-color: rgb(15 37 71 / 0.12);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
+}
+.btn-secondary:hover:not(:disabled) { background: rgb(255 255 255 / 0.95); border-color: rgb(37 99 235 / 0.45); }
+.btn-ghost:hover:not(:disabled) { background: rgb(37 99 235 / 0.08); }
+.btn-danger { border-color: rgb(220 38 38 / 0.25); }
+
+.input, .field input, .field select, .field textarea {
+  background: rgb(255 255 255 / 0.9);
+  border-color: rgb(15 37 71 / 0.14);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 2px rgb(15 37 71 / 0.05);
+  transition: border-color .15s var(--ease-glass), box-shadow .15s var(--ease-glass);
+}
+.input:focus, .field input:focus, .field select:focus, .field textarea:focus {
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 0.16);
+}
+
+.nav-link { border-radius: 999px; transition: background .2s var(--ease-glass), color .2s var(--ease-glass); }
+.nav-link:hover { background: rgb(255 255 255 / 0.7); }
+.nav-link.active { background: rgb(37 99 235 / 0.12); }
+
+.choice { border-radius: var(--radius-sm); background: rgb(255 255 255 / 0.88); transition: border-color .2s var(--ease-glass), background .2s var(--ease-glass), transform .18s var(--ease-glass); }
+.choice:active { transform: scale(0.995); }
+
+.ps-tabs { border-bottom-color: rgb(15 37 71 / 0.08); }
+.ps-tabs button { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+
+/* ---------- accessibility fallbacks: solid surfaces, no blur ---------- */
+@media (prefers-reduced-transparency: reduce) {
+  body { background-image: none; }
+  .site-header, .modal, .toast-card, .ps-drawer, .auth-card .card, .stepper { background: #fff; }
+  .ps-sidebar { background: var(--navy-900); }
+  .card, .ps-panel, .ps-kpi { background: #fff; }
+}
+
+@media (prefers-contrast: more) {
+  :root { --glass-edge: rgb(15 37 71 / 0.55); --glass-edge-dark: rgb(255 255 255 / 0.5); }
+  body { background-image: none; }
+  .site-header, .modal, .toast-card, .ps-drawer, .auth-card .card, .stepper, .card, .ps-panel, .ps-kpi {
+    background: #fff;
+    border: 2px solid rgb(15 37 71 / 0.7);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .ps-sidebar { background: var(--navy-900); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .btn-secondary { border: 2px solid currentColor; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .nav-link, .choice, .input, .field input { transition: none; }
+  .btn:active:not(:disabled), .choice:active { transform: none; }
+}

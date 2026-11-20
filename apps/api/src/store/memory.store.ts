@@ -107,11 +107,6 @@ export class InMemoryStore implements PlatformStore {
     return this.users.size;
   }
 
-  async setUserTotpSecret(id: string, totpSecret: string): Promise<void> {
-    const u = this.users.get(id);
-    if (u) { u.totpSecret = totpSecret; u.mfaEnrolled = true; }
-  }
-
   async revokeUserSessions(userId: string): Promise<void> {
     for (const s of this.sessions.values()) if (s.userId === userId && !s.revokedAt) s.revokedAt = Date.now();
   }

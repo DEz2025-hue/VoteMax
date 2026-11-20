@@ -1,39 +1,8 @@
 /**
- * Shared helpers for the local load/failure scripts: RFC 6238 TOTP
- * (mirrors apps/api/src/auth/credentials.ts) and an authenticated API
- * client. Admin endpoints require a session token + capability (F-03/F-05);
+ * Shared helpers for the local load/failure scripts: an authenticated API
+ * client (staff sign-in uses the emailed code, returned by non-production APIs). Admin endpoints require a session token + capability (F-03/F-05);
  * voter-facing endpoints are public.
  */
-import { createHmac } from 'node:crypto';
-
-const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-
-function base32Decode(secret) {
-  const clean = secret.replace(/[\s=-]/g, '').toUpperCase();
-  const bytes = [];
-  let bits = 0, value = 0;
-  for (const ch of clean) {
-    const idx = B32.indexOf(ch);
-    if (idx < 0) throw new Error('Invalid base32 secret');
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) { bytes.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
-  }
-  return Buffer.from(bytes);
-}
-
-export function totpCode(secret, timeMs = Date.now(), digits = 6) {
-  const counter = Math.floor(timeMs / 1000 / 30);
-  const buf = Buffer.alloc(8);
-  buf.writeBigInt64BE(BigInt(counter));
-  const hmac = createHmac('sha1', base32Decode(secret)).update(buf).digest();
-  const offset = hmac[hmac.length - 1] & 0x0f;
-  const binary =
-    ((hmac[offset] & 0x7f) << 24) | ((hmac[offset + 1] & 0xff) << 16) |
-    ((hmac[offset + 2] & 0xff) << 8) | (hmac[offset + 3] & 0xff);
-  return String(binary % 10 ** digits).padStart(digits, '0');
-}
-
 export async function apiPost(API, path, body, token) {
   const res = await fetch(`${API}${path}`, {
     method: 'POST',

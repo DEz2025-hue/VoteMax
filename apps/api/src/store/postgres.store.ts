@@ -134,10 +134,6 @@ export class PostgresStore implements PlatformStore {
     return row.n;
   }
 
-  async setUserTotpSecret(id: string, totpSecret: string): Promise<void> {
-    await this.database.update(schema.users).set({ totpSecret, mfaEnrolled: true }).where(eq(schema.users.id, id));
-  }
-
   async revokeUserSessions(userId: string): Promise<void> {
     await this.database.update(schema.sessions)
       .set({ revokedAt: new Date() })

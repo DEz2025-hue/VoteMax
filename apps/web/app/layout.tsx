@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import './globals.css';
+import './glass.css';
 import SwRegister from './sw-register';
 import SiteNav from '../components/site-nav';
 
