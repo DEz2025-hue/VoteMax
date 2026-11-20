@@ -20,6 +20,8 @@
   /* the material */
   --glass-fill: rgb(255 255 255 / 0.62);
   --glass-fill-strong: rgb(255 255 255 / 0.80);
+  /* sheets and dialogs hold forms and text, so they get a much denser fill than navigation */
+  --glass-fill-sheet: rgb(255 255 255 / 0.93);
   --glass-fill-dark: rgb(15 37 71 / 0.80);
   --glass-edge: rgb(255 255 255 / 0.70);
   --glass-edge-dark: rgb(255 255 255 / 0.16);
@@ -70,11 +72,17 @@ body {
       border-right: 1px solid var(--glass-edge-dark);
       box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.06);
     }
+    .toast-card {
+      background: var(--glass-fill-strong);
+      -webkit-backdrop-filter: blur(26px) saturate(180%);
+      backdrop-filter: blur(26px) saturate(180%);
+      border: 1px solid var(--glass-edge);
+      box-shadow: var(--shadow-md), var(--glass-highlight);
+    }
     .modal,
-    .toast-card,
     .ps-drawer,
     .auth-card .card {
-      background: var(--glass-fill-strong);
+      background: var(--glass-fill-sheet);
       -webkit-backdrop-filter: blur(26px) saturate(180%);
       backdrop-filter: blur(26px) saturate(180%);
       border: 1px solid var(--glass-edge);
