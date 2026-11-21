@@ -79,7 +79,7 @@ describe('voter notifications', () => {
     const generated = (await store.listVoters(electionId)).filter((v) => v.fullName.endsWith('No-Id'));
     expect(generated).toHaveLength(2);
     expect(new Set(generated.map((v) => v.memberId)).size).toBe(2);
-    for (const v of generated) expect(v.memberId).toMatch(/^VM-[A-HJKMNP-Z2-9]{8}$/);
+    for (const v of generated) expect(v.memberId).toMatch(/^PGA-[A-HJKMNP-Z2-9]{8}$/);
 
     const batch = await svc.notifyVoters(adminId, electionId, 'invite');
     await waitForBatch(batch.id);

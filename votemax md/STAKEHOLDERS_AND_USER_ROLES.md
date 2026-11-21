@@ -20,7 +20,7 @@
 
 ## 1. Purpose
 
-This document identifies who has a stake in VoteMax and defines the user roles, their responsibilities, their permissions, and the separation-of-duties rules that protect election integrity.
+This document identifies who has a stake in PGA and defines the user roles, their responsibilities, their permissions, and the separation-of-duties rules that protect election integrity.
 
 Permissions defined here must be **enforced on the server**, not merely hidden in the interface (EMP-FOUND-001 section 8.2).
 

@@ -47,8 +47,8 @@ if (to) {
   try {
     const info = await transporter.sendMail({
       from, to,
-      subject: 'VoteMax SMTP test',
-      text: 'If you can read this, VoteMax can send invitations and verification codes from this mailbox.',
+      subject: 'PGA SMTP test',
+      text: 'If you can read this, PGA can send invitations and verification codes from this mailbox.',
     });
     console.log(`OK  test email accepted for ${to} (${info.messageId}). Check the inbox AND the spam folder.`);
   } catch (err) {

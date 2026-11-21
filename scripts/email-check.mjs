@@ -6,7 +6,7 @@
  * Usage (PowerShell; your key stays in your shell, never in the repo):
  *   $env:EMAIL_PROVIDER="brevo"        # or resend | sendgrid
  *   $env:EMAIL_API_KEY="<api key>"
- *   $env:EMAIL_FROM="VoteMax <elections@your-domain>"   # must be a verified sender
+ *   $env:EMAIL_FROM="PGA <elections@your-domain>"   # must be a verified sender
  *   node scripts/email-check.mjs someone@real-address.com
  */
 const env = process.env;
@@ -22,8 +22,8 @@ if (!['brevo', 'resend', 'sendgrid'].includes(provider) || !key || !fromRaw || !
 
 const m = /^\s*(?:"?([^"<]*?)"?\s*)?<([^>]+)>\s*$/.exec(fromRaw);
 const from = m ? { name: m[1]?.trim() || undefined, email: m[2].trim() } : { email: fromRaw.trim() };
-const subject = 'VoteMax email test';
-const text = 'If you can read this, VoteMax can send invitations and verification codes through this provider.';
+const subject = 'PGA email test';
+const text = 'If you can read this, PGA can send invitations and verification codes through this provider.';
 
 const requests = {
   brevo: ['https://api.brevo.com/v3/smtp/email', { 'api-key': key }, { sender: from, to: [{ email: to }], subject, textContent: text }],

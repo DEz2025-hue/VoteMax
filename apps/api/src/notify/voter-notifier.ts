@@ -52,7 +52,7 @@ export interface NotificationContext {
 
 /** Sent from a no-reply address, so say so and point voters to a real contact. */
 export const NO_REPLY_NOTE =
-  '\n\n--\nThis is an automated message from VoteMax. Please do not reply to it; if you need help, contact your election officer.';
+  '\n\n--\nThis is an automated message from PGA. Please do not reply to it; if you need help, contact your election officer.';
 
 export function renderVoterMessage(kind: NotificationKind, ctx: NotificationContext): { subject: string; text: string } {
   const window =
@@ -119,7 +119,7 @@ export class VoterNotifier {
   private readonly devAllowed: boolean;
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
-    this.from = env.SMTP_FROM ?? env.SMTP_USER ?? 'VoteMax <no-reply@votemax.local>';
+    this.from = env.SMTP_FROM ?? env.SMTP_USER ?? 'PGA <no-reply@pga.local>';
     this.devAllowed = env.NODE_ENV !== 'production';
     this.httpEmail = new HttpEmailSender(env);
     if (env.SMTP_HOST) {

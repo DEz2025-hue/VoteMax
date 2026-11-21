@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'VoteMax by ClaMax Group',
-    short_name: 'VoteMax',
+    name: 'PGA by ClaMax Group',
+    short_name: 'PGA',
     description: 'Secure organizational elections - register, vote privately, verify results.',
     start_url: '/',
     display: 'standalone',

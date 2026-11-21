@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderVoterSms, VoterNotifier } from './voter-notifier';
 
 const ctx = {
-  organizationName: 'Acme', electionName: 'Board 2026', memberId: 'VM-ABCD2345',
-  link: 'https://vote.example/vote?org=acme&election=e1&id=VM-ABCD2345',
+  organizationName: 'Acme', electionName: 'Board 2026', memberId: 'PGA-ABCD2345',
+  link: 'https://vote.example/vote?org=acme&election=e1&id=PGA-ABCD2345',
   votingOpensAt: null, votingClosesAt: null,
 };
 const msg = { subject: 's', text: 'full email body', sms: renderVoterSms('invite', ctx) };
@@ -13,8 +13,8 @@ afterEach(() => vi.unstubAllGlobals());
 describe('voter SMS text', () => {
   it('contains the member ID, the personal link and a never-share warning', () => {
     const sms = renderVoterSms('invite', ctx);
-    expect(sms).toContain('VM-ABCD2345');
-    expect(sms).toContain('&id=VM-ABCD2345');
+    expect(sms).toContain('PGA-ABCD2345');
+    expect(sms).toContain('&id=PGA-ABCD2345');
     expect(sms).toMatch(/never share/i);
   });
 });

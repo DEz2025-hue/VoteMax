@@ -16,7 +16,7 @@ function stubFetch(handler: (url: string) => { ok: boolean; status: number; text
 
 const env = (provider: string, extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({
   NODE_ENV: 'production', EMAIL_PROVIDER: provider, EMAIL_API_KEY: 'key-123',
-  EMAIL_FROM: 'VoteMax <elections@example.org>', ...extra,
+  EMAIL_FROM: 'PGA <elections@example.org>', ...extra,
 } as NodeJS.ProcessEnv);
 
 const msg = { to: 'voter@example.com', subject: 'Hi', text: 'Body' };
@@ -25,7 +25,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('parseFromAddress', () => {
   it('splits name and address, or accepts a bare address', () => {
-    expect(parseFromAddress('VoteMax <elections@example.org>')).toEqual({ name: 'VoteMax', email: 'elections@example.org' });
+    expect(parseFromAddress('PGA <elections@example.org>')).toEqual({ name: 'PGA', email: 'elections@example.org' });
     expect(parseFromAddress('"Vote Max" <a@b.co>')).toEqual({ name: 'Vote Max', email: 'a@b.co' });
     expect(parseFromAddress('a@b.co')).toEqual({ email: 'a@b.co' });
   });
@@ -49,7 +49,7 @@ describe('provider requests', () => {
     expect(url).toBe('https://api.brevo.com/v3/smtp/email');
     expect(init.headers['api-key']).toBe('key-123');
     expect(JSON.parse(init.body)).toEqual({
-      sender: { name: 'VoteMax', email: 'elections@example.org' }, to: [{ email: 'voter@example.com' }],
+      sender: { name: 'PGA', email: 'elections@example.org' }, to: [{ email: 'voter@example.com' }],
       subject: 'Hi', textContent: 'Body',
     });
   });
@@ -60,7 +60,7 @@ describe('provider requests', () => {
     const [url, init] = f.mock.calls[0] as unknown as Call;
     expect(url).toBe('https://api.resend.com/emails');
     expect(init.headers.authorization).toBe('Bearer key-123');
-    expect(JSON.parse(init.body)).toEqual({ from: 'VoteMax <elections@example.org>', to: ['voter@example.com'], subject: 'Hi', text: 'Body' });
+    expect(JSON.parse(init.body)).toEqual({ from: 'PGA <elections@example.org>', to: ['voter@example.com'], subject: 'Hi', text: 'Body' });
   });
 
   it('SendGrid: bearer auth and personalizations body', async () => {
@@ -70,7 +70,7 @@ describe('provider requests', () => {
     expect(url).toBe('https://api.sendgrid.com/v3/mail/send');
     expect(init.headers.authorization).toBe('Bearer key-123');
     expect(JSON.parse(init.body)).toEqual({
-      personalizations: [{ to: [{ email: 'voter@example.com' }] }], from: { email: 'elections@example.org', name: 'VoteMax' },
+      personalizations: [{ to: [{ email: 'voter@example.com' }] }], from: { email: 'elections@example.org', name: 'PGA' },
       subject: 'Hi', content: [{ type: 'text/plain', value: 'Body' }],
     });
   });

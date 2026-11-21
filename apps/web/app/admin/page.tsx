@@ -622,7 +622,7 @@ export default function AdminPage() {
         <strong>{csvName || 'Drop your voter CSV here'}</strong>
         <span className="muted small">or click to browse - you can also paste rows below</span>
       </div>
-      <Field label="Or paste CSV" htmlFor="register-csv" hint="fullName is required. Blank memberId cells get a unique VM- ID, which is sent to the voter with their voting link. Voters need an email or phone to receive it.">
+      <Field label="Or paste CSV" htmlFor="register-csv" hint="fullName is required. Blank memberId cells get a unique PGA- ID, which is sent to the voter with their voting link. Voters need an email or phone to receive it.">
         <Textarea
           id="register-csv"
           name="csv"

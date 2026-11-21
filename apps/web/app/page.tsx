@@ -23,7 +23,7 @@ export default function HomePage() {
       <section className="hero">
         <div className="container hero-grid">
           <div>
-            <span className="hero-badge"><i />VoteMax by ClaMax Group</span>
+            <span className="hero-badge"><i />PGA by ClaMax Group</span>
             <h1>Your Vote. Your Voice. Your Future.</h1>
             <p className="lede">
               A secure and transparent election platform that helps organizations
@@ -49,7 +49,7 @@ export default function HomePage() {
             <p className="eyebrow">Trust and security</p>
             <h2>Built for accountable elections</h2>
             <p>
-              VoteMax is designed around controls election officers and observers can
+              PGA is designed around controls election officers and observers can
               verify. The platform is still in pilot preparation, and live election
               authorization remains subject to the documented readiness gates.
             </p>

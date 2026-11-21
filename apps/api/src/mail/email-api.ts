@@ -8,7 +8,7 @@
  * Environment:
  *   EMAIL_PROVIDER = brevo | resend | sendgrid
  *   EMAIL_API_KEY  = the provider's API key
- *   EMAIL_FROM     = "VoteMax <elections@your-domain>" (must be a sender/domain
+ *   EMAIL_FROM     = "PGA <elections@your-domain>" (must be a sender/domain
  *                    verified with the provider; falls back to SMTP_FROM)
  *
  * When configured it is preferred over SMTP; SMTP remains the fallback.

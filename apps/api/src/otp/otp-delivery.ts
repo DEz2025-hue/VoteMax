@@ -29,7 +29,7 @@ export interface OtpSender {
 }
 
 function otpText(msg: OtpMessage): string {
-  return `Your Votemax verification code is ${msg.code}. It expires in 10 minutes. Do not share it with anyone.` +
+  return `Your PGA verification code is ${msg.code}. It expires in 10 minutes. Do not share it with anyone.` +
     (msg.email ? '\n\nThis is an automated message - please do not reply to it.' : '');
 }
 
@@ -66,7 +66,7 @@ export class SmtpOtpSender implements OtpSender {
     await this.transporter.sendMail({
       from: this.from,
       to: msg.email,
-      subject: 'Your Votemax verification code',
+      subject: 'Your PGA verification code',
       text: otpText(msg),
     });
   }
@@ -90,7 +90,7 @@ export class HttpEmailOtpSender implements OtpSender {
 
   async send(msg: OtpMessage): Promise<void> {
     if (!msg.email) throw new Error('No email address for delivery');
-    await this.api.send({ to: msg.email, subject: 'Your Votemax verification code', text: otpText(msg) });
+    await this.api.send({ to: msg.email, subject: 'Your PGA verification code', text: otpText(msg) });
   }
 }
 

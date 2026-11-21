@@ -6,7 +6,7 @@ import SwRegister from './sw-register';
 import SiteNav from '../components/site-nav';
 
 export const metadata = {
-  title: 'VoteMax by ClaMax Group',
+  title: 'PGA by ClaMax Group',
   description: 'Secure organizational elections - register, vote privately, verify results.',
 };
 
@@ -16,14 +16,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <header className="site-header">
           <div className="container site-header-inner">
-            <Link href="/" className="brand"><span className="brand-mark" aria-hidden="true">V</span>VoteMax</Link>
+            <Link href="/" className="brand"><span className="brand-mark" aria-hidden="true">P</span>PGA</Link>
             <SiteNav />
           </div>
         </header>
         {children}
         <footer className="site-footer">
           <div className="container site-footer-inner">
-            <span>© {new Date().getFullYear()} VoteMax by ClaMax Group</span>
+            <span>© {new Date().getFullYear()} PGA by ClaMax Group</span>
             <nav aria-label="Footer">
               <Link href="/vote">Vote</Link>
               <Link href="/help">How to vote</Link>

@@ -1,4 +1,4 @@
-# Votemax - Election Management Platform (EMP)
+# PGA - Election Management Platform (EMP)
 
 Secure, multi-tenant election platform for organizations. Pilot: organizational election. Governing documents live in `votemax md/` - start with `PROJECT_OVERVIEW.md`; code must follow them (EMP-SEC-001 SEC-SDL-01/02).
 
@@ -54,7 +54,7 @@ Configured via environment variables on the API:
 
 | Provider | Variables |
 |---|---|
-| Email API (Brevo, Resend or SendGrid) - **preferred** | `EMAIL_PROVIDER` (`brevo`\|`resend`\|`sendgrid`), `EMAIL_API_KEY`, `EMAIL_FROM` (a verified sender, e.g. `VoteMax <elections@your-domain>`) |
+| Email API (Brevo, Resend or SendGrid) - **preferred** | `EMAIL_PROVIDER` (`brevo`\|`resend`\|`sendgrid`), `EMAIL_API_KEY`, `EMAIL_FROM` (a verified sender, e.g. `PGA <elections@your-domain>`) |
 | SMTP email (fallback) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
 | Africa's Talking SMS | `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID` |
 | SMS webhook | `SMS_WEBHOOK_URL`, `SMS_WEBHOOK_AUTH` |

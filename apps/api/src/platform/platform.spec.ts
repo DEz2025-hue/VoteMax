@@ -93,7 +93,7 @@ describe('Phase 2 core workflows', () => {
     await svc.addCandidate(adminId, election.id, position.id, 'Ada Kamara');
     await svc.transition(adminId, election.id, 'CONFIGURED');
     await svc.transition(adminId, election.id, 'REGISTRATION');
-    // No memberId column at all - every voter gets a generated VM- ID.
+    // No memberId column at all - every voter gets a generated PGA- ID.
     const csv = [
       'fullName,email,phone',
       'Alice Auto,alice.auto@example.org,',
@@ -103,7 +103,7 @@ describe('Phase 2 core workflows', () => {
     expect(result).toMatchObject({ eligible: 2, duplicates: 0 });
     const voters = store.voters.filter((v) => v.electionId === election.id);
     expect(voters).toHaveLength(2);
-    for (const v of voters) expect(v.memberId).toMatch(/^VM-[A-Z2-9]{8}$/);
+    for (const v of voters) expect(v.memberId).toMatch(/^PGA-[A-Z2-9]{8}$/);
     expect(new Set(voters.map((v) => v.memberId)).size).toBe(2);
     // A second batch generates IDs that do not collide with the first.
     await svc.importRegister(registrarId, election.id, 'fullName,email\nCarol Auto,carol.auto@example.org');
@@ -126,7 +126,7 @@ describe('Phase 2 core workflows', () => {
     expect(result).toMatchObject({ eligible: 2, duplicates: 0 });
     const voters = store.voters.filter((v) => v.electionId === election.id);
     expect(voters.find((v) => v.fullName === 'Alice Known')!.memberId).toBe('EMP-1042');
-    expect(voters.find((v) => v.fullName === 'Bob Blank')!.memberId).toMatch(/^VM-[A-Z2-9]{8}$/);
+    expect(voters.find((v) => v.fullName === 'Bob Blank')!.memberId).toMatch(/^PGA-[A-Z2-9]{8}$/);
   });
 
   it('enforces SoD-8 and audits the denied attempt (SoD-9)', async () => {

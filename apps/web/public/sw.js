@@ -1,4 +1,4 @@
-// VoteMax service worker (SYSTEM_ARCHITECTURE §web): static assets ONLY.
+// PGA service worker (SYSTEM_ARCHITECTURE §web): static assets ONLY.
 // Pages, API responses, ballot content, and session tokens are never cached -
 // navigations and all /api or cross-origin traffic go straight to network.
 const CACHE = 'votemax-static-v1';

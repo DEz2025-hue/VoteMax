@@ -89,7 +89,7 @@ const MEMBER_ID_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 /** Generate a member ID that is not already present in `seen` (lowercased set). */
 function generateMemberId(seen: Set<string>): string {
   for (;;) {
-    let id = 'VM-';
+    let id = 'PGA-';
     for (let i = 0; i < 8; i++) id += MEMBER_ID_ALPHABET[randomInt(MEMBER_ID_ALPHABET.length)];
     if (!seen.has(id.toLowerCase())) return id;
   }
@@ -97,7 +97,7 @@ function generateMemberId(seen: Set<string>): string {
 
 /**
  * Validate and de-duplicate an import against existing records.
- * Rows without a memberId are assigned a generated VM-XXXXXXXX ID.
+ * Rows without a memberId are assigned a generated PGA-XXXXXXXX ID.
  * Duplicates (same memberId, or same non-empty email) are never silently
  * dropped: they are stored as duplicate_unresolved (FR-VOT-002).
  */
