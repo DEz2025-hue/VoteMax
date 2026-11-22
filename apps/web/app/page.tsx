@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import ElectionAccess from '../components/election-access';
-import { Icon } from '../components/icons';
 
 const FEATURES = [
   { icon: 'users', title: 'Voter eligibility verification', text: 'Only voters on the approved register can request a ballot, confirmed through their personal voting link.' },
@@ -30,13 +29,13 @@ export default function HomePage() {
               conduct elections, manage voters, and verify election results.
             </p>
             <div className="hero-actions">
-              <Link href="/vote" className="btn btn-primary btn-lg">Vote in an Election <Icon name="arrow" size={18} /></Link>
+              <Link href="/vote" className="btn btn-primary btn-lg">Vote in an Election</Link>
               <Link href="/help" className="btn btn-secondary btn-lg">How Voting Works</Link>
             </div>
             <div className="hero-chips">
-              <span><Icon name="check" size={16} />Secret ballots</span>
-              <span><Icon name="check" size={16} />Audit trail</span>
-              <span><Icon name="check" size={16} />Emailed sign-in codes for staff</span>
+              <span>Secret ballots</span>
+              <span>Audit trail</span>
+              <span>Emailed sign-in codes for staff</span>
             </div>
           </div>
           <ElectionAccess />
@@ -57,7 +56,6 @@ export default function HomePage() {
           <div className="feature-grid">
             {FEATURES.map((f) => (
               <div key={f.title} className="feature">
-                <span className="feature-icon"><Icon name={f.icon} size={22} /></span>
                 <h3>{f.title}</h3>
                 <p>{f.text}</p>
               </div>

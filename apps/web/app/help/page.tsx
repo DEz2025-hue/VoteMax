@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Icon } from '../../components/icons';
 
 export default function HelpPage() {
   return (
@@ -15,17 +14,14 @@ export default function HelpPage() {
 
       <div className="help-cards">
         <Link href="/vote" className="help-card">
-          <span className="feature-icon"><Icon name="ballot" size={20} /></span>
           <strong>Ready to vote?</strong>
           <span>Go to the voting page and find your election.</span>
         </Link>
         <a href="#secret" className="help-card">
-          <span className="feature-icon"><Icon name="lock" size={20} /></span>
           <strong>Is my vote secret?</strong>
           <span>How your ballot is kept private.</span>
         </a>
         <a href="#trouble" className="help-card">
-          <span className="feature-icon"><Icon name="help" size={20} /></span>
           <strong>Having trouble?</strong>
           <span>Fixes for the most common problems.</span>
         </a>

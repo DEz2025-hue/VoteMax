@@ -3,14 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Field, Input } from './ui';
-import { Icon } from './icons';
 
 export default function ElectionAccess() {
   const router = useRouter();
   const [slug, setSlug] = useState('');
   return (
     <div className="access-card">
-      <span className="access-icon"><Icon name="ballot" size={22} /></span>
       <p className="eyebrow">Election access</p>
       <h2>Find your election</h2>
       <p className="muted small" style={{ marginTop: 0 }}>

@@ -850,7 +850,7 @@ export default function AdminPage() {
             <i className={`ps-dot ${election ? 'ok' : 'off'}`} />
             <span>{election ? election.name : 'No election selected'}</span>
           </div>
-          <button type="button" className="ps-signout" onClick={signOut}><Icon name="logout" /><span>Sign out</span></button>
+          <button type="button" className="ps-signout" onClick={signOut}><span>Sign out</span></button>
         </>
       }
       title={visibleSections.find((x) => x.id === activeSection)?.label}
@@ -858,7 +858,7 @@ export default function AdminPage() {
       actions={
         <>
           {election && <Badge tone={electionPill(election.state)}>{election.state}</Badge>}
-          <button type="button" className="ps-icon-btn" aria-label="Refresh all" title="Refresh all" onClick={() => void refreshAll()}><Icon name="refresh" /></button>
+          <Button size="sm" variant="secondary" onClick={() => void refreshAll()}>Refresh</Button>
         </>
       }
       after={overlays}
@@ -1065,7 +1065,7 @@ export default function AdminPage() {
                   </div>
                   {election && election.state !== 'DRAFT' && <Alert kind="info" title="Details locked">This election is {election.state} - details can only change while it is a draft.</Alert>}
                   <div className="form-actions">
-                    <Button type="submit" name="intent" value="continue" variant="primary" disabled={!orgId || !capOrg('election.configure')}>Save &amp; continue →</Button>
+                    <Button type="submit" name="intent" value="continue" variant="primary" disabled={!orgId || !capOrg('election.configure')}>Save &amp; continue</Button>
                     <Button type="submit" name="intent" value="exit" variant="secondary" disabled={!orgId || !capOrg('election.configure')}>Save &amp; exit</Button>
                   </div>
                 </form>
@@ -1171,12 +1171,12 @@ export default function AdminPage() {
                     </div>
                   ) : null}
                   <div className="form-actions" style={{ marginTop: 16 }}>
-                    <Button type="button" variant="ghost" onClick={() => goWizardStep(1)}>← Back</Button>
+                    <Button type="button" variant="ghost" onClick={() => goWizardStep(1)}>Back</Button>
                     <Button type="button" variant="primary" disabled={!electionId} onClick={() => {
                       if (election && ['DRAFT', 'CONFIGURED'].includes(election.state)) {
                         void act('Open voter registration', async () => { await advanceToRegistration(); goWizardStep(3); });
                       } else goWizardStep(3);
-                    }}>Save &amp; continue →</Button>
+                    }}>Save &amp; continue</Button>
                   </div>
                 </>
               )}
@@ -1197,15 +1197,15 @@ export default function AdminPage() {
                   )}
                   {registerImportBox}
                   <div className="form-actions" style={{ marginTop: 16 }}>
-                    <Button type="button" variant="ghost" onClick={() => goWizardStep(2)}>← Back</Button>
-                    <Button type="button" variant="primary" disabled={!electionId} onClick={() => goWizardStep(4)}>Save &amp; continue →</Button>
+                    <Button type="button" variant="ghost" onClick={() => goWizardStep(2)}>Back</Button>
+                    <Button type="button" variant="primary" disabled={!electionId} onClick={() => goWizardStep(4)}>Save &amp; continue</Button>
                   </div>
                 </>
               )}
 
               {wizardStep === 4 && election && (
                 <>
-                  <div className="result-row"><div><strong>{election.name}</strong><div className="small muted">{fmtDate(election.votingOpensAt)} → {fmtDate(election.votingClosesAt)} · {election.voteType === 'online' ? 'Online secret ballot' : election.voteType} · {election.resultsMode === 'final' ? 'Final results only' : 'Live counts'}</div></div><Badge tone={electionPill(election.state)}>{election.state}</Badge></div>
+                  <div className="result-row"><div><strong>{election.name}</strong><div className="small muted">{fmtDate(election.votingOpensAt)} to {fmtDate(election.votingClosesAt)} · {election.voteType === 'online' ? 'Online secret ballot' : election.voteType} · {election.resultsMode === 'final' ? 'Final results only' : 'Live counts'}</div></div><Badge tone={electionPill(election.state)}>{election.state}</Badge></div>
                   {election.announcement && <p className="small muted" style={{ marginTop: 8 }}>Announcement: {election.announcement}</p>}
                   <div className="stat-grid" style={{ margin: '16px 0' }}>
                     <Stat label="Positions" value={election.positions.length} />
@@ -1314,7 +1314,7 @@ export default function AdminPage() {
                   </div>
 
                   <div className="form-actions">
-                    <Button type="button" variant="ghost" onClick={() => goWizardStep(3)}>← Back</Button>
+                    <Button type="button" variant="ghost" onClick={() => goWizardStep(3)}>Back</Button>
                     <Button type="button" variant="secondary" onClick={() => { sessionStorage.removeItem('votemax.wizard'); setSection('overview'); }}>Done - back to overview</Button>
                   </div>
                 </>
@@ -1671,7 +1671,7 @@ export default function AdminPage() {
               <div className="ps-split">
                 <Panel
                   title="Current election"
-                  subtitle={election ? `${fmtDate(election.votingOpensAt)} → ${fmtDate(election.votingClosesAt)}` : undefined}
+                  subtitle={election ? `${fmtDate(election.votingOpensAt)} to ${fmtDate(election.votingClosesAt)}` : undefined}
                   actions={election ? <Badge tone={electionPill(election.state)}>{election.state}</Badge> : undefined}
                 >
                   {election ? (
@@ -1703,7 +1703,6 @@ export default function AdminPage() {
                       ['audit', 'filetext', 'Audit log', 'Review what has happened', false],
                     ] as const).filter(([id]) => visibleSections.some((x) => x.id === id)).map(([id, icon, label, hint, fresh]) => (
                       <li key={label}>
-                        <span className="ps-avatar"><Icon name={icon} size={16} /></span>
                         <div className="ps-list-main"><strong>{label}</strong><span>{hint}</span></div>
                         <button type="button" className="ps-icon-btn" aria-label={label} onClick={() => { if (fresh) startNewElection(); setSection(id); }}><Icon name="chevron" /></button>
                       </li>

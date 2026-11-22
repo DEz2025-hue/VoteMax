@@ -6,13 +6,13 @@ import { Icon } from './icons';
 /* Shared SaaS building blocks used by the platform console, the admin
    console and the auth screens. Styles live in globals.css (.ps-*, .auth-*). */
 
-export function Kpi({ icon, label, value, note, tone = 'blue' }: {
-  icon: string; label: string; value: ReactNode; note?: string;
+/** A summary figure. `icon` and `tone` are accepted for older call sites but no longer drawn. */
+export function Kpi({ label, value, note }: {
+  icon?: string; label: string; value: ReactNode; note?: string;
   tone?: 'blue' | 'navy' | 'amber' | 'green';
 }) {
   return (
     <div className="ps-kpi">
-      <span className={`ps-kpi-icon ${tone}`}><Icon name={icon} size={20} /></span>
       <div>
         <div className="ps-kpi-label">{label}</div>
         <div className="ps-kpi-value">{value}</div>
@@ -75,7 +75,6 @@ export function ConsoleShell({
               aria-current={active === s.id ? 'page' : undefined}
               onClick={() => { onSelect(s.id); setMobileNav(false); }}
             >
-              <Icon name={s.icon} />
               <span>{s.label}</span>
               {s.badge !== undefined && s.badge !== null && <em>{s.badge}</em>}
             </button>
@@ -112,9 +111,9 @@ export function AuthLayout({ eyebrow, title, lede, children, footer }: {
           <span className="ps-logo ps-logo-lg"><img src="/logo.png" alt="PGA" width={64} height={50} /></span>
           <h2>Elections your members can trust.</h2>
           <ul>
-            <li><Icon name="lock" size={18} /><span>Secret ballots - no record links a voter to a vote.</span></li>
-            <li><Icon name="shield" size={18} /><span>Tamper-evident audit trail for every action.</span></li>
-            <li><Icon name="users" size={18} /><span>Separation of duties for tally and certification.</span></li>
+            <li><span>Secret ballots - no record links a voter to a vote.</span></li>
+            <li><span>Tamper-evident audit trail for every action.</span></li>
+            <li><span>Separation of duties for tally and certification.</span></li>
           </ul>
         </div>
       </aside>

@@ -199,5 +199,5 @@ body {
 }
 .ps-logo { height: 40px; }
 .ps-logo-lg { height: auto; padding: 8px 12px; border-radius: 16px; }
-.ps-logo img { display: block; height: 100%; width: auto; max-height: 100%; }
+.ps-logo img { display: block; height: 30px; width: auto; }
 .ps-logo-lg img { height: 50px; width: auto; }

@@ -446,15 +446,15 @@ export default function PlatformPage() {
             <i className={`ps-dot ${health ? (health.store === 'memory' ? 'warn' : 'ok') : 'off'}`} />
             <span>{health ? (health.store === 'memory' ? 'In-memory store' : 'PostgreSQL connected') : 'Connecting…'}</span>
           </div>
-          <button type="button" className="ps-signout" onClick={signOut}><Icon name="logout" /><span>Sign out</span></button>
+          <button type="button" className="ps-signout" onClick={signOut}><span>Sign out</span></button>
         </>
       }
       title={showingDetail ? 'Organization' : current.title}
       description={showingDetail ? 'Staffing, elections and access for this tenant.' : current.blurb}
       actions={
         <>
-          <button type="button" className="ps-icon-btn" aria-label="Refresh data" title="Refresh" onClick={() => void refreshAll().catch(() => undefined)} disabled={loading}><Icon name="refresh" /></button>
-          <Button size="sm" onClick={() => { setSection('organizations'); setDetail(null); setDetailLoading(false); setShowNewOrg(true); }}><Icon name="plus" size={16} />New organization</Button>
+          <Button size="sm" variant="secondary" onClick={() => void refreshAll().catch(() => undefined)} disabled={loading}>Refresh</Button>
+          <Button size="sm" onClick={() => { setSection('organizations'); setDetail(null); setDetailLoading(false); setShowNewOrg(true); }}>New organization</Button>
         </>
       }
       after={overlays}
@@ -479,7 +479,6 @@ export default function PlatformPage() {
                       <ul className="ps-list">
                         {unstaffedTenants.map((t) => (
                           <li key={t.id}>
-                            <span className="ps-avatar">{initials(t.name)}</span>
                             <div className="ps-list-main"><strong>{t.name}</strong><span>{t.slug}</span></div>
                             <Button size="sm" onClick={() => void openTenant(t.id, 'provision')}>Provision owner</Button>
                           </li>
@@ -498,7 +497,6 @@ export default function PlatformPage() {
                       <ul className="ps-list ps-list-flush">
                         {recentTenants.map((t) => (
                           <li key={t.id}>
-                            <span className="ps-avatar">{initials(t.name)}</span>
                             <div className="ps-list-main"><strong>{t.name}</strong><span>{plural(t.userCount, 'user')} · {plural(t.electionCount, 'election')} · {fmtDay(t.createdAt)}</span></div>
                             {t.staffed ? <Badge tone="success">staffed</Badge> : <Badge tone="warning">unstaffed</Badge>}
                             <button type="button" className="ps-icon-btn" aria-label={`Manage ${t.name}`} onClick={() => void openTenant(t.id)}><Icon name="chevron" /></button>
@@ -551,7 +549,7 @@ export default function PlatformPage() {
               {directory === null ? <div className="ps-panel-body"><Skeleton lines={5} /></div> : directory.length === 0 ? (
                 <div className="ps-panel-body">
                   <EmptyState title="No organizations yet">Create the first organization to get started.</EmptyState>
-                  <div className="ps-center"><Button onClick={() => setShowNewOrg(true)}><Icon name="plus" size={16} />New organization</Button></div>
+                  <div className="ps-center"><Button onClick={() => setShowNewOrg(true)}>New organization</Button></div>
                 </div>
               ) : tenantRows.length === 0 ? (
                 <div className="ps-panel-body"><EmptyState title="No matching organizations">Adjust the search or filter.</EmptyState></div>
@@ -566,7 +564,6 @@ export default function PlatformPage() {
                         <tr key={t.id} onClick={() => void openTenant(t.id)}>
                           <td>
                             <div className="ps-org-cell">
-                              <span className="ps-avatar">{initials(t.name)}</span>
                               <div><strong>{t.name}</strong><span>{t.slug}</span></div>
                             </div>
                           </td>
@@ -575,7 +572,7 @@ export default function PlatformPage() {
                           <td className="num hide-sm" title={Object.entries(t.electionsByState).map(([s, n]) => `${s} ×${n}`).join(', ')}>{t.electionCount}</td>
                           <td className="hide-sm muted">{fmtDay(t.createdAt)}</td>
                           <td className="actions" onClick={(e) => e.stopPropagation()}>
-                            <button type="button" className="ps-icon-btn hide-sm" aria-label={`Copy voter link for ${t.name}`} title="Copy voter link" onClick={() => void copyVoterLink(t.slug)}><Icon name="link" /></button>
+                            <Button size="sm" variant="ghost" className="hide-sm" title="Copy voter link" onClick={() => void copyVoterLink(t.slug)}>Copy link</Button>
                             <Button size="sm" variant="secondary" onClick={() => void openTenant(t.id)}>Manage</Button>
                           </td>
                         </tr>
@@ -600,9 +597,8 @@ export default function PlatformPage() {
             detailLoading || !detail ? <Skeleton lines={6} /> : (
               <>
                 <div className="ps-detail-head">
-                  <button type="button" className="ps-back" onClick={() => { setDetail(null); }}><Icon name="back" size={16} />Organizations</button>
+                  <button type="button" className="ps-back" onClick={() => { setDetail(null); }}>Back to organizations</button>
                   <div className="ps-detail-title">
-                    <span className="ps-avatar ps-avatar-lg">{initials(detail.name)}</span>
                     <div>
                       <h2>{detail.name}</h2>
                       <p><code>{detail.slug}</code> · created {fmtDay(detail.createdAt)}</p>
@@ -610,8 +606,8 @@ export default function PlatformPage() {
                     {detail.roleAssignments.some((a) => a.role === 'organization_owner') ? <Badge tone="success">staffed</Badge> : <Badge tone="warning">unstaffed</Badge>}
                   </div>
                   <div className="ps-detail-actions">
-                    <Button size="sm" variant="secondary" onClick={() => void copyVoterLink(detail.slug)}><Icon name="link" size={16} />Copy voter link</Button>
-                    <Button size="sm" onClick={() => setDetailTab('provision')}><Icon name="key" size={16} />Provision staff</Button>
+                    <Button size="sm" variant="secondary" onClick={() => void copyVoterLink(detail.slug)}>Copy voter link</Button>
+                    <Button size="sm" onClick={() => setDetailTab('provision')}>Provision staff</Button>
                   </div>
                 </div>
 
@@ -650,7 +646,7 @@ export default function PlatformPage() {
                             <tbody>
                               {detail.users.map((u) => (
                                 <tr key={u.id}>
-                                  <td><div className="ps-org-cell"><span className="ps-avatar">{initials(u.displayName)}</span><div><strong>{u.displayName}</strong><span>{u.email}</span></div></div></td>
+                                  <td><div className="ps-org-cell"><div><strong>{u.displayName}</strong><span>{u.email}</span></div></div></td>
                                   <td>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                       <Button size="sm" variant="secondary" disabled={loading} onClick={() => setConfirm({
@@ -678,7 +674,7 @@ export default function PlatformPage() {
                           <tr key={e.id}>
                             <td><strong>{e.name}</strong></td>
                             <td><Badge tone={electionPill(e.state)}>{e.state}</Badge></td>
-                            <td className="small muted">{fmtDate(e.votingOpensAt)} → {fmtDate(e.votingClosesAt)}</td>
+                            <td className="small muted">{fmtDate(e.votingOpensAt)} to {fmtDate(e.votingClosesAt)}</td>
                           </tr>
                         ))}
                       </Table>
