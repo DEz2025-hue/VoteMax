@@ -63,7 +63,7 @@ export function ConsoleShell({
     <div className="ps-shell">
       <aside className={`ps-sidebar ${mobileNav ? 'open' : ''}`}>
         <div className="ps-side-head">
-          <span className="ps-logo">P</span>
+          <span className="ps-logo"><img src="/logo.png" alt="PGA" width={40} height={31} /></span>
           <div><strong>PGA</strong><span>{subtitle}</span></div>
         </div>
         <div className="ps-nav-label">{navLabel}</div>
@@ -109,7 +109,7 @@ export function AuthLayout({ eyebrow, title, lede, children, footer }: {
     <main className="auth-split">
       <aside className="auth-brand">
         <div className="auth-brand-inner">
-          <span className="ps-logo ps-logo-lg">P</span>
+          <span className="ps-logo ps-logo-lg"><img src="/logo.png" alt="PGA" width={64} height={50} /></span>
           <h2>Elections your members can trust.</h2>
           <ul>
             <li><Icon name="lock" size={18} /><span>Secret ballots - no record links a voter to a vote.</span></li>

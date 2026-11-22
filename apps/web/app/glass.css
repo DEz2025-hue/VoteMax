@@ -188,3 +188,16 @@ body {
   .btn, .nav-link, .choice, .input, .field input { transition: none; }
   .btn:active:not(:disabled), .choice:active { transform: none; }
 }
+
+/* ---------- logo ---------- */
+.brand-logo { display: block; height: 36px; width: auto; }
+/* On the dark sidebar and sign-in panel the black lettering needs a light tile behind it. */
+.ps-logo, .ps-logo-lg {
+  background: rgb(255 255 255 / 0.94);
+  box-shadow: 0 4px 14px rgb(15 37 71 / 0.22), inset 0 1px 0 #fff;
+  display: inline-grid; width: fit-content; padding: 4px 8px;
+}
+.ps-logo { height: 40px; }
+.ps-logo-lg { height: auto; padding: 8px 12px; border-radius: 16px; }
+.ps-logo img { display: block; height: 100%; width: auto; max-height: 100%; }
+.ps-logo-lg img { height: 50px; width: auto; }

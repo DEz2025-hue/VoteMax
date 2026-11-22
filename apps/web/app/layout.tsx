@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <header className="site-header">
           <div className="container site-header-inner">
-            <Link href="/" className="brand"><span className="brand-mark" aria-hidden="true">P</span>PGA</Link>
+            <Link href="/" className="brand" aria-label="PGA home"><img src="/logo.png" alt="PGA" className="brand-logo" width={46} height={36} /></Link>
             <SiteNav />
           </div>
         </header>
